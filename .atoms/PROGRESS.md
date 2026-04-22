@@ -18,6 +18,10 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Add interactive corner handles - blue resize handle and yellow rotate handle on building corners
 - [x] Add Paving tool with rectangle drag and free-draw modes, dimension labels, and stats integration
 - [x] Update truck court & trailer parking: cross dock per-side options, rear load single option, 130ft default → 185ft with trailer
+- [x] Site naming - prompt for name after drawing site boundary, display in header
+- [x] Auto-save to localStorage on every change
+- [x] Site management dropdown - list/load/rename/delete saved sites
+- [x] Visual save indicator near site name
 
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application

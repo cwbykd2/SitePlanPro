@@ -79,17 +79,53 @@ select option{background:var(--panel2)}
 .handle-resize,.handle-rotate{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #fff;user-select:none;line-height:1}
 .handle-resize{background:#3b82f6;color:#fff}
 .handle-rotate{background:#f59e0b;color:#fff}
+.site-name{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--accent2);cursor:pointer;padding:4px 8px;border-radius:4px;transition:background .15s;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block}
+.site-name:hover{background:var(--panel2)}
+#site-name-wrap{display:flex;align-items:center;gap:6px}
+#site-name-wrap.hidden{display:none!important}
+.save-indicator{font-family:'DM Mono',monospace;font-size:10px;color:var(--green);opacity:0;transition:opacity .3s;white-space:nowrap}
+.save-indicator.show{opacity:1}
+.save-indicator.hidden{display:none}
+.sites-dropdown-wrap{position:relative}
+.sites-dropdown{position:absolute;top:100%;right:0;margin-top:6px;background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:240px;max-height:320px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:2000;display:flex;flex-direction:column}
+.sites-dropdown.hidden{display:none!important}
+.sites-dropdown-footer{padding:8px;border-top:1px solid var(--border)}
+#sites-list{overflow-y:auto;max-height:260px;padding:6px}
+#sites-list::-webkit-scrollbar{width:4px}
+#sites-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.site-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;transition:background .15s;border:1px solid transparent}
+.site-item:hover{background:var(--panel2);border-color:var(--border)}
+.site-item.active-site{border-color:var(--accent);background:rgba(59,130,246,.08)}
+.site-item-name{flex:1;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site-item-meta{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace}
+.site-item-actions{display:flex;gap:4px}
+.site-item-actions button{padding:3px 6px;font-size:10px;min-width:0}
+.no-sites-msg{font-size:11px;color:var(--muted);text-align:center;padding:16px 12px}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">Site<span>Plan</span> Pro</div>
   <div class="toolbar-sep"></div>
+  <div id="site-name-wrap" class="hidden">
+    <span id="site-name-display" class="site-name" onclick="renameSite()"></span>
+    <span id="save-indicator" class="save-indicator hidden">Saved ✓</span>
+  </div>
+  <div class="toolbar-sep" id="site-name-sep" style="display:none"></div>
   <div class="addr-wrap">
     <input type="text" id="address-input" placeholder="Search any address, city, or place..." autocomplete="off">
     <button class="btn-primary" onclick="geocodeAddress()">Go</button>
   </div>
   <div class="toolbar-sep"></div>
+  <div class="sites-dropdown-wrap">
+    <button class="btn-ghost" id="btn-sites" onclick="toggleSitesDropdown()">📁 Sites</button>
+    <div id="sites-dropdown" class="sites-dropdown hidden">
+      <div id="sites-list"></div>
+      <div class="sites-dropdown-footer">
+        <button class="btn-ghost" onclick="newSite()" style="width:100%;font-size:11px">+ New Site</button>
+      </div>
+    </div>
+  </div>
   <button class="btn-ghost" id="btn-site" onclick="toggleSiteTool()">Draw Site</button>
   <button class="btn-ghost" id="btn-redraw-site" onclick="redrawSite()" style="display:none">Redraw Site</button>
   <button class="btn-ghost" onclick="clearAll()">Clear All</button>
@@ -1355,6 +1391,428 @@ map.on('mousemove', function(e) {
   tip.style.top = (e.originalEvent.clientY+16)+'px';
 });
 map.on('mouseup', function() { dimStart=null; document.getElementById('dim-tip').style.display='none'; });
+
+/* ===== SITE NAMING & PERSISTENCE ===== */
+
+var currentSiteName = null;
+var saveTimeout = null;
+var STORAGE_KEY = 'siteplan_pro_sites';
+
+function getSavedSites() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch(e) { return {}; }
+}
+
+function saveSitesIndex(sites) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sites));
+}
+
+function promptSiteName(isRename) {
+  var msg = isRename ? 'Rename site:' : 'Name this site:';
+  var def = currentSiteName || '';
+  var name = prompt(msg, def);
+  if (!name || !name.trim()) return null;
+  return name.trim();
+}
+
+function setSiteName(name) {
+  currentSiteName = name;
+  var wrap = document.getElementById('site-name-wrap');
+  var sep = document.getElementById('site-name-sep');
+  var display = document.getElementById('site-name-display');
+  wrap.classList.remove('hidden');
+  sep.style.display = '';
+  display.textContent = name;
+  display.title = 'Click to rename: ' + name;
+  document.title = name + ' — SitePlan Pro';
+}
+
+function clearSiteName() {
+  currentSiteName = null;
+  document.getElementById('site-name-wrap').classList.add('hidden');
+  document.getElementById('site-name-sep').style.display = 'none';
+  document.title = 'SitePlan Pro';
+}
+
+function renameSite() {
+  if (!currentSiteName) return;
+  var oldName = currentSiteName;
+  var newName = promptSiteName(true);
+  if (!newName || newName === oldName) return;
+  var sites = getSavedSites();
+  if (sites[oldName]) {
+    sites[newName] = sites[oldName];
+    sites[newName].name = newName;
+    sites[newName].updatedAt = Date.now();
+    delete sites[oldName];
+    saveSitesIndex(sites);
+  }
+  setSiteName(newName);
+  autoSave();
+  setStatus('Site renamed to "' + newName + '"');
+}
+
+/* ===== SERIALIZATION ===== */
+
+function serializeLatlngs(latlngs) {
+  if (!latlngs) return [];
+  var arr = Array.isArray(latlngs[0]) ? latlngs[0] : latlngs;
+  return arr.map(function(ll) { return { lat: ll.lat, lng: ll.lng }; });
+}
+
+function serializeSite() {
+  var data = {
+    name: currentSiteName,
+    updatedAt: Date.now(),
+    mapCenter: { lat: map.getCenter().lat, lng: map.getCenter().lng },
+    mapZoom: map.getZoom(),
+    buildings: buildings.map(function(b) {
+      return {
+        id: b.id,
+        vertices: serializeLatlngs(b.vertices),
+        type: b.type,
+        spacing: b.spacing,
+        customW: b.customW,
+        customD: b.customD,
+        trailerTop: b.trailerTop,
+        trailerBottom: b.trailerBottom,
+        trailerRear: b.trailerRear,
+        leftParking: b.leftParking,
+        rightParking: b.rightParking,
+        rotation: b.rotation,
+        scale: b.scale
+      };
+    }),
+    roads: roads.map(function(r) {
+      return serializeLatlngs(r.getLatLngs());
+    }),
+    ponds: ponds.map(function(p) {
+      var ll = p.getLatLngs();
+      return serializeLatlngs(ll[0] || ll);
+    }),
+    pavings: pavings.map(function(p) {
+      return {
+        id: p.id,
+        vertices: serializeLatlngs(p.vertices),
+        isRect: p.isRect
+      };
+    }),
+    siteBoundary: siteBoundary ? serializeLatlngs(siteBoundary.getLatLngs()[0] || siteBoundary.getLatLngs()) : null
+  };
+  return data;
+}
+
+function deserializeSite(data) {
+  // Clear current state without confirmation
+  stopDraw();
+  disableSiteEditing();
+  buildings.forEach(function(b) {
+    drawnItems.removeLayer(b.layer);
+    map.removeLayer(b.overlayGroup);
+    if (b.labelGroup) map.removeLayer(b.labelGroup);
+  });
+  roads.forEach(function(r) { drawnItems.removeLayer(r); });
+  ponds.forEach(function(p) { drawnItems.removeLayer(p); });
+  pavings.forEach(function(p) {
+    drawnItems.removeLayer(p.layer);
+    if (p.labelGroup) map.removeLayer(p.labelGroup);
+  });
+  if (siteBoundary) drawnItems.removeLayer(siteBoundary);
+  buildings = []; roads = []; ponds = []; pavings = []; siteBoundary = null; activeBuilding = null;
+  hideAllHandles();
+
+  // Restore map view
+  if (data.mapCenter && data.mapZoom) {
+    map.setView([data.mapCenter.lat, data.mapCenter.lng], data.mapZoom);
+  }
+
+  // Restore site boundary
+  if (data.siteBoundary && data.siteBoundary.length >= 3) {
+    var bVerts = data.siteBoundary.map(function(v) { return L.latLng(v.lat, v.lng); });
+    siteBoundary = L.polygon(bVerts, { color: '#a78bfa', weight: 3, dashArray: '8,4', fillColor: '#a78bfa', fillOpacity: 0.08 });
+    drawnItems.addLayer(siteBoundary);
+    enableSiteEditing();
+    updateSiteButtons();
+  }
+
+  // Restore roads
+  if (data.roads) {
+    data.roads.forEach(function(rd) {
+      var lls = rd.map(function(v) { return L.latLng(v.lat, v.lng); });
+      var polyline = L.polyline(lls, { color: 'var(--road)', weight: 6, opacity: 0.85 });
+      polyline.setStyle({ color: '#6366f1', weight: 6, opacity: 0.85 });
+      drawnItems.addLayer(polyline);
+      roads.push(polyline);
+      polyline.on('click', function() {
+        if (currentTool === 'select' && confirm('Delete this road?')) {
+          drawnItems.removeLayer(polyline);
+          roads = roads.filter(function(r) { return r !== polyline; });
+          recalcStats();
+          autoSave();
+        }
+      });
+    });
+  }
+
+  // Restore ponds
+  if (data.ponds) {
+    data.ponds.forEach(function(pd) {
+      var lls = pd.map(function(v) { return L.latLng(v.lat, v.lng); });
+      var poly = L.polygon(lls, { color: '#06b6d4', weight: 2, fillColor: '#06b6d4', fillOpacity: 0.35 });
+      drawnItems.addLayer(poly);
+      ponds.push(poly);
+      poly.on('click', function() {
+        if (currentTool === 'select' && confirm('Delete this pond?')) {
+          drawnItems.removeLayer(poly);
+          ponds = ponds.filter(function(p) { return p !== poly; });
+          recalcStats();
+          autoSave();
+        }
+      });
+    });
+  }
+
+  // Restore pavings
+  if (data.pavings) {
+    data.pavings.forEach(function(pd) {
+      var lls = pd.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+      var poly = L.polygon(lls, { color: '#10b981', weight: 2, fillColor: '#10b981', fillOpacity: 0.25 });
+      drawnItems.addLayer(poly);
+      var paving = {
+        id: pd.id || Date.now() + Math.random(),
+        layer: poly,
+        vertices: lls,
+        isRect: pd.isRect,
+        labelGroup: L.featureGroup().addTo(map)
+      };
+      pavings.push(paving);
+      poly.on('click', function() {
+        if (currentTool === 'select' && confirm('Delete this paving area?')) {
+          deletePaving(paving.id);
+          autoSave();
+        }
+      });
+      updatePavingLabels(paving);
+    });
+  }
+
+  // Restore buildings
+  if (data.buildings) {
+    data.buildings.forEach(function(bd) {
+      var verts = bd.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+      var polygon = L.polygon(verts, { color: bd.type === 'cross' ? '#f59e0b' : '#10b981', weight: 2, fillColor: bd.type === 'cross' ? '#f59e0b' : '#10b981', fillOpacity: 0.35 });
+      drawnItems.addLayer(polygon);
+
+      var bldg = {
+        id: bd.id || Date.now() + Math.random(),
+        layer: polygon,
+        vertices: verts.map(function(v) { return L.latLng(v.lat, v.lng); }),
+        baseVertices: verts.map(function(v) { return L.latLng(v.lat, v.lng); }),
+        overlayGroup: L.featureGroup().addTo(map),
+        type: bd.type || 'cross',
+        spacing: bd.spacing || '50x52',
+        customW: bd.customW || 50,
+        customD: bd.customD || 52,
+        trailerTop: bd.trailerTop || false,
+        trailerBottom: bd.trailerBottom || false,
+        trailerRear: bd.trailerRear || false,
+        leftParking: bd.leftParking || false,
+        rightParking: bd.rightParking || false,
+        rotation: bd.rotation || 0,
+        scale: bd.scale || 100,
+        labelGroup: null
+      };
+      buildings.push(bldg);
+      setupBuildingDrag(bldg);
+      updateBuildingLabels(bldg);
+      drawBuildingOverlays(bldg);
+    });
+  }
+
+  document.getElementById('building-opts-panel').classList.add('hidden');
+  updateBuildingList();
+  recalcStats();
+  updateSiteButtons();
+}
+
+/* ===== AUTO-SAVE ===== */
+
+function autoSave() {
+  if (!currentSiteName) return;
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(function() {
+    var sites = getSavedSites();
+    sites[currentSiteName] = serializeSite();
+    saveSitesIndex(sites);
+    flashSaveIndicator();
+  }, 500);
+}
+
+function flashSaveIndicator() {
+  var el = document.getElementById('save-indicator');
+  el.classList.remove('hidden');
+  el.classList.add('show');
+  setTimeout(function() { el.classList.remove('show'); }, 1500);
+}
+
+// Hook auto-save into all change events
+(function hookAutoSave() {
+  // Override recalcStats to trigger auto-save after stats update
+  var origRecalcStats = recalcStats;
+  recalcStats = function() {
+    origRecalcStats();
+    autoSave();
+  };
+})();
+
+/* ===== SITE NAME PROMPT AFTER BOUNDARY ===== */
+
+// Patch: after site boundary is drawn, prompt for name
+(function hookSiteBoundaryNaming() {
+  // Watch for site boundary creation via the draw:created event
+  // We override the existing handler by adding a post-hook
+  var origSetStatus = setStatus;
+  var lastSiteBoundaryMsg = 'Site boundary set! Drag corners to adjust, drag midpoints to add vertices.';
+  setStatus = function(msg) {
+    origSetStatus(msg);
+    if (msg === lastSiteBoundaryMsg && !currentSiteName) {
+      setTimeout(function() {
+        var name = promptSiteName(false);
+        if (name) {
+          setSiteName(name);
+          autoSave();
+          setStatus('Site "' + name + '" created and auto-saving.');
+        }
+      }, 200);
+    }
+  };
+})();
+
+/* ===== SITES DROPDOWN ===== */
+
+function toggleSitesDropdown() {
+  var dd = document.getElementById('sites-dropdown');
+  if (dd.classList.contains('hidden')) {
+    renderSitesList();
+    dd.classList.remove('hidden');
+  } else {
+    dd.classList.add('hidden');
+  }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  var wrap = document.querySelector('.sites-dropdown-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('sites-dropdown').classList.add('hidden');
+  }
+});
+
+function renderSitesList() {
+  var sites = getSavedSites();
+  var keys = Object.keys(sites).sort(function(a, b) {
+    return (sites[b].updatedAt || 0) - (sites[a].updatedAt || 0);
+  });
+  var el = document.getElementById('sites-list');
+
+  if (!keys.length) {
+    el.innerHTML = '<div class="no-sites-msg">No saved sites yet.<br>Draw a site boundary to get started.</div>';
+    return;
+  }
+
+  el.innerHTML = keys.map(function(name) {
+    var s = sites[name];
+    var isActive = name === currentSiteName;
+    var bCount = (s.buildings || []).length;
+    var date = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '';
+    return '<div class="site-item' + (isActive ? ' active-site' : '') + '" onclick="loadSite(\'' + escHtml(name) + '\')">'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="site-item-name">' + escHtml(name) + '</div>'
+      + '<div class="site-item-meta">' + bCount + ' building' + (bCount !== 1 ? 's' : '') + ' · ' + date + '</div>'
+      + '</div>'
+      + '<div class="site-item-actions">'
+      + '<button class="btn-ghost" onclick="event.stopPropagation();deleteSavedSite(\'' + escHtml(name) + '\')" title="Delete">🗑</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/'/g,'\\\'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function loadSite(name) {
+  // Unescape the name
+  name = name.replace(/\\'/g, "'");
+  var sites = getSavedSites();
+  if (!sites[name]) { setStatus('Site not found.'); return; }
+  deserializeSite(sites[name]);
+  setSiteName(name);
+  document.getElementById('sites-dropdown').classList.add('hidden');
+  setStatus('Loaded site "' + name + '"');
+}
+
+function deleteSavedSite(name) {
+  name = name.replace(/\\'/g, "'");
+  if (!confirm('Delete saved site "' + name + '"? This cannot be undone.')) return;
+  var sites = getSavedSites();
+  delete sites[name];
+  saveSitesIndex(sites);
+  if (currentSiteName === name) {
+    clearSiteName();
+  }
+  renderSitesList();
+  setStatus('Deleted site "' + name + '"');
+}
+
+function newSite() {
+  document.getElementById('sites-dropdown').classList.add('hidden');
+  if (buildings.length || roads.length || ponds.length || siteBoundary) {
+    if (!confirm('Start a new site? Current unsaved changes will be lost.')) return;
+  }
+  clearAll_noConfirm();
+  clearSiteName();
+  setStatus('Ready for a new site. Draw a site boundary to begin.');
+}
+
+function clearAll_noConfirm() {
+  stopDraw();
+  disableSiteEditing();
+  buildings.forEach(function(b) {
+    drawnItems.removeLayer(b.layer);
+    map.removeLayer(b.overlayGroup);
+    if (b.labelGroup) map.removeLayer(b.labelGroup);
+  });
+  roads.forEach(function(r) { drawnItems.removeLayer(r); });
+  ponds.forEach(function(p) { drawnItems.removeLayer(p); });
+  pavings.forEach(function(p) {
+    drawnItems.removeLayer(p.layer);
+    if (p.labelGroup) map.removeLayer(p.labelGroup);
+  });
+  if (siteBoundary) drawnItems.removeLayer(siteBoundary);
+  buildings = []; roads = []; ponds = []; pavings = []; siteBoundary = null; activeBuilding = null;
+  hideAllHandles();
+  document.getElementById('building-opts-panel').classList.add('hidden');
+  updateBuildingList();
+  recalcStats();
+  updateSiteButtons();
+  setTool('select');
+}
+
+/* ===== LOAD LAST SITE ON STARTUP ===== */
+
+(function autoLoadLastSite() {
+  var sites = getSavedSites();
+  var keys = Object.keys(sites);
+  if (!keys.length) return;
+  // Load most recently updated site
+  keys.sort(function(a, b) { return (sites[b].updatedAt || 0) - (sites[a].updatedAt || 0); });
+  var lastName = keys[0];
+  setTimeout(function() {
+    deserializeSite(sites[lastName]);
+    setSiteName(lastName);
+    setStatus('Loaded last site: "' + lastName + '"');
+  }, 300);
+})();
+
 </script>
 </body>
 </html>
