@@ -424,14 +424,13 @@ function setupBuildingDrag(bldg) {
       origVerts: bldg.vertices.map(function(v) { return L.latLng(v.lat, v.lng); }),
       origOverlayPositions: []
     };
-    // Store overlay positions
+    // Store overlay vertex positions
     bldg.overlayGroup.eachLayer(function(ol) {
-      if (ol.getBounds) {
-        var b = ol.getBounds();
+      if (ol.getLatLngs) {
+        var latlngs = ol.getLatLngs()[0] || ol.getLatLngs();
         dragState.origOverlayPositions.push({
           layer: ol,
-          ne: L.latLng(b.getNorth(), b.getEast()),
-          sw: L.latLng(b.getSouth(), b.getWest())
+          verts: latlngs.map(function(v) { return L.latLng(v.lat, v.lng); })
         });
       }
     });
@@ -463,9 +462,10 @@ function onBuildingDrag(e) {
 
   // Move overlays
   dragState.origOverlayPositions.forEach(function(op) {
-    var newSW = L.latLng(op.sw.lat + dLat, op.sw.lng + dLng);
-    var newNE = L.latLng(op.ne.lat + dLat, op.ne.lng + dLng);
-    op.layer.setBounds(L.latLngBounds(newSW, newNE));
+    var newVerts = op.verts.map(function(v) {
+      return L.latLng(v.lat + dLat, v.lng + dLng);
+    });
+    op.layer.setLatLngs([newVerts]);
   });
 }
 
