@@ -75,7 +75,8 @@ select option{background:var(--panel2)}
     <button class="btn-primary" onclick="geocodeAddress()">Go</button>
   </div>
   <div class="toolbar-sep"></div>
-  <button class="btn-ghost" onclick="toggleSiteTool()">Draw Site</button>
+  <button class="btn-ghost" id="btn-site" onclick="toggleSiteTool()">Draw Site</button>
+  <button class="btn-ghost" id="btn-redraw-site" onclick="redrawSite()" style="display:none">Redraw Site</button>
   <button class="btn-ghost" onclick="clearAll()">Clear All</button>
 </header>
 <div class="app-body">
@@ -260,12 +261,18 @@ map.on(L.Draw.Event.CREATED, function(e) {
     beginDraw('polygon', 'pond');
 
   } else if (mode === 'site') {
-    if (siteBoundary) drawnItems.removeLayer(siteBoundary);
+    if (siteBoundary) {
+      if (siteBoundary.editing) siteBoundary.editing.disable();
+      drawnItems.removeLayer(siteBoundary);
+    }
     layer.setStyle({color:'#a78bfa',weight:3,dashArray:'8,4',fillColor:'#a78bfa',fillOpacity:0.08});
     siteBoundary = layer;
     drawnItems.addLayer(layer);
+    // Enable vertex editing immediately so user can drag corners and add points
+    enableSiteEditing();
+    updateSiteButtons();
     recalcStats();
-    setStatus('Site boundary set!');
+    setStatus('Site boundary set! Drag corners to adjust, drag midpoints to add vertices.');
     setTool('select');
   }
 });
@@ -359,8 +366,83 @@ function drawBuildingOverlays(b) {
   }
 }
 
+var siteEditEnabled = false;
+
+function enableSiteEditing() {
+  if (!siteBoundary) return;
+  if (siteBoundary.editing) {
+    siteBoundary.editing.enable();
+    siteEditEnabled = true;
+  }
+  // Listen for vertex changes to recalculate stats in real-time
+  siteBoundary.off('edit');
+  siteBoundary.on('edit', function() {
+    recalcStats();
+  });
+  // Also listen for mouseup on the map to catch drag-end of vertices
+  map.off('mouseup.siteedit');
+  map.on('mouseup.siteedit', function() {
+    if (siteEditEnabled && siteBoundary) {
+      recalcStats();
+    }
+  });
+}
+
+function disableSiteEditing() {
+  if (siteBoundary && siteBoundary.editing) {
+    siteBoundary.editing.disable();
+  }
+  siteEditEnabled = false;
+  map.off('mouseup.siteedit');
+}
+
+function updateSiteButtons() {
+  var btnSite = document.getElementById('btn-site');
+  var btnRedraw = document.getElementById('btn-redraw-site');
+  if (siteBoundary) {
+    btnSite.textContent = siteEditEnabled ? 'Done Editing' : 'Edit Site';
+    btnRedraw.style.display = '';
+  } else {
+    btnSite.textContent = 'Draw Site';
+    btnRedraw.style.display = 'none';
+  }
+}
+
+function redrawSite() {
+  disableSiteEditing();
+  if (siteBoundary) {
+    drawnItems.removeLayer(siteBoundary);
+    siteBoundary = null;
+  }
+  updateSiteButtons();
+  // Start drawing a new site boundary
+  drawingMode = 'site';
+  activeDraw = new L.Draw.Polygon(map, {
+    shapeOptions:{color:'#a78bfa',weight:3,dashArray:'8,4',fillColor:'#a78bfa',fillOpacity:0.08},
+    allowIntersection:false, showArea:false
+  });
+  activeDraw.enable();
+  recalcStats();
+  setStatus('Click to draw new site boundary - double-click to finish');
+}
+
 function toggleSiteTool() {
   stopDraw();
+  // If site boundary already exists, toggle editing mode
+  if (siteBoundary) {
+    if (siteEditEnabled) {
+      disableSiteEditing();
+      updateSiteButtons();
+      recalcStats();
+      setStatus('Site editing saved. Click "Edit Site" to continue editing.');
+    } else {
+      enableSiteEditing();
+      updateSiteButtons();
+      setStatus('Site editing enabled! Drag corners to reshape, drag midpoints to add new vertices.');
+    }
+    return;
+  }
+  // No site boundary yet, draw a new one
   drawingMode = 'site';
   activeDraw = new L.Draw.Polygon(map, {
     shapeOptions:{color:'#a78bfa',weight:3,dashArray:'8,4',fillColor:'#a78bfa',fillOpacity:0.08},
@@ -476,6 +558,7 @@ document.addEventListener('keydown', function(e) {
 function clearAll() {
   if (!confirm('Clear everything?')) return;
   stopDraw();
+  disableSiteEditing();
   buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); });
   roads.forEach(function(r){ drawnItems.removeLayer(r); });
   ponds.forEach(function(p){ drawnItems.removeLayer(p); });
@@ -483,6 +566,7 @@ function clearAll() {
   buildings=[]; roads=[]; ponds=[]; siteBoundary=null; activeBuilding=null;
   document.getElementById('building-opts-panel').classList.add('hidden');
   updateBuildingList(); recalcStats();
+  updateSiteButtons();
   setStatus('Canvas cleared');
   setTool('select');
 }

@@ -12,6 +12,7 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 
 ## Task Breakdown
 - [x] Deploy uploaded SitePlan Pro HTML to the html_template
+- [x] Add editable site boundary - drag corners and add midpoints to refine parcel shape
 
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application
