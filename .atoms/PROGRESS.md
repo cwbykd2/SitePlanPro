@@ -22,6 +22,8 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Auto-save to localStorage on every change
 - [x] Site management dropdown - list/load/rename/delete saved sites
 - [x] Visual save indicator near site name
+- [x] Export PDF button - captures map view and site statistics as downloadable PDF
 
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application
+- 2026-04-22: Added PDF export feature with html2canvas + jsPDF
