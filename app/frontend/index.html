@@ -75,6 +75,9 @@ select option{background:var(--panel2)}
 .bldg-label{background:none;border:none;white-space:nowrap;pointer-events:none}
 .bldg-label-sf{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:#fff;text-shadow:0 0 6px rgba(0,0,0,.9),0 0 12px rgba(0,0,0,.7);text-align:center;pointer-events:none}
 .bldg-label-dim{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:#fbbf24;text-shadow:0 0 5px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.7);text-align:center;pointer-events:none}
+.handle-resize,.handle-rotate{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #fff;user-select:none;line-height:1}
+.handle-resize{background:#3b82f6;color:#fff}
+.handle-rotate{background:#f59e0b;color:#fff}
 </style>
 </head>
 <body>
@@ -179,7 +182,7 @@ select option{background:var(--panel2)}
                 <button class="btn-ghost" onclick="scaleActiveBuilding(1.1)">Expand</button>
               </div>
               <div style="font-size:10px;color:var(--muted);text-align:center;padding-top:4px">
-                Click &amp; drag building on map to move it
+                Drag building to move &bull; Blue ⤡ corner = resize &bull; Yellow ↻ corner = rotate
               </div>
             </div>
           </div>
@@ -357,6 +360,155 @@ function updateBuildingLabels(b) {
   L.marker(depthMid, {icon: depthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
 }
 
+/* ===== CORNER HANDLES (RESIZE & ROTATE) ===== */
+
+var resizeHandle = null;
+var rotateHandle = null;
+var handleState = null; // {type:'resize'|'rotate', bldgId, startLatLng, ...}
+
+function createHandleIcon(cls, symbol) {
+  return L.divIcon({
+    className: '',
+    html: '<div class="' + cls + '">' + symbol + '</div>',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+}
+
+function showBuildingHandles(b) {
+  hideAllHandles();
+  if (!b || b.vertices.length < 4) return;
+
+  // Resize handle at vertex[2] (bottom-right)
+  resizeHandle = L.marker(b.vertices[2], {
+    icon: createHandleIcon('handle-resize', '⤡'),
+    draggable: true,
+    zIndexOffset: 2000
+  }).addTo(map);
+
+  // Rotate handle at vertex[0] (top-left)
+  rotateHandle = L.marker(b.vertices[0], {
+    icon: createHandleIcon('handle-rotate', '↻'),
+    draggable: true,
+    zIndexOffset: 2000
+  }).addTo(map);
+
+  // --- Resize drag ---
+  resizeHandle.on('dragstart', function(e) {
+    map.dragging.disable();
+    var center = getPolygonCenter(b.vertices);
+    var startDist = center.distanceTo(b.vertices[2]);
+    handleState = {
+      type: 'resize',
+      bldgId: b.id,
+      center: center,
+      startDist: startDist,
+      origBaseVerts: b.baseVertices.map(function(v) { return L.latLng(v.lat, v.lng); }),
+      origScale: b.scale,
+      origRotation: b.rotation
+    };
+  });
+
+  resizeHandle.on('drag', function(e) {
+    if (!handleState || handleState.type !== 'resize') return;
+    var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
+    if (!bld) return;
+    var newPos = e.target.getLatLng();
+    var newDist = handleState.center.distanceTo(newPos);
+    var ratio = newDist / handleState.startDist;
+    ratio = Math.max(0.25, Math.min(4, ratio));
+    bld.scale = Math.round(handleState.origScale * ratio);
+    bld.scale = Math.max(25, Math.min(400, bld.scale));
+    applyTransformFromHandles(bld);
+  });
+
+  resizeHandle.on('dragend', function(e) {
+    map.dragging.enable();
+    var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
+    if (bld) {
+      updateTransformSliders(bld);
+      recalcStats();
+      drawBuildingOverlays(bld);
+    }
+    handleState = null;
+  });
+
+  // --- Rotate drag ---
+  rotateHandle.on('dragstart', function(e) {
+    map.dragging.disable();
+    var center = getPolygonCenter(b.vertices);
+    var startAngle = Math.atan2(
+      b.vertices[0].lat - center.lat,
+      (b.vertices[0].lng - center.lng) * Math.cos(center.lat * Math.PI / 180)
+    ) * 180 / Math.PI;
+    handleState = {
+      type: 'rotate',
+      bldgId: b.id,
+      center: center,
+      startAngle: startAngle,
+      origRotation: b.rotation
+    };
+  });
+
+  rotateHandle.on('drag', function(e) {
+    if (!handleState || handleState.type !== 'rotate') return;
+    var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
+    if (!bld) return;
+    var newPos = e.target.getLatLng();
+    var newAngle = Math.atan2(
+      newPos.lat - handleState.center.lat,
+      (newPos.lng - handleState.center.lng) * Math.cos(handleState.center.lat * Math.PI / 180)
+    ) * 180 / Math.PI;
+    var delta = newAngle - handleState.startAngle;
+    bld.rotation = handleState.origRotation + delta;
+    if (bld.rotation > 180) bld.rotation -= 360;
+    if (bld.rotation < -180) bld.rotation += 360;
+    applyTransformFromHandles(bld);
+  });
+
+  rotateHandle.on('dragend', function(e) {
+    map.dragging.enable();
+    var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
+    if (bld) {
+      updateTransformSliders(bld);
+      recalcStats();
+      drawBuildingOverlays(bld);
+    }
+    handleState = null;
+  });
+}
+
+function applyTransformFromHandles(b) {
+  var center = getPolygonCenter(b.baseVertices);
+  var scaleFactor = b.scale / 100;
+  var newVerts = b.baseVertices.map(function(v) {
+    var scaled = scalePoint(center, v, scaleFactor);
+    return rotatePoint(center, scaled, b.rotation);
+  });
+  updateBuildingPolygon(b, newVerts);
+  // Update handle positions to follow the building corners
+  if (resizeHandle && b.vertices.length >= 4) {
+    resizeHandle.setLatLng(b.vertices[2]);
+  }
+  if (rotateHandle && b.vertices.length >= 4) {
+    rotateHandle.setLatLng(b.vertices[0]);
+  }
+  updateTransformSliders(b);
+  updateBuildingList();
+}
+
+function hideAllHandles() {
+  if (resizeHandle) { map.removeLayer(resizeHandle); resizeHandle = null; }
+  if (rotateHandle) { map.removeLayer(rotateHandle); rotateHandle = null; }
+  handleState = null;
+}
+
+function refreshHandlePositions(b) {
+  if (!b || b.vertices.length < 4) return;
+  if (resizeHandle) resizeHandle.setLatLng(b.vertices[2]);
+  if (rotateHandle) rotateHandle.setLatLng(b.vertices[0]);
+}
+
 /* ===== TOOL MANAGEMENT ===== */
 
 function setTool(tool) {
@@ -365,6 +517,12 @@ function setTool(tool) {
   document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active')});
   var btn = document.getElementById('tool-' + tool);
   if (btn) btn.classList.add('active');
+  if (tool !== 'select') {
+    hideAllHandles();
+  } else if (activeBuilding) {
+    var ab = buildings.find(function(x) { return x.id === activeBuilding; });
+    if (ab) showBuildingHandles(ab);
+  }
   if (tool === 'select') {
     setStatus('Pan and zoom freely - click a building to select and drag it');
   } else if (tool === 'building') {
@@ -484,7 +642,7 @@ function registerBuilding(layer, verts) {
   showBuildingOpts();
   updateBuildingList();
   recalcStats();
-  setStatus('Building placed! Drag to move, use Transform panel to rotate/resize');
+  setStatus('Building placed! Drag to move. Use blue ⤡ handle to resize, yellow ↻ handle to rotate.');
 }
 
 function setupBuildingDrag(bldg) {
@@ -564,6 +722,7 @@ function onBuildingDragEnd(e) {
     updateTransformSliders(b);
     recalcStats();
     drawBuildingOverlays(b);
+    refreshHandlePositions(b);
   }
   dragState = null;
 }
@@ -585,6 +744,7 @@ function applyTransform(b) {
   drawBuildingOverlays(b);
   recalcStats();
   updateBuildingList();
+  refreshHandlePositions(b);
 }
 
 function onRotateSlider(val) {
@@ -653,6 +813,7 @@ function showBuildingOpts() {
   document.getElementById('chk-right').checked = b.rightParking;
   updateTransformSliders(b);
   onSpacingChange();
+  showBuildingHandles(b);
 }
 
 function selectType(type) {
@@ -892,7 +1053,7 @@ function deleteBuilding(id) {
   map.removeLayer(b.overlayGroup);
   if (b.labelGroup) map.removeLayer(b.labelGroup);
   buildings = buildings.filter(function(x){return x.id!==id});
-  if (activeBuilding===id) { activeBuilding=null; document.getElementById('building-opts-panel').classList.add('hidden'); }
+  if (activeBuilding===id) { activeBuilding=null; document.getElementById('building-opts-panel').classList.add('hidden'); hideAllHandles(); }
   updateBuildingList();
   recalcStats();
 }
@@ -949,6 +1110,7 @@ function clearAll() {
   ponds.forEach(function(p){ drawnItems.removeLayer(p); });
   if (siteBoundary) drawnItems.removeLayer(siteBoundary);
   buildings=[]; roads=[]; ponds=[]; siteBoundary=null; activeBuilding=null;
+  hideAllHandles();
   document.getElementById('building-opts-panel').classList.add('hidden');
   updateBuildingList(); recalcStats();
   updateSiteButtons();
