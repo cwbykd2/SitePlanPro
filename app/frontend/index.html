@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SitePlan Pro</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0f14;--panel:#131720;--panel2:#1a1f2e;--border:#252d40;--accent:#3b82f6;--accent2:#22d3ee;--warn:#f59e0b;--green:#10b981;--red:#ef4444;--text:#e2e8f0;--muted:#64748b;--road:#6366f1;--pond:#06b6d4}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:16px;padding:0 20px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative}
+.logo{font-size:17px;font-weight:800;letter-spacing:-0.5px;color:#fff;white-space:nowrap}
+.logo span{color:var(--accent)}
+.addr-wrap{flex:1;display:flex;gap:8px;max-width:480px}
+.addr-wrap input{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:7px 12px;border-radius:6px;outline:none;transition:border-color .2s}
+.addr-wrap input:focus{border-color:var(--accent)}
+.addr-wrap input::placeholder{color:var(--muted)}
+button{font-family:'Syne',sans-serif;font-weight:600;font-size:12px;cursor:pointer;border:none;border-radius:6px;padding:7px 14px;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#2563eb}
+.btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.toolbar-sep{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.app-body{flex:1;display:flex;overflow:hidden}
+.sidebar{width:290px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:500}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.sidebar-scroll::-webkit-scrollbar{width:4px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.section-label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px}
+.tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tool-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:6px;background:var(--panel);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;font-family:'Syne',sans-serif;font-weight:600;transition:all .15s}
+.tool-btn svg{width:20px;height:20px}
+.tool-btn:hover{border-color:var(--accent);color:var(--accent)}
+.tool-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(59,130,246,.1)}
+.tool-btn.road-tool.active{border-color:var(--road);color:var(--road);background:rgba(99,102,241,.1)}
+.tool-btn.pond-tool.active{border-color:var(--pond);color:var(--pond);background:rgba(6,182,212,.1)}
+label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px}
+select,input[type=number]{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:5px;outline:none;transition:border-color .2s}
+select:focus,input[type=number]:focus{border-color:var(--accent)}
+select option{background:var(--panel2)}
+.form-row{display:flex;gap:8px}.form-row>*{flex:1}
+.checkbox-row{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:12px;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border)}
+.checkbox-row:last-child{border-bottom:none}
+.checkbox-row input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent);cursor:pointer}
+.bldg-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:5px;font-size:11px;background:var(--panel);border:1px solid var(--border);margin-bottom:5px;cursor:pointer;transition:border-color .15s}
+.bldg-item:hover{border-color:var(--accent)}
+.bldg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.bldg-info{flex:1}.bldg-name{font-weight:600;color:var(--text)}.bldg-meta{color:var(--muted);margin-top:1px}
+.bldg-del{color:var(--muted);cursor:pointer;padding:2px 5px}.bldg-del:hover{color:var(--red)}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-box{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px}
+.stat-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:#fff;line-height:1}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:4px}
+.stat-box.accent .stat-val{color:var(--accent)}.stat-box.green .stat-val{color:var(--green)}
+.stat-box.warn .stat-val{color:var(--warn)}.stat-box.cyan .stat-val{color:var(--accent2)}
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 8px}
+.type-card{border:2px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;text-align:center;transition:all .15s}
+.type-card:hover{border-color:var(--accent)}.type-card.selected{border-color:var(--accent);background:rgba(59,130,246,.1)}
+.type-card .type-icon{font-size:20px;margin-bottom:3px}.type-card .type-name{font-size:11px;font-weight:700;color:var(--text)}
+#map{width:100%;height:100%}
+.leaflet-draw{display:none!important}
+#status-bar{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(13,15,20,.92);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:12px;color:var(--muted);pointer-events:none;z-index:900;font-family:'DM Mono',monospace;white-space:nowrap}
+#dim-tip{position:fixed;background:rgba(0,0,0,.88);border:1px solid var(--accent);color:#fff;font-family:'DM Mono',monospace;font-size:12px;padding:5px 10px;border-radius:4px;pointer-events:none;display:none;z-index:9999;white-space:nowrap}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Site<span>Plan</span> Pro</div>
+  <div class="toolbar-sep"></div>
+  <div class="addr-wrap">
+    <input type="text" id="address-input" placeholder="Search any address, city, or place..." autocomplete="off">
+    <button class="btn-primary" onclick="geocodeAddress()">Go</button>
+  </div>
+  <div class="toolbar-sep"></div>
+  <button class="btn-ghost" onclick="toggleSiteTool()">Draw Site</button>
+  <button class="btn-ghost" onclick="clearAll()">Clear All</button>
+</header>
+<div class="app-body">
+  <div class="sidebar">
+    <div class="sidebar-scroll">
+      <div>
+        <div class="section-label">Tools</div>
+        <div class="card" style="padding:8px">
+          <div class="tool-grid">
+            <button class="tool-btn active" id="tool-select" onclick="setTool('select')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 00-2-2v0a2 2 0 00-2 2v0M14 10V5a2 2 0 00-2-2v0a2 2 0 00-2 2v0m0 0V4a2 2 0 00-2-2v0a2 2 0 00-2 2v11"/><path d="M6 17l-.4 1.6A2 2 0 007.5 21h7.1a4 4 0 003.9-3.1L19 15"/></svg>
+              Pan
+            </button>
+            <button class="tool-btn" id="tool-building" onclick="setTool('building')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="15" rx="1"/><path d="M3 6l9-3 9 3"/></svg>
+              Building
+            </button>
+            <button class="tool-btn road-tool" id="tool-road" onclick="setTool('road')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16M8 20l2-16M16 20l-2-16M10 4h4"/></svg>
+              Roads
+            </button>
+            <button class="tool-btn pond-tool" id="tool-pond" onclick="setTool('pond')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="13" rx="9" ry="6"/><path d="M8 10c1-2 6-2 8 0"/></svg>
+              Pond
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="building-opts-panel" class="hidden">
+        <div class="section-label">Building Options</div>
+        <div class="card">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label>Building Type</label>
+              <div class="type-grid">
+                <div class="type-card selected" id="opt-cross" onclick="selectType('cross')"><div class="type-icon">&#x1F500;</div><div class="type-name">Cross Dock</div></div>
+                <div class="type-card" id="opt-rear" onclick="selectType('rear')"><div class="type-icon">&#x1F69B;</div><div class="type-name">Rear Load</div></div>
+              </div>
+            </div>
+            <div>
+              <label>Bay Spacing</label>
+              <select id="opt-spacing" onchange="onSpacingChange()">
+                <option value="50x52">50 x 52 ft</option>
+                <option value="50x54">50 x 54 ft</option>
+                <option value="50x56">50 x 56 ft</option>
+                <option value="custom">Custom...</option>
+              </select>
+            </div>
+            <div id="custom-dims" class="hidden">
+              <div class="form-row">
+                <div><label>Width (ft)</label><input type="number" id="opt-cw" value="50" min="10"></div>
+                <div><label>Depth (ft)</label><input type="number" id="opt-cd" value="52" min="10"></div>
+              </div>
+            </div>
+            <div>
+              <label style="margin-bottom:6px">Parking &amp; Amenities</label>
+              <div>
+                <label class="checkbox-row"><input type="checkbox" id="chk-trailer"> Trailer parking behind truck court</label>
+                <label class="checkbox-row"><input type="checkbox" id="chk-left"> Parking on left side</label>
+                <label class="checkbox-row"><input type="checkbox" id="chk-right"> Parking on right side</label>
+              </div>
+            </div>
+            <button class="btn-primary" onclick="applyBuildingOptions()" style="width:100%">Apply Options</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">Placed Buildings</div>
+        <div id="bldg-list"><div style="font-size:11px;color:var(--muted);text-align:center;padding:12px">No buildings yet - use Building tool</div></div>
+      </div>
+      <div>
+        <div class="section-label">Site Statistics</div>
+        <div class="stats-grid">
+          <div class="stat-box accent"><div class="stat-val" id="stat-bldg">0</div><div class="stat-lbl">Bldg SF</div></div>
+          <div class="stat-box green"><div class="stat-val" id="stat-paved">0</div><div class="stat-lbl">Paved SF</div></div>
+          <div class="stat-box warn"><div class="stat-val" id="stat-pond">0</div><div class="stat-lbl">Pond SF</div></div>
+          <div class="stat-box cyan"><div class="stat-val" id="stat-coverage">0%</div><div class="stat-lbl">Site Coverage</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="flex:1;position:relative;overflow:hidden">
+    <div id="map"></div>
+    <div id="status-bar">Pan and zoom freely - pick a draw tool to place elements</div>
+    <div id="dim-tip"></div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script>
+var FEET_PER_METER = 3.28084;
+var currentTool = 'select';
+var buildings = [];
+var roads = [];
+var ponds = [];
+var siteBoundary = null;
+var activeBuilding = null;
+var activeDraw = null;
+var drawingMode = null;
+var dimStart = null;
+
+var map = L.map('map', {center:[32.7767,-96.7970], zoom:14, zoomControl:true});
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {attribution:'Tiles &copy; Esri', maxZoom:19}).addTo(map);
+
+var drawnItems = L.featureGroup().addTo(map);
+
+function setTool(tool) {
+  stopDraw();
+  currentTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active')});
+  var btn = document.getElementById('tool-' + tool);
+  if (btn) btn.classList.add('active');
+  if (tool === 'select') {
+    setStatus('Pan and zoom freely - pick a draw tool to place elements');
+  } else if (tool === 'building') {
+    beginDraw('rect');
+    setStatus('Drag to draw a building rectangle');
+  } else if (tool === 'road') {
+    beginDraw('polyline');
+    setStatus('Click points to draw road - double-click to finish');
+  } else if (tool === 'pond') {
+    beginDraw('polygon', 'pond');
+    setStatus('Click points to draw pond - double-click to finish');
+  }
+}
+
+function stopDraw() {
+  if (activeDraw) { try { activeDraw.disable(); } catch(e){} activeDraw = null; }
+  drawingMode = null;
+}
+
+function beginDraw(type, mode) {
+  drawingMode = mode || type;
+  if (type === 'rect') {
+    activeDraw = new L.Draw.Rectangle(map, {shapeOptions:{color:'#f59e0b',weight:2,fillOpacity:0.3},showArea:false});
+  } else if (type === 'polyline') {
+    activeDraw = new L.Draw.Polyline(map, {shapeOptions:{color:'#6366f1',weight:5,opacity:0.85},allowIntersection:true});
+  } else if (type === 'polygon') {
+    var c = drawingMode === 'site' ? '#a78bfa' : '#06b6d4';
+    var op = drawingMode === 'site' ? 0.1 : 0.3;
+    activeDraw = new L.Draw.Polygon(map, {shapeOptions:{color:c,weight:2,fillOpacity:op},allowIntersection:false,showArea:false});
+  }
+  activeDraw.enable();
+}
+
+map.on(L.Draw.Event.CREATED, function(e) {
+  var layer = e.layer;
+  var mode = drawingMode;
+  stopDraw();
+
+  if (mode === 'rect') {
+    layer.setStyle({color:'#f59e0b',weight:2,fillColor:'#f59e0b',fillOpacity:0.35});
+    drawnItems.addLayer(layer);
+    registerBuilding(layer);
+    setTool('select');
+
+  } else if (mode === 'polyline') {
+    layer.setStyle({color:'#6366f1',weight:5,opacity:0.85});
+    drawnItems.addLayer(layer);
+    roads.push(layer);
+    layer.on('click', function() {
+      if (confirm('Delete this road?')) { drawnItems.removeLayer(layer); roads = roads.filter(function(r){return r!==layer}); recalcStats(); }
+    });
+    recalcStats();
+    setStatus('Road added - draw another or switch tools');
+    currentTool = 'road';
+    beginDraw('polyline');
+
+  } else if (mode === 'polygon') {
+    layer.setStyle({color:'#06b6d4',weight:2,fillColor:'#06b6d4',fillOpacity:0.35});
+    drawnItems.addLayer(layer);
+    ponds.push(layer);
+    layer.on('click', function() {
+      if (confirm('Delete this pond?')) { drawnItems.removeLayer(layer); ponds = ponds.filter(function(p){return p!==layer}); recalcStats(); }
+    });
+    recalcStats();
+    setStatus('Pond added - draw another or switch tools');
+    currentTool = 'pond';
+    beginDraw('polygon', 'pond');
+
+  } else if (mode === 'site') {
+    if (siteBoundary) drawnItems.removeLayer(siteBoundary);
+    layer.setStyle({color:'#a78bfa',weight:3,dashArray:'8,4',fillColor:'#a78bfa',fillOpacity:0.08});
+    siteBoundary = layer;
+    drawnItems.addLayer(layer);
+    recalcStats();
+    setStatus('Site boundary set!');
+    setTool('select');
+  }
+});
+
+function registerBuilding(layer) {
+  var id = Date.now();
+  var bldg = {
+    id:id, layer:layer,
+    overlayGroup: L.featureGroup().addTo(map),
+    type:'cross', spacing:'50x52',
+    customW:50, customD:52,
+    trailerParking:false, leftParking:false, rightParking:false
+  };
+  buildings.push(bldg);
+  activeBuilding = id;
+  layer.on('click', function() { activeBuilding = id; showBuildingOpts(); });
+  showBuildingOpts();
+  updateBuildingList();
+  recalcStats();
+  setStatus('Building placed! Configure it in the panel');
+}
+
+function showBuildingOpts() {
+  document.getElementById('building-opts-panel').classList.remove('hidden');
+  var b = buildings.find(function(x){return x.id===activeBuilding});
+  if (!b) return;
+  document.getElementById('opt-cross').classList.toggle('selected', b.type==='cross');
+  document.getElementById('opt-rear').classList.toggle('selected', b.type==='rear');
+  document.getElementById('opt-spacing').value = b.spacing;
+  document.getElementById('opt-cw').value = b.customW;
+  document.getElementById('opt-cd').value = b.customD;
+  document.getElementById('chk-trailer').checked = b.trailerParking;
+  document.getElementById('chk-left').checked = b.leftParking;
+  document.getElementById('chk-right').checked = b.rightParking;
+  onSpacingChange();
+}
+
+function selectType(type) {
+  document.getElementById('opt-cross').classList.toggle('selected', type==='cross');
+  document.getElementById('opt-rear').classList.toggle('selected', type==='rear');
+}
+
+function onSpacingChange() {
+  document.getElementById('custom-dims').classList.toggle('hidden',
+    document.getElementById('opt-spacing').value !== 'custom');
+}
+
+function applyBuildingOptions() {
+  var b = buildings.find(function(x){return x.id===activeBuilding});
+  if (!b) return;
+  b.type = document.getElementById('opt-cross').classList.contains('selected') ? 'cross' : 'rear';
+  b.spacing = document.getElementById('opt-spacing').value;
+  b.customW = parseFloat(document.getElementById('opt-cw').value) || 50;
+  b.customD = parseFloat(document.getElementById('opt-cd').value) || 52;
+  b.trailerParking = document.getElementById('chk-trailer').checked;
+  b.leftParking = document.getElementById('chk-left').checked;
+  b.rightParking = document.getElementById('chk-right').checked;
+  var color = b.type === 'cross' ? '#f59e0b' : '#10b981';
+  b.layer.setStyle({color:color, fillColor:color, fillOpacity:0.35});
+  drawBuildingOverlays(b);
+  updateBuildingList();
+  recalcStats();
+  setStatus('Options applied!');
+}
+
+function drawBuildingOverlays(b) {
+  b.overlayGroup.clearLayers();
+  var bounds = b.layer.getBounds();
+  var N=bounds.getNorth(), S=bounds.getSouth(), E=bounds.getEast(), W=bounds.getWest();
+  var lat = (N+S)/2;
+  var ftLat = 1/(111320*FEET_PER_METER);
+  var ftLng = 1/(111320*Math.cos(lat*Math.PI/180)*FEET_PER_METER);
+  var TRUCK=130, PARK=62, TRAIL=60;
+  function addR(latN,latS,lngW,lngE,color,op) {
+    L.rectangle([[latS,lngW],[latN,lngE]],{color:color,weight:1,fillColor:color,fillOpacity:op,interactive:false}).addTo(b.overlayGroup);
+  }
+  if (b.type === 'rear') {
+    addR(S, S-TRUCK*ftLat, W, E, '#fbbf24', 0.2);
+    if (b.trailerParking) addR(S-TRUCK*ftLat, S-(TRUCK+TRAIL)*ftLat, W, E, '#f97316', 0.18);
+    if (b.leftParking) addR(N, S, W-PARK*ftLng, W, '#60a5fa', 0.2);
+    if (b.rightParking) addR(N, S, E, E+PARK*ftLng, '#60a5fa', 0.2);
+  } else {
+    addR(N, N+TRUCK*ftLat, W, E, '#fbbf24', 0.2);
+    addR(S-TRUCK*ftLat, S, W, E, '#fbbf24', 0.2);
+    if (b.trailerParking) {
+      addR(N+TRUCK*ftLat, N+(TRUCK+TRAIL)*ftLat, W, E, '#f97316', 0.18);
+      addR(S-(TRUCK+TRAIL)*ftLat, S-TRUCK*ftLat, W, E, '#f97316', 0.18);
+    }
+    if (b.leftParking) addR(N, S, W-PARK*ftLng, W, '#60a5fa', 0.2);
+    if (b.rightParking) addR(N, S, E, E+PARK*ftLng, '#60a5fa', 0.2);
+  }
+}
+
+function toggleSiteTool() {
+  stopDraw();
+  drawingMode = 'site';
+  activeDraw = new L.Draw.Polygon(map, {
+    shapeOptions:{color:'#a78bfa',weight:3,dashArray:'8,4',fillColor:'#a78bfa',fillOpacity:0.08},
+    allowIntersection:false, showArea:false
+  });
+  activeDraw.enable();
+  setStatus('Click to draw site boundary - double-click to finish');
+}
+
+function areaSF(layer) {
+  try { return turf.area(layer.toGeoJSON()) * FEET_PER_METER * FEET_PER_METER; } catch(e) { return 0; }
+}
+
+function recalcStats() {
+  var bldgSF=0, pavedSF=0, pondSF=0, siteSF=0;
+  buildings.forEach(function(b) {
+    bldgSF += areaSF(b.layer);
+    b.overlayGroup.eachLayer(function(o){ pavedSF += areaSF(o); });
+  });
+  roads.forEach(function(r) {
+    var pts = r.getLatLngs(), len=0;
+    for (var i=0;i<pts.length-1;i++) len+=pts[i].distanceTo(pts[i+1]);
+    pavedSF += len*FEET_PER_METER*30;
+  });
+  ponds.forEach(function(p){ pondSF += areaSF(p); });
+  if (siteBoundary) siteSF = areaSF(siteBoundary);
+  var cov = siteSF>0 ? Math.min(100,(bldgSF+pavedSF)/siteSF*100) : 0;
+  document.getElementById('stat-bldg').textContent = fmt(bldgSF);
+  document.getElementById('stat-paved').textContent = fmt(pavedSF);
+  document.getElementById('stat-pond').textContent = fmt(pondSF);
+  document.getElementById('stat-coverage').textContent = cov.toFixed(1)+'%';
+}
+
+function fmt(n) {
+  if (n>=1e6) return (n/1e6).toFixed(2)+'M';
+  if (n>=1e3) return (n/1e3).toFixed(1)+'K';
+  return Math.round(n).toLocaleString();
+}
+
+function updateBuildingList() {
+  var el = document.getElementById('bldg-list');
+  if (!buildings.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:12px">No buildings yet - use Building tool</div>';
+    return;
+  }
+  el.innerHTML = buildings.map(function(b,i) {
+    var color = b.type==='cross'?'#f59e0b':'#10b981';
+    var label = b.type==='cross'?'Cross Dock':'Rear Load';
+    return '<div class="bldg-item" onclick="selectBuilding('+b.id+')">'
+      +'<div class="bldg-dot" style="background:'+color+'"></div>'
+      +'<div class="bldg-info"><div class="bldg-name">Building '+(i+1)+'</div>'
+      +'<div class="bldg-meta">'+label+' &middot; '+fmt(areaSF(b.layer))+' SF</div></div>'
+      +'<span class="bldg-del" onclick="event.stopPropagation();deleteBuilding('+b.id+')">&#x2715;</span>'
+      +'</div>';
+  }).join('');
+}
+
+function selectBuilding(id) {
+  activeBuilding = id;
+  showBuildingOpts();
+  var b = buildings.find(function(x){return x.id===id});
+  if (b) map.fitBounds(b.layer.getBounds(), {padding:[60,60]});
+}
+
+function deleteBuilding(id) {
+  var b = buildings.find(function(x){return x.id===id});
+  if (!b) return;
+  drawnItems.removeLayer(b.layer);
+  map.removeLayer(b.overlayGroup);
+  buildings = buildings.filter(function(x){return x.id!==id});
+  if (activeBuilding===id) { activeBuilding=null; document.getElementById('building-opts-panel').classList.add('hidden'); }
+  updateBuildingList();
+  recalcStats();
+}
+
+function geocodeAddress() {
+  var addr = document.getElementById('address-input').value.trim();
+  if (!addr) return;
+  setStatus('Searching...');
+  fetch('https://photon.komoot.io/api/?q=' + encodeURIComponent(addr) + '&limit=1&lang=en')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.features && data.features.length > 0) {
+        var f = data.features[0];
+        var lon = f.geometry.coordinates[0];
+        var lat = f.geometry.coordinates[1];
+        var parts = [f.properties.name, f.properties.city, f.properties.state, f.properties.country];
+        var name = parts.filter(Boolean).join(', ');
+        if (f.properties.extent) {
+          var ex = f.properties.extent;
+          map.fitBounds([[ex[1],ex[0]],[ex[3],ex[2]]]);
+        } else {
+          map.setView([lat, lon], 15);
+        }
+        setStatus('Found: ' + name);
+      } else {
+        setStatus('Not found - try a more specific address');
+      }
+    })
+    .catch(function(err) {
+      console.error('Geocode error:', err);
+      setStatus('Search failed - check your internet connection');
+    });
+}
+
+document.getElementById('address-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') geocodeAddress();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') setTool('select');
+});
+
+function clearAll() {
+  if (!confirm('Clear everything?')) return;
+  stopDraw();
+  buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); });
+  roads.forEach(function(r){ drawnItems.removeLayer(r); });
+  ponds.forEach(function(p){ drawnItems.removeLayer(p); });
+  if (siteBoundary) drawnItems.removeLayer(siteBoundary);
+  buildings=[]; roads=[]; ponds=[]; siteBoundary=null; activeBuilding=null;
+  document.getElementById('building-opts-panel').classList.add('hidden');
+  updateBuildingList(); recalcStats();
+  setStatus('Canvas cleared');
+  setTool('select');
+}
+
+function setStatus(msg) { document.getElementById('status-bar').textContent = msg; }
+
+map.on('mousedown', function(e) { if (currentTool==='building') dimStart = e.latlng; });
+map.on('mousemove', function(e) {
+  var tip = document.getElementById('dim-tip');
+  if (!dimStart || currentTool!=='building') { tip.style.display='none'; return; }
+  var dLat = Math.abs(e.latlng.lat - dimStart.lat);
+  var dLng = Math.abs(e.latlng.lng - dimStart.lng);
+  var lat = (e.latlng.lat + dimStart.lat)/2;
+  var wFt = Math.round(dLng*111320*Math.cos(lat*Math.PI/180)*FEET_PER_METER);
+  var hFt = Math.round(dLat*111320*FEET_PER_METER);
+  if (wFt<2 && hFt<2) { tip.style.display='none'; return; }
+  tip.textContent = wFt+' ft x '+hFt+' ft  |  '+fmt(wFt*hFt)+' SF';
+  tip.style.display = 'block';
+  tip.style.left = (e.originalEvent.clientX+16)+'px';
+  tip.style.top = (e.originalEvent.clientY+16)+'px';
+});
+map.on('mouseup', function() { dimStart=null; document.getElementById('dim-tip').style.display='none'; });
+</script>
+</body>
+</html>
