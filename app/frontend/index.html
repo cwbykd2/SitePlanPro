@@ -72,6 +72,9 @@ select option{background:var(--panel2)}
 .transform-row .val-display{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);min-width:42px;text-align:right}
 .transform-btn-row{display:flex;gap:6px;flex-wrap:wrap}
 .transform-btn-row button{flex:1;min-width:0;padding:6px 8px;font-size:11px}
+.bldg-label{background:none;border:none;white-space:nowrap;pointer-events:none}
+.bldg-label-sf{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:#fff;text-shadow:0 0 6px rgba(0,0,0,.9),0 0 12px rgba(0,0,0,.7);text-align:center;pointer-events:none}
+.bldg-label-dim{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:#fbbf24;text-shadow:0 0 5px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.7);text-align:center;pointer-events:none}
 </style>
 </head>
 <body>
@@ -277,6 +280,81 @@ function rectToVerts(bounds) {
 function updateBuildingPolygon(b, newVerts) {
   b.vertices = newVerts.map(function(v) { return L.latLng(v.lat, v.lng); });
   b.layer.setLatLngs([b.vertices]);
+  updateBuildingLabels(b);
+}
+
+/* ===== BUILDING DIMENSION LABELS ===== */
+
+function getBuildingDimensions(verts) {
+  // verts is an array of 4 LatLng points forming the building polygon
+  // Calculate width (distance between first two vertices) and depth (distance between second and third)
+  if (verts.length < 4) return { width: 0, depth: 0, sf: 0 };
+  var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
+  var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
+  // Width is the longer side, depth is the shorter
+  var w = Math.round(Math.max(d01, d12));
+  var d = Math.round(Math.min(d01, d12));
+  var sf = w * d;
+  return { width: w, depth: d, sf: sf, edgeW: d01 > d12 ? 0 : 1 };
+}
+
+function getMidpoint(a, b) {
+  return L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
+}
+
+function updateBuildingLabels(b) {
+  if (!b.labelGroup) {
+    b.labelGroup = L.featureGroup().addTo(map);
+  }
+  b.labelGroup.clearLayers();
+
+  var verts = b.vertices;
+  if (verts.length < 4) return;
+
+  var dims = getBuildingDimensions(verts);
+  var center = getPolygonCenter(verts);
+
+  // SF label in center
+  var sfText = dims.sf >= 1e6 ? (dims.sf / 1e6).toFixed(2) + 'M SF' :
+               dims.sf >= 1e3 ? (dims.sf / 1e3).toFixed(1) + 'K SF' :
+               Math.round(dims.sf).toLocaleString() + ' SF';
+  var sfIcon = L.divIcon({
+    className: 'bldg-label',
+    html: '<div class="bldg-label-sf">' + sfText + '</div>',
+    iconSize: [120, 20],
+    iconAnchor: [60, 10]
+  });
+  L.marker(center, {icon: sfIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
+
+  // Width label along the wider edge (top edge: verts[0] to verts[1])
+  var widthEdgeIdx = dims.edgeW === 0 ? 0 : 1;
+  var widthMid, depthMid;
+
+  if (widthEdgeIdx === 0) {
+    // Width along edge 0-1 (top), depth along edge 1-2 (right side)
+    widthMid = getMidpoint(verts[0], verts[1]);
+    depthMid = getMidpoint(verts[1], verts[2]);
+  } else {
+    // Width along edge 1-2 (right side), depth along edge 0-1 (top)
+    widthMid = getMidpoint(verts[1], verts[2]);
+    depthMid = getMidpoint(verts[0], verts[1]);
+  }
+
+  var widthIcon = L.divIcon({
+    className: 'bldg-label',
+    html: '<div class="bldg-label-dim">' + dims.width + ' ft</div>',
+    iconSize: [80, 16],
+    iconAnchor: [40, 8]
+  });
+  L.marker(widthMid, {icon: widthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
+
+  var depthIcon = L.divIcon({
+    className: 'bldg-label',
+    html: '<div class="bldg-label-dim">' + dims.depth + ' ft</div>',
+    iconSize: [80, 16],
+    iconAnchor: [40, 8]
+  });
+  L.marker(depthMid, {icon: depthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
 }
 
 /* ===== TOOL MANAGEMENT ===== */
@@ -400,6 +478,9 @@ function registerBuilding(layer, verts) {
   // Setup drag on the building layer
   setupBuildingDrag(bldg);
 
+  // Show dimension labels
+  updateBuildingLabels(bldg);
+
   showBuildingOpts();
   updateBuildingList();
   recalcStats();
@@ -456,16 +537,16 @@ function onBuildingDrag(e) {
   var dLat = e.latlng.lat - dragState.startLatLng.lat;
   var dLng = e.latlng.lng - dragState.startLatLng.lng;
 
-  // Move building vertices
+  // Move building vertices (this also updates labels via updateBuildingPolygon)
   var newVerts = translateVerts(dragState.origVerts, dLat, dLng);
   updateBuildingPolygon(b, newVerts);
 
   // Move overlays
   dragState.origOverlayPositions.forEach(function(op) {
-    var newVerts = op.verts.map(function(v) {
+    var movedVerts = op.verts.map(function(v) {
       return L.latLng(v.lat + dLat, v.lng + dLng);
     });
-    op.layer.setLatLngs([newVerts]);
+    op.layer.setLatLngs([movedVerts]);
   });
 }
 
@@ -809,6 +890,7 @@ function deleteBuilding(id) {
   if (!b) return;
   drawnItems.removeLayer(b.layer);
   map.removeLayer(b.overlayGroup);
+  if (b.labelGroup) map.removeLayer(b.labelGroup);
   buildings = buildings.filter(function(x){return x.id!==id});
   if (activeBuilding===id) { activeBuilding=null; document.getElementById('building-opts-panel').classList.add('hidden'); }
   updateBuildingList();
@@ -862,7 +944,7 @@ function clearAll() {
   if (!confirm('Clear everything?')) return;
   stopDraw();
   disableSiteEditing();
-  buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); });
+  buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); if (b.labelGroup) map.removeLayer(b.labelGroup); });
   roads.forEach(function(r){ drawnItems.removeLayer(r); });
   ponds.forEach(function(p){ drawnItems.removeLayer(p); });
   if (siteBoundary) drawnItems.removeLayer(siteBoundary);
