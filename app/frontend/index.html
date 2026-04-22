@@ -151,11 +151,20 @@ select option{background:var(--panel2)}
               </div>
             </div>
             <div>
-              <label style="margin-bottom:6px">Parking &amp; Amenities</label>
+              <label style="margin-bottom:6px">Truck Court &amp; Parking</label>
               <div>
-                <label class="checkbox-row"><input type="checkbox" id="chk-trailer"> Trailer parking behind truck court</label>
+                <div id="cross-trailer-opts">
+                  <label class="checkbox-row"><input type="checkbox" id="chk-trailer-top"> Trailer parking — top side (130→185 ft)</label>
+                  <label class="checkbox-row"><input type="checkbox" id="chk-trailer-bottom"> Trailer parking — bottom side (130→185 ft)</label>
+                </div>
+                <div id="rear-trailer-opts" class="hidden">
+                  <label class="checkbox-row"><input type="checkbox" id="chk-trailer-rear"> Trailer parking (130→185 ft)</label>
+                </div>
                 <label class="checkbox-row"><input type="checkbox" id="chk-left"> Parking on left side</label>
                 <label class="checkbox-row"><input type="checkbox" id="chk-right"> Parking on right side</label>
+              </div>
+              <div style="font-size:10px;color:var(--muted);padding-top:4px">
+                Default truck court: 130 ft &bull; With trailer parking: 185 ft
               </div>
             </div>
             <button class="btn-primary" onclick="applyBuildingOptions()" style="width:100%">Apply Options</button>
@@ -666,7 +675,9 @@ function registerBuilding(layer, verts) {
     spacing: '50x52',
     customW: 50,
     customD: 52,
-    trailerParking: false,
+    trailerTop: false,
+    trailerBottom: false,
+    trailerRear: false,
     leftParking: false,
     rightParking: false,
     rotation: 0,
@@ -850,17 +861,26 @@ function showBuildingOpts() {
   document.getElementById('opt-spacing').value = b.spacing;
   document.getElementById('opt-cw').value = b.customW;
   document.getElementById('opt-cd').value = b.customD;
-  document.getElementById('chk-trailer').checked = b.trailerParking;
+  document.getElementById('chk-trailer-top').checked = b.trailerTop;
+  document.getElementById('chk-trailer-bottom').checked = b.trailerBottom;
+  document.getElementById('chk-trailer-rear').checked = b.trailerRear;
   document.getElementById('chk-left').checked = b.leftParking;
   document.getElementById('chk-right').checked = b.rightParking;
+  updateTrailerOpts(b.type);
   updateTransformSliders(b);
   onSpacingChange();
   showBuildingHandles(b);
 }
 
+function updateTrailerOpts(type) {
+  document.getElementById('cross-trailer-opts').classList.toggle('hidden', type !== 'cross');
+  document.getElementById('rear-trailer-opts').classList.toggle('hidden', type !== 'rear');
+}
+
 function selectType(type) {
   document.getElementById('opt-cross').classList.toggle('selected', type==='cross');
   document.getElementById('opt-rear').classList.toggle('selected', type==='rear');
+  updateTrailerOpts(type);
 }
 
 function onSpacingChange() {
@@ -875,7 +895,9 @@ function applyBuildingOptions() {
   b.spacing = document.getElementById('opt-spacing').value;
   b.customW = parseFloat(document.getElementById('opt-cw').value) || 50;
   b.customD = parseFloat(document.getElementById('opt-cd').value) || 52;
-  b.trailerParking = document.getElementById('chk-trailer').checked;
+  b.trailerTop = document.getElementById('chk-trailer-top').checked;
+  b.trailerBottom = document.getElementById('chk-trailer-bottom').checked;
+  b.trailerRear = document.getElementById('chk-trailer-rear').checked;
   b.leftParking = document.getElementById('chk-left').checked;
   b.rightParking = document.getElementById('chk-right').checked;
   var color = b.type === 'cross' ? '#f59e0b' : '#10b981';
@@ -910,7 +932,9 @@ function drawBuildingOverlays(b) {
   var lat = (minLat + maxLat) / 2;
   var ftLat = 1 / (111320 * FEET_PER_METER);
   var ftLng = 1 / (111320 * Math.cos(lat * Math.PI / 180) * FEET_PER_METER);
-  var TRUCK = 130, PARK = 62, TRAIL = 60;
+  var TRUCK_DEFAULT = 130; // Default truck court depth in feet
+  var TRUCK_EXTENDED = 185; // Extended truck court with trailer parking
+  var PARK = 62;
 
   // Scale the base bounds
   var N = baseCenter.lat + (maxLat - baseCenter.lat) * scaleFactor;
@@ -919,14 +943,12 @@ function drawBuildingOverlays(b) {
   var W = baseCenter.lng + (minLng - baseCenter.lng) * scaleFactor;
 
   function addRotatedRect(latN, latS, lngW, lngE, color, op) {
-    // Create rectangle corners in unrotated space, then rotate them
     var corners = [
       L.latLng(latN, lngW),
       L.latLng(latN, lngE),
       L.latLng(latS, lngE),
       L.latLng(latS, lngW)
     ];
-    // Rotate around the building center
     var rotated = corners.map(function(c) {
       return rotatePoint(center, c, b.rotation);
     });
@@ -934,16 +956,27 @@ function drawBuildingOverlays(b) {
   }
 
   if (b.type === 'rear') {
-    addRotatedRect(S, S - TRUCK * ftLat, W, E, '#fbbf24', 0.2);
-    if (b.trailerParking) addRotatedRect(S - TRUCK * ftLat, S - (TRUCK + TRAIL) * ftLat, W, E, '#f97316', 0.18);
+    // Rear load: truck court on one side (south/bottom)
+    var rearDepth = b.trailerRear ? TRUCK_EXTENDED : TRUCK_DEFAULT;
+    // Base truck court (130ft) always shown in yellow
+    addRotatedRect(S, S - TRUCK_DEFAULT * ftLat, W, E, '#fbbf24', 0.2);
+    // If trailer parking enabled, show the extra 55ft (130→185) in orange
+    if (b.trailerRear) {
+      addRotatedRect(S - TRUCK_DEFAULT * ftLat, S - TRUCK_EXTENDED * ftLat, W, E, '#f97316', 0.18);
+    }
     if (b.leftParking) addRotatedRect(N, S, W - PARK * ftLng, W, '#60a5fa', 0.2);
     if (b.rightParking) addRotatedRect(N, S, E, E + PARK * ftLng, '#60a5fa', 0.2);
   } else {
-    addRotatedRect(N, N + TRUCK * ftLat, W, E, '#fbbf24', 0.2);
-    addRotatedRect(S - TRUCK * ftLat, S, W, E, '#fbbf24', 0.2);
-    if (b.trailerParking) {
-      addRotatedRect(N + TRUCK * ftLat, N + (TRUCK + TRAIL) * ftLat, W, E, '#f97316', 0.18);
-      addRotatedRect(S - (TRUCK + TRAIL) * ftLat, S - TRUCK * ftLat, W, E, '#f97316', 0.18);
+    // Cross dock: truck court on both sides (top and bottom)
+    // Top side (north)
+    addRotatedRect(N, N + TRUCK_DEFAULT * ftLat, W, E, '#fbbf24', 0.2);
+    if (b.trailerTop) {
+      addRotatedRect(N + TRUCK_DEFAULT * ftLat, N + TRUCK_EXTENDED * ftLat, W, E, '#f97316', 0.18);
+    }
+    // Bottom side (south)
+    addRotatedRect(S - TRUCK_DEFAULT * ftLat, S, W, E, '#fbbf24', 0.2);
+    if (b.trailerBottom) {
+      addRotatedRect(S - TRUCK_EXTENDED * ftLat, S - TRUCK_DEFAULT * ftLat, W, E, '#f97316', 0.18);
     }
     if (b.leftParking) addRotatedRect(N, S, W - PARK * ftLng, W, '#60a5fa', 0.2);
     if (b.rightParking) addRotatedRect(N, S, E, E + PARK * ftLng, '#60a5fa', 0.2);
