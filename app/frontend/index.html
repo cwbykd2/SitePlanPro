@@ -36,6 +36,7 @@ button{font-family:'Syne',sans-serif;font-weight:600;font-size:12px;cursor:point
 .tool-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(59,130,246,.1)}
 .tool-btn.road-tool.active{border-color:var(--road);color:var(--road);background:rgba(99,102,241,.1)}
 .tool-btn.pond-tool.active{border-color:var(--pond);color:var(--pond);background:rgba(6,182,212,.1)}
+.tool-btn.paving-tool.active{border-color:var(--green);color:var(--green);background:rgba(16,185,129,.1)}
 label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px}
 select,input[type=number]{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:5px;outline:none;transition:border-color .2s}
 select:focus,input[type=number]:focus{border-color:var(--accent)}
@@ -116,6 +117,10 @@ select option{background:var(--panel2)}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="13" rx="9" ry="6"/><path d="M8 10c1-2 6-2 8 0"/></svg>
               Pond
             </button>
+            <button class="tool-btn paving-tool" id="tool-paving" onclick="setTool('paving')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="1"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="2" y1="16" x2="22" y2="16"/><line x1="8" y1="4" x2="8" y2="10"/><line x1="15" y1="10" x2="15" y2="16"/><line x1="8" y1="16" x2="8" y2="20"/></svg>
+              Paving
+            </button>
           </div>
         </div>
       </div>
@@ -188,6 +193,23 @@ select option{background:var(--panel2)}
           </div>
         </div>
       </div>
+      <div id="paving-opts-panel" class="hidden">
+        <div class="section-label">Paving Options</div>
+        <div class="card">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <label>Draw Mode</label>
+              <div class="type-grid">
+                <div class="type-card selected" id="pave-mode-rect" onclick="setPavingMode('rect')"><div class="type-icon">▭</div><div class="type-name">Rectangle</div></div>
+                <div class="type-card" id="pave-mode-free" onclick="setPavingMode('free')"><div class="type-icon">✎</div><div class="type-name">Free Draw</div></div>
+              </div>
+            </div>
+            <div style="font-size:10px;color:var(--muted);text-align:center">
+              Rectangle: drag to draw &bull; Free Draw: click points, double-click to finish
+            </div>
+          </div>
+        </div>
+      </div>
       <div>
         <div class="section-label">Placed Buildings</div>
         <div id="bldg-list"><div style="font-size:11px;color:var(--muted);text-align:center;padding:12px">No buildings yet - use Building tool</div></div>
@@ -218,6 +240,8 @@ var currentTool = 'select';
 var buildings = [];
 var roads = [];
 var ponds = [];
+var pavings = [];
+var pavingMode = 'rect'; // 'rect' or 'free'
 var siteBoundary = null;
 var activeBuilding = null;
 var activeDraw = null;
@@ -523,6 +547,9 @@ function setTool(tool) {
     var ab = buildings.find(function(x) { return x.id === activeBuilding; });
     if (ab) showBuildingHandles(ab);
   }
+  // Show/hide paving options panel
+  document.getElementById('paving-opts-panel').classList.toggle('hidden', tool !== 'paving');
+
   if (tool === 'select') {
     setStatus('Pan and zoom freely - click a building to select and drag it');
   } else if (tool === 'building') {
@@ -534,6 +561,8 @@ function setTool(tool) {
   } else if (tool === 'pond') {
     beginDraw('polygon', 'pond');
     setStatus('Click points to draw pond - double-click to finish');
+  } else if (tool === 'paving') {
+    beginPavingDraw();
   }
 }
 
@@ -593,6 +622,19 @@ map.on(L.Draw.Event.CREATED, function(e) {
     setStatus('Pond added - draw another or switch tools');
     currentTool = 'pond';
     beginDraw('polygon', 'pond');
+
+  } else if (mode === 'paving-rect') {
+    drawnItems.addLayer(layer);
+    registerPaving(layer, true);
+    currentTool = 'paving';
+    beginPavingDraw();
+
+  } else if (mode === 'paving-free') {
+    layer.setStyle({color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:0.25});
+    drawnItems.addLayer(layer);
+    registerPaving(layer, false);
+    currentTool = 'paving';
+    beginPavingDraw();
 
   } else if (mode === 'site') {
     if (siteBoundary) {
@@ -908,6 +950,135 @@ function drawBuildingOverlays(b) {
   }
 }
 
+/* ===== PAVING MANAGEMENT ===== */
+
+function setPavingMode(mode) {
+  pavingMode = mode;
+  document.getElementById('pave-mode-rect').classList.toggle('selected', mode === 'rect');
+  document.getElementById('pave-mode-free').classList.toggle('selected', mode === 'free');
+  if (currentTool === 'paving') {
+    stopDraw();
+    beginPavingDraw();
+  }
+}
+
+function beginPavingDraw() {
+  if (pavingMode === 'rect') {
+    drawingMode = 'paving-rect';
+    activeDraw = new L.Draw.Rectangle(map, {shapeOptions:{color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:0.25},showArea:false});
+    activeDraw.enable();
+    setStatus('Drag to draw a paving rectangle - shows dimensions as you draw');
+  } else {
+    drawingMode = 'paving-free';
+    activeDraw = new L.Draw.Polygon(map, {shapeOptions:{color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:0.25},allowIntersection:false,showArea:false});
+    activeDraw.enable();
+    setStatus('Click points to draw paving area - double-click to finish');
+  }
+}
+
+function registerPaving(layer, isRect) {
+  var id = Date.now();
+  var verts;
+  if (isRect) {
+    var bounds = layer.getBounds();
+    verts = rectToVerts(bounds);
+    // Replace rectangle with polygon for consistency
+    var polygon = L.polygon(verts, {color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:0.25});
+    drawnItems.removeLayer(layer);
+    drawnItems.addLayer(polygon);
+    layer = polygon;
+  } else {
+    verts = layer.getLatLngs()[0] || layer.getLatLngs();
+    verts = verts.map(function(v) { return L.latLng(v.lat, v.lng); });
+  }
+
+  var paving = {
+    id: id,
+    layer: layer,
+    vertices: verts,
+    isRect: isRect,
+    labelGroup: L.featureGroup().addTo(map)
+  };
+  pavings.push(paving);
+
+  // Click to delete
+  layer.on('click', function() {
+    if (currentTool === 'select' && confirm('Delete this paving area?')) {
+      deletePaving(id);
+    }
+  });
+
+  updatePavingLabels(paving);
+  recalcStats();
+  setStatus('Paving added! ' + (pavingMode === 'rect' ? 'Drag another rectangle' : 'Click to draw another') + ' or switch tools');
+}
+
+function updatePavingLabels(p) {
+  p.labelGroup.clearLayers();
+  var verts = p.vertices;
+  var center = getPolygonCenter(verts);
+
+  if (p.isRect && verts.length >= 4) {
+    // Show width, depth, SF like buildings
+    var dims = getBuildingDimensions(verts);
+    var sfText = dims.sf >= 1e6 ? (dims.sf / 1e6).toFixed(2) + 'M SF' :
+                 dims.sf >= 1e3 ? (dims.sf / 1e3).toFixed(1) + 'K SF' :
+                 Math.round(dims.sf).toLocaleString() + ' SF';
+
+    var sfIcon = L.divIcon({
+      className: 'bldg-label',
+      html: '<div class="bldg-label-sf" style="color:#10b981">' + sfText + '</div>',
+      iconSize: [120, 20], iconAnchor: [60, 10]
+    });
+    L.marker(center, {icon: sfIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
+
+    var widthEdgeIdx = dims.edgeW === 0 ? 0 : 1;
+    var widthMid, depthMid;
+    if (widthEdgeIdx === 0) {
+      widthMid = getMidpoint(verts[0], verts[1]);
+      depthMid = getMidpoint(verts[1], verts[2]);
+    } else {
+      widthMid = getMidpoint(verts[1], verts[2]);
+      depthMid = getMidpoint(verts[0], verts[1]);
+    }
+
+    var wIcon = L.divIcon({
+      className: 'bldg-label',
+      html: '<div class="bldg-label-dim" style="color:#34d399">' + dims.width + ' ft</div>',
+      iconSize: [80, 16], iconAnchor: [40, 8]
+    });
+    L.marker(widthMid, {icon: wIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
+
+    var dIcon = L.divIcon({
+      className: 'bldg-label',
+      html: '<div class="bldg-label-dim" style="color:#34d399">' + dims.depth + ' ft</div>',
+      iconSize: [80, 16], iconAnchor: [40, 8]
+    });
+    L.marker(depthMid, {icon: dIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
+  } else {
+    // Free-draw: just show SF in center
+    var sf = areaSF(p.layer);
+    var sfText = sf >= 1e6 ? (sf / 1e6).toFixed(2) + 'M SF' :
+                 sf >= 1e3 ? (sf / 1e3).toFixed(1) + 'K SF' :
+                 Math.round(sf).toLocaleString() + ' SF';
+    var sfIcon = L.divIcon({
+      className: 'bldg-label',
+      html: '<div class="bldg-label-sf" style="color:#10b981">' + sfText + '</div>',
+      iconSize: [120, 20], iconAnchor: [60, 10]
+    });
+    L.marker(center, {icon: sfIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
+  }
+}
+
+function deletePaving(id) {
+  var p = pavings.find(function(x) { return x.id === id; });
+  if (!p) return;
+  drawnItems.removeLayer(p.layer);
+  if (p.labelGroup) map.removeLayer(p.labelGroup);
+  pavings = pavings.filter(function(x) { return x.id !== id; });
+  recalcStats();
+}
+
 /* ===== SITE BOUNDARY ===== */
 
 var siteEditEnabled = false;
@@ -999,6 +1170,7 @@ function recalcStats() {
     for (var i=0;i<pts.length-1;i++) len+=pts[i].distanceTo(pts[i+1]);
     pavedSF += len*FEET_PER_METER*30;
   });
+  pavings.forEach(function(p){ pavedSF += areaSF(p.layer); });
   ponds.forEach(function(p){ pondSF += areaSF(p); });
   if (siteBoundary) siteSF = areaSF(siteBoundary);
   var cov = siteSF>0 ? Math.min(100,(bldgSF+pavedSF)/siteSF*100) : 0;
@@ -1108,8 +1280,9 @@ function clearAll() {
   buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); if (b.labelGroup) map.removeLayer(b.labelGroup); });
   roads.forEach(function(r){ drawnItems.removeLayer(r); });
   ponds.forEach(function(p){ drawnItems.removeLayer(p); });
+  pavings.forEach(function(p){ drawnItems.removeLayer(p.layer); if (p.labelGroup) map.removeLayer(p.labelGroup); });
   if (siteBoundary) drawnItems.removeLayer(siteBoundary);
-  buildings=[]; roads=[]; ponds=[]; siteBoundary=null; activeBuilding=null;
+  buildings=[]; roads=[]; ponds=[]; pavings=[]; siteBoundary=null; activeBuilding=null;
   hideAllHandles();
   document.getElementById('building-opts-panel').classList.add('hidden');
   updateBuildingList(); recalcStats();
@@ -1122,10 +1295,11 @@ function setStatus(msg) { document.getElementById('status-bar').textContent = ms
 
 /* ===== DIMENSION TIP ===== */
 
-map.on('mousedown', function(e) { if (currentTool==='building') dimStart = e.latlng; });
+map.on('mousedown', function(e) { if (currentTool==='building' || (currentTool==='paving' && pavingMode==='rect')) dimStart = e.latlng; });
 map.on('mousemove', function(e) {
   var tip = document.getElementById('dim-tip');
-  if (!dimStart || currentTool!=='building') { tip.style.display='none'; return; }
+  var showTip = currentTool==='building' || (currentTool==='paving' && pavingMode==='rect');
+  if (!dimStart || !showTip) { tip.style.display='none'; return; }
   var dLat = Math.abs(e.latlng.lat - dimStart.lat);
   var dLng = Math.abs(e.latlng.lng - dimStart.lng);
   var lat = (e.latlng.lat + dimStart.lat)/2;
