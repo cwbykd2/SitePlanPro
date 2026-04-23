@@ -215,36 +215,8 @@ select option{background:var(--panel2)}
             <button class="btn-primary" onclick="applyBuildingOptions()" style="width:100%">Apply Options</button>
           </div>
         </div>
-        <div style="margin-top:10px">
-          <div class="section-label">Transform</div>
-          <div class="card">
-            <div class="transform-controls">
-              <div class="transform-row">
-                <label>Rotate</label>
-                <input type="range" id="rotate-slider" min="-180" max="180" value="0" step="1" oninput="onRotateSlider(this.value)">
-                <span class="val-display" id="rotate-val">0°</span>
-              </div>
-              <div class="transform-row">
-                <label>Scale</label>
-                <input type="range" id="scale-slider" min="25" max="400" value="100" step="5" oninput="onScaleSlider(this.value)">
-                <span class="val-display" id="scale-val">100%</span>
-              </div>
-              <div class="transform-btn-row">
-                <button class="btn-ghost" onclick="rotateActiveBuilding(-15)">↺ 15°</button>
-                <button class="btn-ghost" onclick="rotateActiveBuilding(-5)">↺ 5°</button>
-                <button class="btn-ghost" onclick="rotateActiveBuilding(5)">↻ 5°</button>
-                <button class="btn-ghost" onclick="rotateActiveBuilding(15)">↻ 15°</button>
-              </div>
-              <div class="transform-btn-row">
-                <button class="btn-ghost" onclick="scaleActiveBuilding(0.9)">Shrink</button>
-                <button class="btn-ghost" onclick="resetTransform()">Reset</button>
-                <button class="btn-ghost" onclick="scaleActiveBuilding(1.1)">Expand</button>
-              </div>
-              <div style="font-size:10px;color:var(--muted);text-align:center;padding-top:4px">
-                Drag building to move &bull; Blue ↔ = width &bull; Green ↕ = depth &bull; Yellow ↻ = rotate
-              </div>
-            </div>
-          </div>
+        <div style="margin-top:10px;font-size:10px;color:var(--muted);text-align:center;padding:6px 0">
+          Drag building to move &bull; Blue ↔ = width &bull; Green ↕ = depth &bull; Yellow ↻ = rotate
         </div>
       </div>
       <div id="paving-opts-panel" class="hidden">
@@ -553,7 +525,6 @@ function showBuildingHandles(b) {
       bld.baseVertices = bld.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
       bld.rotation = 0;
       bld.scale = 100;
-      updateTransformSliders(bld);
       recalcStats();
       drawBuildingOverlays(bld);
       refreshHandlePositions(bld);
@@ -612,7 +583,6 @@ function showBuildingHandles(b) {
       bld.baseVertices = bld.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
       bld.rotation = 0;
       bld.scale = 100;
-      updateTransformSliders(bld);
       recalcStats();
       drawBuildingOverlays(bld);
       refreshHandlePositions(bld);
@@ -658,7 +628,6 @@ function showBuildingHandles(b) {
     map.dragging.enable();
     var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
     if (bld) {
-      updateTransformSliders(bld);
       recalcStats();
       drawBuildingOverlays(bld);
       checkOutOfBounds();
@@ -676,7 +645,6 @@ function applyTransformFromHandles(b) {
   });
   updateBuildingPolygon(b, newVerts);
   refreshHandlePositions(b);
-  updateTransformSliders(b);
   updateBuildingList();
 }
 
@@ -928,7 +896,6 @@ function onBuildingDragEnd(e) {
     b.baseVertices = b.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
     b.rotation = 0;
     b.scale = 100;
-    updateTransformSliders(b);
     recalcStats();
     drawBuildingOverlays(b);
     refreshHandlePositions(b);
@@ -958,55 +925,7 @@ function applyTransform(b) {
   checkOutOfBounds();
 }
 
-function onRotateSlider(val) {
-  var b = getActiveBuilding();
-  if (!b) return;
-  b.rotation = parseFloat(val);
-  document.getElementById('rotate-val').textContent = val + '°';
-  applyTransform(b);
-}
 
-function onScaleSlider(val) {
-  var b = getActiveBuilding();
-  if (!b) return;
-  b.scale = parseFloat(val);
-  document.getElementById('scale-val').textContent = val + '%';
-  applyTransform(b);
-}
-
-function rotateActiveBuilding(deg) {
-  var b = getActiveBuilding();
-  if (!b) return;
-  b.rotation = ((b.rotation + deg) % 360);
-  if (b.rotation > 180) b.rotation -= 360;
-  if (b.rotation < -180) b.rotation += 360;
-  updateTransformSliders(b);
-  applyTransform(b);
-}
-
-function scaleActiveBuilding(factor) {
-  var b = getActiveBuilding();
-  if (!b) return;
-  b.scale = Math.max(25, Math.min(400, Math.round(b.scale * factor)));
-  updateTransformSliders(b);
-  applyTransform(b);
-}
-
-function resetTransform() {
-  var b = getActiveBuilding();
-  if (!b) return;
-  b.rotation = 0;
-  b.scale = 100;
-  updateTransformSliders(b);
-  applyTransform(b);
-}
-
-function updateTransformSliders(b) {
-  document.getElementById('rotate-slider').value = b.rotation;
-  document.getElementById('rotate-val').textContent = Math.round(b.rotation) + '°';
-  document.getElementById('scale-slider').value = b.scale;
-  document.getElementById('scale-val').textContent = Math.round(b.scale) + '%';
-}
 
 /* ===== BUILDING OPTIONS ===== */
 
@@ -1025,7 +944,6 @@ function showBuildingOpts() {
   document.getElementById('chk-left').checked = b.leftParking;
   document.getElementById('chk-right').checked = b.rightParking;
   updateTrailerOpts(b.type);
-  updateTransformSliders(b);
   onSpacingChange();
   showBuildingHandles(b);
 }

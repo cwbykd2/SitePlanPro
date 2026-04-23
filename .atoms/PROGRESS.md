@@ -37,3 +37,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Rewrote overlay positioning to use edge-vector math instead of bounding boxes, fixing alignment after drag/rotate operations
 - 2026-04-22: Replaced single resize handle with independent width (blue ↔) and depth (green ↕) edge-midpoint handles for axis-specific resizing
 - 2026-04-22: Added hashed black boundary line (locked after naming), Adjust Site button, and out-of-bounds red highlighting for items outside boundary
+- 2026-04-22: Removed Transform section (rotate/scale sliders and buttons) from sidebar; kept mouse handle hint text
