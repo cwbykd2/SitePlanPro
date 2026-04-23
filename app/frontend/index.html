@@ -4286,15 +4286,19 @@ function drawBayGrid(b) {
         depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       }
     } else {
-      // Rear load: speed bay at top only
-      var speedFrac = bSpeedDepth / d12;
-      depthRowFracs.push(Math.min(speedFrac, 1));
-      depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
-      for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (bSpeedDepth + j * BAY_STD_DEPTH) / d12;
+      // Rear load: speed bay on the truck court side (bottom)
+      // Standard bays first (from top), then speed bay at the bottom
+      for (var j = 0; j < stdBays; j++) {
+        var dFrac = (j + 1) * BAY_STD_DEPTH / d12;
         if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
         depthRowFracs.push(dFrac);
         depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
+      }
+      // Speed bay at the bottom (truck court side)
+      var lastFrac = depthRowFracs[depthRowFracs.length - 1];
+      if (lastFrac < 1) {
+        depthRowFracs.push(1);
+        depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       }
     }
 
@@ -4314,7 +4318,14 @@ function drawBayGrid(b) {
     for (var ri = 1; ri < depthRowFracs.length; ri++) {
       var rowFrac = depthRowFracs[ri];
       if (rowFrac >= 1) break;
-      var isSpeedLine = (ri === 1) || (isCrossDock && ri === depthRowFracs.length - 2);
+      var isSpeedLine;
+      if (isCrossDock) {
+        // Cross dock: speed lines at first and last internal boundaries
+        isSpeedLine = (ri === 1) || (ri === depthRowFracs.length - 2);
+      } else {
+        // Rear load: speed line at the last internal boundary (truck court side = bottom)
+        isSpeedLine = (ri === depthRowFracs.length - 2);
+      }
       var lineColor = isSpeedLine ? speedBayColor : bayGridColor;
       var lineWeight = isSpeedLine ? 2 : bayGridWeight;
       var lineDash = isSpeedLine ? '8,4' : bayGridDash;
