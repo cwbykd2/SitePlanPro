@@ -37,6 +37,7 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Save/Load fee templates per city in localStorage
 - [x] Fee summary in PDF export
 - [x] Truck court inset - per-side inset inputs to shorten truck court from each end of building edge
+- [x] Building Cost Estimator tab - per-building cost calculation using pricing chart with 32'/36'/40' clear heights, closest SF matching, site total, PDF export integration, and save/load support
 
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application

@@ -171,6 +171,28 @@ select option{background:var(--panel2)}
 .site-item-actions button{padding:3px 6px;font-size:10px;min-width:0}
 .no-sites-msg{font-size:11px;color:var(--muted);text-align:center;padding:16px 12px}
 #btn-adjust-site:hover{border-color:var(--warn);background:rgba(245,158,11,.1)}
+
+/* Building Cost Estimator Styles */
+.cost-estimator{margin-top:2px}
+.cost-section-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;user-select:none}
+.cost-section-toggle .section-label{margin:0;cursor:pointer}
+.cost-toggle-arrow{font-size:10px;color:var(--muted);transition:transform 0.2s}
+.cost-toggle-arrow.open{transform:rotate(180deg)}
+.cost-panel{display:none;flex-direction:column;gap:8px;padding-top:6px}
+.cost-panel.open{display:flex}
+.cost-clear-height-bar{display:flex;align-items:center;gap:6px;padding:4px 0}
+.cost-clear-height-bar label{margin:0;font-size:11px;color:var(--muted);white-space:nowrap}
+.cost-clear-height-bar select{flex:1}
+.cost-building-item{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+.cost-building-item .cost-bldg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.cost-building-item .cost-bldg-name{font-size:11px;font-weight:600;color:var(--text)}
+.cost-building-item .cost-bldg-total{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:#fff}
+.cost-building-item .cost-bldg-details{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1.6}
+.cost-building-item .cost-bldg-details span{color:var(--accent2)}
+.cost-grand-total{display:flex;align-items:center;justify-content:space-between;padding:10px;background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(239,68,68,0.1));border:1px solid var(--warn);border-radius:6px}
+.cost-grand-label{font-size:12px;font-weight:700;color:var(--warn)}
+.cost-grand-value{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#fff}
+.cost-no-buildings{font-size:11px;color:var(--muted);text-align:center;padding:12px}
 </style>
 </head>
 <body>
@@ -338,6 +360,31 @@ select option{background:var(--panel2)}
           <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;"><span style="color:#f97316;">Trailer Parking</span><span style="color:#fff;font-family:'DM Mono',monospace;" id="stat-trailer">0 SF</span></div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;"><span style="color:#a78bfa;">Road</span><span style="color:#fff;font-family:'DM Mono',monospace;" id="stat-road">0 SF</span></div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;"><span style="color:#10b981;">Paving</span><span style="color:#fff;font-family:'DM Mono',monospace;" id="stat-pavingarea">0 SF</span></div>
+        </div>
+      </div>
+
+      <!-- Building Cost Estimator -->
+      <div class="cost-estimator">
+        <div class="cost-section-toggle" onclick="toggleCostPanel()">
+          <div class="section-label">Building Cost Estimator</div>
+          <span class="cost-toggle-arrow" id="cost-arrow">▼</span>
+        </div>
+        <div class="cost-panel" id="cost-panel">
+          <div class="cost-clear-height-bar">
+            <label>Clear Height:</label>
+            <select id="cost-clear-height" onchange="recalcBuildingCosts()">
+              <option value="32">32' Clear Height</option>
+              <option value="36">36' Clear Height</option>
+              <option value="40" selected>40' Clear Height</option>
+            </select>
+          </div>
+          <div id="cost-building-list">
+            <div class="cost-no-buildings">No buildings placed yet</div>
+          </div>
+          <div class="cost-grand-total">
+            <span class="cost-grand-label">TOTAL SITE COST</span>
+            <span class="cost-grand-value" id="cost-grand-total">$0</span>
+          </div>
         </div>
       </div>
 
@@ -2604,6 +2651,100 @@ function exportPDF() {
       pdf.text(feeGrandTotal, pageW - 20, gtY + 4.5, { align: 'right' });
     }
 
+    // --- Building Cost Estimator Summary ---
+    if (buildings.length > 0) {
+      var clearHeight = document.getElementById('cost-clear-height').value;
+      var costItems = [];
+      var costGrandTotal = 0;
+      buildings.forEach(function(b, i) {
+        var bldgSF = Math.round(areaSF(b.layer));
+        var match = lookupCostPerSF(bldgSF, clearHeight);
+        var total = bldgSF * match.costPerSF;
+        costGrandTotal += total;
+        costItems.push({
+          name: 'Building ' + (i + 1) + ' (' + (b.type === 'cross' ? 'Cross Dock' : 'Rear Load') + ')',
+          sf: bldgSF,
+          rate: match.costPerSF,
+          matchedSF: match.sf,
+          total: total
+        });
+      });
+
+      // Determine Y position
+      var costY;
+      if (hasFees) {
+        costY = (typeof feeY !== 'undefined' ? feeY + 48 : statsY + statsBoxH + 50);
+      } else {
+        costY = statsY + statsBoxH + 6;
+      }
+      if (costY + 36 + costItems.length * 7 > pageH - 10) {
+        pdf.addPage();
+        costY = 15;
+      }
+
+      var costBoxH = 18 + costItems.length * 8 + 10;
+      pdf.setFillColor(28, 22, 10);
+      pdf.roundedRect(10, costY, pageW - 20, costBoxH, 3, 3, 'F');
+
+      // Header
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(245, 158, 11);
+      pdf.text('Building Cost Estimator', 15, costY + 7);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(160, 160, 180);
+      pdf.text(clearHeight + "' Clear Height", 70, costY + 7);
+
+      // Grand total on right
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(14);
+      pdf.setTextColor(245, 158, 11);
+      pdf.text('$' + formatCurrency(costGrandTotal), pageW - 15, costY + 7, { align: 'right' });
+
+      // Divider
+      pdf.setDrawColor(60, 50, 30);
+      pdf.line(15, costY + 10, pageW - 15, costY + 10);
+
+      // Column headers
+      var colX = [15, 90, 140, 185, pageW - 15];
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(120, 120, 140);
+      pdf.text('Building', colX[0], costY + 16);
+      pdf.text('Size (SF)', colX[1], costY + 16);
+      pdf.text('Matched SF', colX[2], costY + 16);
+      pdf.text('Rate', colX[3], costY + 16);
+      pdf.text('Cost', colX[4], costY + 16, { align: 'right' });
+
+      // Rows
+      costItems.forEach(function(item, idx) {
+        var rowY = costY + 23 + idx * 8;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(220, 220, 230);
+        pdf.text(item.name, colX[0], rowY);
+        pdf.setTextColor(180, 180, 200);
+        pdf.text(fmt(item.sf), colX[1], rowY);
+        pdf.text(fmt(item.matchedSF), colX[2], rowY);
+        pdf.text('$' + item.rate.toFixed(2) + '/SF', colX[3], rowY);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(255, 255, 255);
+        pdf.text('$' + formatCurrency(item.total), colX[4], rowY, { align: 'right' });
+      });
+
+      // Total bar
+      var totalBarY = costY + costBoxH - 8;
+      pdf.setFillColor(40, 35, 15);
+      pdf.roundedRect(15, totalBarY, pageW - 30, 6, 2, 2, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(245, 158, 11);
+      pdf.text('TOTAL BUILDING COST:', 20, totalBarY + 4.5);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('$' + formatCurrency(costGrandTotal), pageW - 20, totalBarY + 4.5, { align: 'right' });
+    }
+
     // --- Footer ---
     pdf.setFontSize(7);
     pdf.setTextColor(120, 120, 140);
@@ -2787,7 +2928,8 @@ function serializeSite() {
       };
     }),
     siteBoundary: siteBoundary ? serializeLatlngs(siteBoundary.getLatLngs()[0] || siteBoundary.getLatLngs()) : null,
-    fees: getFeeData()
+    fees: getFeeData(),
+    clearHeight: document.getElementById('cost-clear-height').value
   };
   return data;
 }
@@ -2938,6 +3080,10 @@ function deserializeSite(data) {
   updateBuildingList();
   recalcStats();
   updateSiteButtons();
+  // Restore clear height
+  if (data.clearHeight) {
+    document.getElementById('cost-clear-height').value = data.clearHeight;
+  }
   // Restore fee data
   if (data.fees) {
     restoreFeeData(data.fees);
@@ -2964,6 +3110,100 @@ function flashSaveIndicator() {
   el.classList.remove('hidden');
   el.classList.add('show');
   setTimeout(function() { el.classList.remove('show'); }, 1500);
+}
+
+/* ===== BUILDING COST ESTIMATOR ===== */
+
+var BUILDING_COST_CHART = {
+  '32': [
+    { sf: 50000, costPerSF: 82.54 },
+    { sf: 100000, costPerSF: 70.65 },
+    { sf: 200000, costPerSF: 63.10 },
+    { sf: 300000, costPerSF: 56.51 },
+    { sf: 400000, costPerSF: 54.41 }
+  ],
+  '36': [
+    { sf: 500000, costPerSF: 50.97 },
+    { sf: 600000, costPerSF: 49.35 },
+    { sf: 700000, costPerSF: 48.19 },
+    { sf: 800000, costPerSF: 48.08 },
+    { sf: 900000, costPerSF: 47.71 },
+    { sf: 1000000, costPerSF: 47.15 }
+  ],
+  '40': [
+    { sf: 500000, costPerSF: 51.74 },
+    { sf: 600000, costPerSF: 50.05 },
+    { sf: 700000, costPerSF: 48.83 },
+    { sf: 800000, costPerSF: 48.69 },
+    { sf: 900000, costPerSF: 48.36 },
+    { sf: 1000000, costPerSF: 47.73 }
+  ]
+};
+
+function lookupCostPerSF(bldgSF, clearHeight) {
+  var chart = BUILDING_COST_CHART[String(clearHeight)];
+  if (!chart || chart.length === 0) return 0;
+  // Find the entry with the closest SF to the building's SF
+  var closest = chart[0];
+  var closestDiff = Math.abs(bldgSF - closest.sf);
+  for (var i = 1; i < chart.length; i++) {
+    var diff = Math.abs(bldgSF - chart[i].sf);
+    if (diff < closestDiff) {
+      closestDiff = diff;
+      closest = chart[i];
+    }
+  }
+  return closest;
+}
+
+function toggleCostPanel() {
+  var panel = document.getElementById('cost-panel');
+  var arrow = document.getElementById('cost-arrow');
+  panel.classList.toggle('open');
+  arrow.classList.toggle('open');
+}
+
+function recalcBuildingCosts() {
+  var clearHeight = document.getElementById('cost-clear-height').value;
+  var listEl = document.getElementById('cost-building-list');
+  var grandTotalEl = document.getElementById('cost-grand-total');
+
+  if (!buildings.length) {
+    listEl.innerHTML = '<div class="cost-no-buildings">No buildings placed yet</div>';
+    grandTotalEl.textContent = '$0';
+    return;
+  }
+
+  var grandTotal = 0;
+  var html = '';
+
+  buildings.forEach(function(b, i) {
+    var bldgSF = areaSF(b.layer);
+    var roundedSF = Math.round(bldgSF);
+    var match = lookupCostPerSF(roundedSF, clearHeight);
+    var costPerSF = match.costPerSF;
+    var matchedSF = match.sf;
+    var totalCost = roundedSF * costPerSF;
+    grandTotal += totalCost;
+
+    var color = b.type === 'cross' ? '#f59e0b' : '#10b981';
+    var label = b.type === 'cross' ? 'Cross Dock' : 'Rear Load';
+
+    html += '<div class="cost-building-item">'
+      + '<div class="cost-bldg-header">'
+      + '<span class="cost-bldg-name" style="color:' + color + '">Building ' + (i + 1) + ' — ' + label + '</span>'
+      + '<span class="cost-bldg-total">$' + formatCurrency(totalCost) + '</span>'
+      + '</div>'
+      + '<div class="cost-bldg-details">'
+      + 'Size: <span>' + fmt(roundedSF) + ' SF</span> · '
+      + 'Matched: <span>' + fmt(matchedSF) + ' SF</span> · '
+      + 'Rate: <span>$' + costPerSF.toFixed(2) + '/SF</span>'
+      + '</div>'
+      + '</div>';
+  });
+
+  listEl.innerHTML = html;
+  grandTotalEl.textContent = '$' + formatCurrency(grandTotal);
 }
 
 /* ===== FEE ESTIMATOR ===== */
@@ -3227,6 +3467,7 @@ function restoreFeeData(data) {
     pavings.forEach(function(p) { rawPavedSF += areaSF(p.layer); });
     rawTotalSF = rawBldgSF + rawPavedSF;
     recalcFees();
+    recalcBuildingCosts();
     autoSave();
   };
 })();
