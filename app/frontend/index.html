@@ -1774,6 +1774,146 @@ function drawBuildingOverlays(b) {
     L.marker(mid, {icon: icon, interactive: false, zIndexOffset: 910}).addTo(b.overlayGroup);
   }
 
+  // ===== PARKING SUB-ZONE HELPER =====
+  // Draws stacked sub-zones for parking instead of a single overlay.
+  // Double row (76'): 10' sidewalk + 20' car stalls + 26' fire lane + 20' car stalls
+  // Single row (56'): 10' sidewalk + 20' car stalls + 26' fire lane
+  //
+  // p1, p2: base edge points (building edge)
+  // dirAlongFt, dirPerpFt: extrusion direction in (along, perp) units
+  // isDouble: true for double row, false for single row
+  // insetStartFt, insetEndFt: optional insets from p1/p2 ends
+  function addParkingSubZones(p1, p2, dirAlongFt, dirPerpFt, isDouble, insetStartFt, insetEndFt) {
+    var SIDEWALK = 10, STALL = 20, FIRELANE = 26;
+    var totalDepth = isDouble ? (SIDEWALK + STALL + FIRELANE + STALL) : (SIDEWALK + STALL + FIRELANE);
+
+    // Apply insets to get effective edge points
+    var ep1 = p1, ep2 = p2;
+    if (insetStartFt && insetStartFt > 0) {
+      var dxS = (p2.lng - p1.lng);
+      var dyS = (p2.lat - p1.lat);
+      var lenS = Math.sqrt((dxS * latScale) * (dxS * latScale) + dyS * dyS);
+      var insetCoord = (insetStartFt * ftToCoord);
+      if (lenS > 0) {
+        ep1 = L.latLng(p1.lat + dyS * insetCoord / lenS, p1.lng + dxS * insetCoord / lenS);
+      }
+    }
+    if (insetEndFt && insetEndFt > 0) {
+      var dxE = (p1.lng - p2.lng);
+      var dyE = (p1.lat - p2.lat);
+      var lenE = Math.sqrt((dxE * latScale) * (dxE * latScale) + dyE * dyE);
+      var insetCoordE = (insetEndFt * ftToCoord);
+      if (lenE > 0) {
+        ep2 = L.latLng(p2.lat + dyE * insetCoordE / lenE, p2.lng + dxE * insetCoordE / lenE);
+      }
+    }
+
+    // Helper to draw one sub-zone strip and return the far edge points
+    function drawStrip(startP1, startP2, depth, color, opacity, strokeDash, overlayType, labelText) {
+      var farP1 = offsetPt(startP1, dirAlongFt * depth, dirPerpFt * depth);
+      var farP2 = offsetPt(startP2, dirAlongFt * depth, dirPerpFt * depth);
+      var poly = L.polygon([startP1, startP2, farP2, farP1], {
+        color: '#000000', weight: 1, fillColor: color, fillOpacity: opacity, interactive: false,
+        dashArray: strokeDash || null
+      });
+      poly._overlayType = overlayType;
+      poly.addTo(b.overlayGroup);
+
+      // Add depth label on the perpendicular side (midpoint of startP1→farP1)
+      var mid = getMidpoint(startP1, farP1);
+      var icon = L.divIcon({
+        className: 'bldg-label',
+        html: '<div class="bldg-label-dim" style="color:#000000;font-size:9px;text-shadow:0 0 4px rgba(255,255,255,1),0 0 8px rgba(255,255,255,1),0 0 2px rgba(255,255,255,1);">' + labelText + '</div>',
+        iconSize: [60, 14], iconAnchor: [30, 7]
+      });
+      L.marker(mid, {icon: icon, interactive: false, zIndexOffset: 910}).addTo(b.overlayGroup);
+
+      return { p1: farP1, p2: farP2 };
+    }
+
+    // Helper to add stall line markers inside a car stall strip
+    function addStallLines(startP1, startP2, depth, dirAF, dirPF) {
+      // Draw perpendicular lines at regular intervals along the edge
+      var dxEdge = (startP2.lng - startP1.lng);
+      var dyEdge = (startP2.lat - startP1.lat);
+      var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
+      var stallWidthFt = 9; // standard stall width
+      var stallWidthCoord = stallWidthFt * ftToCoord;
+      var numStalls = Math.floor(edgeLenCoord / stallWidthCoord);
+      if (numStalls < 1) return;
+
+      for (var i = 1; i < numStalls; i++) {
+        var frac = i / numStalls;
+        var linePt = L.latLng(
+          startP1.lat + dyEdge * frac,
+          startP1.lng + dxEdge * frac
+        );
+        var linePtFar = offsetPt(linePt, dirAF * depth, dirPF * depth);
+        var line = L.polyline([linePt, linePtFar], {
+          color: '#ffffff', weight: 0.8, opacity: 0.6, interactive: false, dashArray: '2,2'
+        });
+        line.addTo(b.overlayGroup);
+      }
+    }
+
+    // Helper to add diagonal hash lines inside a fire lane strip
+    function addFireLaneHash(startP1, startP2, depth, dirAF, dirPF) {
+      var dxEdge = (startP2.lng - startP1.lng);
+      var dyEdge = (startP2.lat - startP1.lat);
+      var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
+      var spacingFt = 12;
+      var spacingCoord = spacingFt * ftToCoord;
+      var numLines = Math.floor(edgeLenCoord / spacingCoord);
+      if (numLines < 1) return;
+
+      for (var i = 0; i <= numLines; i++) {
+        var frac = i / Math.max(numLines, 1);
+        var basePt = L.latLng(
+          startP1.lat + dyEdge * frac,
+          startP1.lng + dxEdge * frac
+        );
+        var farPt = offsetPt(basePt, dirAF * depth, dirPF * depth);
+        // Shift the far point along the edge to create diagonal
+        var shiftFrac = Math.min(frac + 0.5 / Math.max(numLines, 1), 1.0);
+        // Use a fixed diagonal offset
+        var diagOffsetCoord = depth * 0.4 * ftToCoord;
+        var farPtShifted = L.latLng(
+          farPt.lat + dyEdge * (diagOffsetCoord / Math.max(edgeLenCoord, 0.0001)),
+          farPt.lng + dxEdge * (diagOffsetCoord / Math.max(edgeLenCoord, 0.0001))
+        );
+        var line = L.polyline([basePt, farPtShifted], {
+          color: '#cc0000', weight: 1.2, opacity: 0.5, interactive: false
+        });
+        line.addTo(b.overlayGroup);
+      }
+    }
+
+    var curEdge;
+
+    // 1. Sidewalk (10') - light tan, dotted border
+    curEdge = drawStrip(ep1, ep2, SIDEWALK, '#d4c9a8', 0.6, '3,3', 'sidewalk', "10' SW");
+
+    // 2. Car stalls (20') - medium gray, dashed border with stall lines
+    var stallEdge1 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+    addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+    curEdge = stallEdge1;
+
+    // 3. Fire lane (26') - yellow with red hash lines
+    var flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#e8d44d', 0.5, null, 'firelane', "26' Fire");
+    addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
+    curEdge = flEdge;
+
+    // 4. Second row of car stalls (20') - only for double row
+    if (isDouble) {
+      var stallEdge2 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+      addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+      curEdge = stallEdge2;
+    }
+
+    // Return overall overlay bounds for compatibility
+    return { ep1: ep1, ep2: ep2, p3: curEdge.p2, p4: curEdge.p1, depthFt: totalDepth };
+  }
+
   // Identify edges:
   // Top edge: v[0]→v[1] (NW→NE)
   // Bottom edge: v[3]→v[2] (SW→SE)
@@ -1809,11 +1949,10 @@ function drawBuildingOverlays(b) {
         var tc2 = offsetPt(tcEdge.ep2, 0, TRUCK_DEFAULT);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
       }
-      // Car parking on top (opposite side)
-      var cpTop = addEdgeOverlay(v[0], v[1], PARK_MAIN, 0, -1, '#b0b0b0', 0.5, 'carparking');
-      addOverlayDepthLabel(cpTop, PARK_MAIN + ' ft');
-      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK_LEFT, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK_LEFT + ' ft'); }
-      if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK_RIGHT, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK_RIGHT + ' ft'); }
+      // Car parking on top (opposite side) — sub-zoned
+      addParkingSubZones(v[0], v[1], 0, -1, b.parkingRowsMain === 'double');
+      if (b.leftParking) { addParkingSubZones(v[0], v[3], -1, 0, b.parkingRowsLeft === 'double'); }
+      if (b.rightParking) { addParkingSubZones(v[1], v[2], 1, 0, b.parkingRowsRight === 'double'); }
     } else {
       // Left/right edges are longer → truck court on left (west), car parking on right (east)
       var tcEdge = addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#808080', 0.5, 'truckcourt', tcInsetL, tcInsetR);
@@ -1823,10 +1962,10 @@ function drawBuildingOverlays(b) {
         var tc2 = offsetPt(tcEdge.ep2, -TRUCK_DEFAULT, 0);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
       }
-      var cpRight = addEdgeOverlay(v[1], v[2], PARK_MAIN, 1, 0, '#b0b0b0', 0.5, 'carparking');
-      addOverlayDepthLabel(cpRight, PARK_MAIN + ' ft');
-      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[1], PARK_LEFT, 0, -1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK_LEFT + ' ft'); }
-      if (b.rightParking) { var cpR = addEdgeOverlay(v[3], v[2], PARK_RIGHT, 0, 1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK_RIGHT + ' ft'); }
+      // Car parking on right (east) — sub-zoned
+      addParkingSubZones(v[1], v[2], 1, 0, b.parkingRowsMain === 'double');
+      if (b.leftParking) { addParkingSubZones(v[0], v[1], 0, -1, b.parkingRowsLeft === 'double'); }
+      if (b.rightParking) { addParkingSubZones(v[3], v[2], 0, 1, b.parkingRowsRight === 'double'); }
     }
   } else {
     // Cross dock: truck court on both top and bottom
@@ -1844,8 +1983,9 @@ function drawBuildingOverlays(b) {
       var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
     }
-    if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK_LEFT, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK_LEFT + ' ft'); }
-    if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK_RIGHT, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK_RIGHT + ' ft'); }
+    // Cross dock side parking — sub-zoned
+    if (b.leftParking) { addParkingSubZones(v[0], v[3], -1, 0, b.parkingRowsLeft === 'double'); }
+    if (b.rightParking) { addParkingSubZones(v[1], v[2], 1, 0, b.parkingRowsRight === 'double'); }
   }
 
   // ===== BUMP OUTS =====
@@ -2688,7 +2828,7 @@ function recalcStats() {
         bldgSF += sf;
       } else {
         pavedSF += sf;
-        if (otype === 'carparking') carparkingSF += sf;
+        if (otype === 'carparking' || otype === 'sidewalk' || otype === 'carstall' || otype === 'firelane') carparkingSF += sf;
         else if (otype === 'trailer') trailerSF += sf;
         else truckcourtSF += sf;
       }
