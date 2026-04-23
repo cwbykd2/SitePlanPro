@@ -1629,12 +1629,12 @@ function drawBuildingOverlays(b) {
   }
 
   // Helper: add a depth label on the perpendicular side of an overlay
-  function addOverlayDepthLabel(ov, labelText, color) {
+  function addOverlayDepthLabel(ov, labelText) {
     // Place label at midpoint of the depth edge (ep1→p4)
     var mid = getMidpoint(ov.ep1, ov.p4);
     var icon = L.divIcon({
       className: 'bldg-label',
-      html: '<div class="bldg-label-dim" style="color:' + color + ';font-size:10px;">' + labelText + '</div>',
+      html: '<div class="bldg-label-dim" style="color:#000000;font-size:10px;text-shadow:0 0 4px rgba(255,255,255,1),0 0 8px rgba(255,255,255,1),0 0 2px rgba(255,255,255,1);">' + labelText + '</div>',
       iconSize: [70, 14], iconAnchor: [35, 7]
     });
     L.marker(mid, {icon: icon, interactive: false, zIndexOffset: 910}).addTo(b.overlayGroup);
@@ -1669,7 +1669,7 @@ function drawBuildingOverlays(b) {
     if (topFt >= rightFt) {
       // Top/bottom edges are longer → truck court on bottom (south), car parking on top (north)
       var tcEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'truckcourt', tcInsetL, tcInsetR);
-      addOverlayDepthLabel(tcEdge, TRUCK_DEFAULT + ' ft', '#808080');
+      addOverlayDepthLabel(tcEdge, TRUCK_DEFAULT + ' ft');
       if (b.trailerRear) {
         var tc1 = offsetPt(tcEdge.ep1, 0, TRUCK_DEFAULT);
         var tc2 = offsetPt(tcEdge.ep2, 0, TRUCK_DEFAULT);
@@ -1677,41 +1677,41 @@ function drawBuildingOverlays(b) {
       }
       // Car parking on top (opposite side)
       var cpTop = addEdgeOverlay(v[0], v[1], PARK, 0, -1, '#b0b0b0', 0.5, 'carparking');
-      addOverlayDepthLabel(cpTop, PARK + ' ft', '#b0b0b0');
-      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft', '#b0b0b0'); }
-      if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft', '#b0b0b0'); }
+      addOverlayDepthLabel(cpTop, PARK + ' ft');
+      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft'); }
+      if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft'); }
     } else {
       // Left/right edges are longer → truck court on left (west), car parking on right (east)
       var tcEdge = addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#808080', 0.5, 'truckcourt', tcInsetL, tcInsetR);
-      addOverlayDepthLabel(tcEdge, TRUCK_DEFAULT + ' ft', '#808080');
+      addOverlayDepthLabel(tcEdge, TRUCK_DEFAULT + ' ft');
       if (b.trailerRear) {
         var tc1 = offsetPt(tcEdge.ep1, -TRUCK_DEFAULT, 0);
         var tc2 = offsetPt(tcEdge.ep2, -TRUCK_DEFAULT, 0);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
       }
       var cpRight = addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#b0b0b0', 0.5, 'carparking');
-      addOverlayDepthLabel(cpRight, PARK + ' ft', '#b0b0b0');
-      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[1], PARK, 0, -1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft', '#b0b0b0'); }
-      if (b.rightParking) { var cpR = addEdgeOverlay(v[3], v[2], PARK, 0, 1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft', '#b0b0b0'); }
+      addOverlayDepthLabel(cpRight, PARK + ' ft');
+      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[1], PARK, 0, -1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft'); }
+      if (b.rightParking) { var cpR = addEdgeOverlay(v[3], v[2], PARK, 0, 1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft'); }
     }
   } else {
     // Cross dock: truck court on both top and bottom
     var tcTopEdge = addEdgeOverlay(v[0], v[1], TRUCK_DEFAULT, 0, -1, '#808080', 0.5, 'truckcourt', tcInsetTopL, tcInsetTopR);
-    addOverlayDepthLabel(tcTopEdge, TRUCK_DEFAULT + ' ft', '#808080');
+    addOverlayDepthLabel(tcTopEdge, TRUCK_DEFAULT + ' ft');
     if (b.trailerTop) {
       var tc1 = offsetPt(tcTopEdge.ep1, 0, -TRUCK_DEFAULT);
       var tc2 = offsetPt(tcTopEdge.ep2, 0, -TRUCK_DEFAULT);
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#f97316', 0.18, 'trailer');
     }
     var tcBotEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'truckcourt', tcInsetBotL, tcInsetBotR);
-    addOverlayDepthLabel(tcBotEdge, TRUCK_DEFAULT + ' ft', '#808080');
+    addOverlayDepthLabel(tcBotEdge, TRUCK_DEFAULT + ' ft');
     if (b.trailerBottom) {
       var tc1 = offsetPt(tcBotEdge.ep1, 0, TRUCK_DEFAULT);
       var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
     }
-    if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft', '#b0b0b0'); }
-    if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft', '#b0b0b0'); }
+    if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft'); }
+    if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft'); }
   }
 
   // ===== BUMP OUTS =====
