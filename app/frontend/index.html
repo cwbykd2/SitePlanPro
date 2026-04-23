@@ -208,7 +208,7 @@ select option{background:var(--panel2)}
     <button class="btn-primary" onclick="geocodeAddress()">Go</button>
   </div>
   <div class="toolbar-sep"></div>
-  <button class="btn-ghost" id="btn-sites">📁 Sites</button>
+  <button class="btn-ghost" id="btn-sites" onclick="event.stopPropagation();event.preventDefault();toggleSitesDropdown();">📁 Sites</button>
   <button class="btn-ghost" id="btn-site" onclick="toggleSiteTool()">Draw Site</button>
   <button class="btn-ghost" id="btn-redraw-site" onclick="redrawSite()" style="display:none">Redraw Site</button>
   <button class="btn-ghost" onclick="clearAll()">Clear All</button>
@@ -3889,35 +3889,22 @@ function restoreFeeData(data) {
 
 var _sitesDropdownOpen = false;
 var _sitesDropdownEl = null;
+var _sitesDropdownOpenTime = 0;
 
-// Create dropdown element and attach button handler after DOM is ready
+// Create dropdown element after DOM is ready
 function _setupSitesDropdown() {
-  // Create dropdown element dynamically
-  if (!document.getElementById('sites-dropdown')) {
-    var dd = document.createElement('div');
-    dd.id = 'sites-dropdown';
-    dd.className = 'sites-dropdown hidden';
-    dd.style.cssText = 'position:fixed;z-index:99999;';
-    dd.innerHTML = '<div id="sites-list"></div>'
-      + '<div class="sites-dropdown-footer">'
-      + '<button class="btn-ghost" style="width:100%;font-size:11px">+ New Site</button>'
-      + '</div>';
-    dd.addEventListener('click', function(e) { e.stopPropagation(); });
-    dd.querySelector('.sites-dropdown-footer button').addEventListener('click', function() { newSite(); });
-    document.body.appendChild(dd);
-    _sitesDropdownEl = dd;
-  }
-
-  // Attach click handler to Sites button
-  var btn = document.getElementById('btn-sites');
-  if (btn && !btn._sitesHandlerAttached) {
-    btn._sitesHandlerAttached = true;
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      e.preventDefault();
-      toggleSitesDropdown();
-    });
-  }
+  if (document.getElementById('sites-dropdown')) return;
+  var dd = document.createElement('div');
+  dd.id = 'sites-dropdown';
+  dd.className = 'sites-dropdown hidden';
+  dd.style.cssText = 'position:fixed;z-index:99999;';
+  dd.innerHTML = '<div id="sites-list"></div>'
+    + '<div class="sites-dropdown-footer">'
+    + '<button class="btn-ghost" style="width:100%;font-size:11px" onclick="event.stopPropagation();newSite();">+ New Site</button>'
+    + '</div>';
+  dd.addEventListener('click', function(e) { e.stopPropagation(); });
+  document.body.appendChild(dd);
+  _sitesDropdownEl = dd;
 }
 
 // Ensure setup runs after DOM is fully loaded
@@ -3926,11 +3913,14 @@ if (document.readyState === 'loading') {
 } else {
   _setupSitesDropdown();
 }
-// Also run on window load as a safety net for published builds
 window.addEventListener('load', _setupSitesDropdown);
 
 function toggleSitesDropdown() {
   var dd = _sitesDropdownEl || document.getElementById('sites-dropdown');
+  if (!dd) {
+    _setupSitesDropdown();
+    dd = _sitesDropdownEl || document.getElementById('sites-dropdown');
+  }
   if (!dd) return;
   if (_sitesDropdownOpen) {
     dd.classList.add('hidden');
@@ -3945,13 +3935,22 @@ function toggleSitesDropdown() {
     }
     dd.classList.remove('hidden');
     _sitesDropdownOpen = true;
+    _sitesDropdownOpenTime = Date.now();
   }
 }
 
-// Close dropdown when clicking outside
+// Close dropdown when clicking outside — with timestamp guard to prevent
+// the same click that opened the dropdown from immediately closing it
 document.addEventListener('click', function(e) {
   if (!_sitesDropdownOpen) return;
+  // Ignore clicks within 300ms of opening (same event bubble)
+  if (Date.now() - _sitesDropdownOpenTime < 300) return;
   var dd = _sitesDropdownEl || document.getElementById('sites-dropdown');
+  var btn = document.getElementById('btn-sites');
+  // Don't close if clicking the button itself (toggle handles it)
+  if (btn && btn.contains(e.target)) return;
+  // Don't close if clicking inside the dropdown
+  if (dd && dd.contains(e.target)) return;
   if (dd) {
     dd.classList.add('hidden');
     _sitesDropdownOpen = false;
