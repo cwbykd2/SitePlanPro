@@ -31,7 +31,7 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height
 .road-width-modal .curve-toggle{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;margin-bottom:16px;cursor:pointer;font-family:'DM Mono',monospace;font-size:13px;color:var(--text);transition:all 0.15s}
 .road-width-modal .curve-toggle:hover{border-color:var(--muted);background:var(--border)}
 .road-width-modal .curve-toggle input[type="checkbox"]{accent-color:var(--accent)}
-.snap-indicator{width:10px;height:10px;background:#22d3ee;border:2px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(34,211,238,0.6);pointer-events:none}
+
 .road-edit-vertex{width:12px;height:12px;background:#6366f1;border:2px solid #fff;border-radius:50%;cursor:grab;box-shadow:0 0 6px rgba(99,102,241,0.5)}
 .road-edit-vertex:hover{background:#818cf8;transform:scale(1.2)}
 .road-edit-midpoint{width:10px;height:10px;background:rgba(99,102,241,0.5);border:2px solid rgba(255,255,255,0.6);border-radius:50%;cursor:pointer;box-shadow:0 0 4px rgba(99,102,241,0.3)}
@@ -316,8 +316,7 @@ var roads = []; // Each road: { centerline: [], width: number, layer: L.Polygon,
 var pendingRoadPolyline = null;
 var selectedRoadWidth = 40;
 var editingRoad = null; // currently editing road object
-var snapMarker = null; // visual snap indicator
-var SNAP_DIST_PX = 20; // snap distance in pixels
+
 var ponds = [];
 var pavings = [];
 var pavingMode = 'rect'; // 'rect' or 'free'
@@ -1558,111 +1557,7 @@ function fmt(n) {
   return Math.round(n).toLocaleString();
 }
 
-/* ===== SNAP-TO-EDGES HELPERS ===== */
 
-function getAllSnappableEdges() {
-  var edges = [];
-  // Collect edges from building overlays (truck courts, parking)
-  buildings.forEach(function(b) {
-    b.overlayGroup.eachLayer(function(ol) {
-      if (ol.getLatLngs) {
-        var lls = ol.getLatLngs()[0] || ol.getLatLngs();
-        for (var i = 0; i < lls.length; i++) {
-          edges.push([lls[i], lls[(i + 1) % lls.length]]);
-        }
-      }
-    });
-    // Building edges themselves
-    if (b.vertices && b.vertices.length >= 4) {
-      for (var i = 0; i < b.vertices.length; i++) {
-        edges.push([b.vertices[i], b.vertices[(i + 1) % b.vertices.length]]);
-      }
-    }
-  });
-  // Paving edges
-  pavings.forEach(function(p) {
-    if (p.vertices && p.vertices.length >= 3) {
-      for (var i = 0; i < p.vertices.length; i++) {
-        edges.push([p.vertices[i], p.vertices[(i + 1) % p.vertices.length]]);
-      }
-    }
-  });
-  // Other road polygon edges
-  roads.forEach(function(r) {
-    if (r.isPolygon && r.layer) {
-      var lls = r.layer.getLatLngs()[0] || r.layer.getLatLngs();
-      for (var i = 0; i < lls.length; i++) {
-        edges.push([lls[i], lls[(i + 1) % lls.length]]);
-      }
-    }
-  });
-  return edges;
-}
-
-function closestPointOnSegment(p, a, b) {
-  var dx = b.lng - a.lng, dy = b.lat - a.lat;
-  var lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-18) return { lat: a.lat, lng: a.lng };
-  var t = ((p.lng - a.lng) * dx + (p.lat - a.lat) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  return L.latLng(a.lat + t * dy, a.lng + t * dx);
-}
-
-function findSnapPoint(latlng) {
-  var edges = getAllSnappableEdges();
-  var bestDist = Infinity;
-  var bestPt = null;
-  var pt = map.latLngToContainerPoint(latlng);
-  for (var i = 0; i < edges.length; i++) {
-    var cp = closestPointOnSegment(latlng, edges[i][0], edges[i][1]);
-    var cpPx = map.latLngToContainerPoint(cp);
-    var dist = pt.distanceTo(cpPx);
-    if (dist < SNAP_DIST_PX && dist < bestDist) {
-      bestDist = dist;
-      bestPt = cp;
-    }
-  }
-  return bestPt;
-}
-
-function showSnapIndicator(latlng) {
-  if (!snapMarker) {
-    snapMarker = L.marker(latlng, {
-      icon: L.divIcon({ className: 'snap-indicator', iconSize: [10, 10], iconAnchor: [5, 5] }),
-      interactive: false, zIndexOffset: 3000
-    }).addTo(map);
-  } else {
-    snapMarker.setLatLng(latlng);
-    if (!map.hasLayer(snapMarker)) snapMarker.addTo(map);
-  }
-}
-
-function hideSnapIndicator() {
-  if (snapMarker && map.hasLayer(snapMarker)) map.removeLayer(snapMarker);
-}
-
-// Hook into Leaflet.Draw to add snap behavior during polyline drawing
-(function hookDrawSnap() {
-  map.on('mousemove', function(e) {
-    if (currentTool !== 'road' || !activeDraw) { hideSnapIndicator(); return; }
-    var snap = findSnapPoint(e.latlng);
-    if (snap) {
-      showSnapIndicator(snap);
-    } else {
-      hideSnapIndicator();
-    }
-  });
-
-  // Override the addVertex method of polyline draw to snap
-  var origAddVertex = L.Draw.Polyline.prototype.addVertex;
-  L.Draw.Polyline.prototype.addVertex = function(latlng) {
-    if (currentTool === 'road') {
-      var snap = findSnapPoint(latlng);
-      if (snap) latlng = snap;
-    }
-    origAddVertex.call(this, latlng);
-  };
-})();
 
 /* ===== CATMULL-ROM SPLINE ===== */
 
@@ -1729,7 +1624,6 @@ function cancelRoadWidth() {
   var modal = document.getElementById('road-width-modal');
   modal.classList.remove('active');
   pendingRoadPolyline = null;
-  hideSnapIndicator();
   setStatus('Road cancelled - draw another or switch tools');
   currentTool = 'road';
   beginDraw('polyline');
@@ -1738,7 +1632,6 @@ function cancelRoadWidth() {
 function applyRoadWidth() {
   var modal = document.getElementById('road-width-modal');
   modal.classList.remove('active');
-  hideSnapIndicator();
 
   var widthFt = selectedRoadWidth;
   if (widthFt === -1) {
@@ -1754,14 +1647,6 @@ function applyRoadWidth() {
 
   var centerlineLatLngs = pendingRoadPolyline.getLatLngs();
   var curved = document.getElementById('chk-curved-road').checked;
-
-  // Snap first and last points
-  if (centerlineLatLngs.length >= 2) {
-    var snapFirst = findSnapPoint(centerlineLatLngs[0]);
-    if (snapFirst) centerlineLatLngs[0] = snapFirst;
-    var snapLast = findSnapPoint(centerlineLatLngs[centerlineLatLngs.length - 1]);
-    if (snapLast) centerlineLatLngs[centerlineLatLngs.length - 1] = snapLast;
-  }
 
   var road = createRoadFromCenterline(centerlineLatLngs, widthFt, curved);
   pendingRoadPolyline = null;
@@ -1879,15 +1764,12 @@ function renderRoadEditHandles(road) {
 
     m.on('dragstart', function() { map.dragging.disable(); });
     m.on('drag', function(e) {
-      var snap = findSnapPoint(e.target.getLatLng());
-      var pos = snap || e.target.getLatLng();
-      if (snap) { e.target.setLatLng(snap); showSnapIndicator(snap); } else { hideSnapIndicator(); }
+      var pos = e.target.getLatLng();
       road.centerline[idx] = pos;
       rebuildRoadGeometry(road);
     });
     m.on('dragend', function() {
       map.dragging.enable();
-      hideSnapIndicator();
       renderRoadEditHandles(road);
       mergeRoadIntersections(road);
       recalcStats();
@@ -1954,7 +1836,6 @@ function exitRoadEditMode() {
     editingRoad.editGroup = null;
   }
   editingRoad = null;
-  hideSnapIndicator();
 }
 
 function deleteEditingRoad() {
@@ -2487,7 +2368,6 @@ function deserializeSite(data) {
   buildings = []; roads = []; ponds = []; pavings = []; siteBoundary = null; activeBuilding = null;
   editingRoad = null;
   hideAllHandles();
-  hideSnapIndicator();
 
   // Restore map view
   if (data.mapCenter && data.mapZoom) {
@@ -2770,7 +2650,6 @@ function clearAll_noConfirm() {
   buildings = []; roads = []; ponds = []; pavings = []; siteBoundary = null; activeBuilding = null;
   editingRoad = null;
   hideAllHandles();
-  hideSnapIndicator();
   document.getElementById('building-opts-panel').classList.add('hidden');
   updateBuildingList();
   recalcStats();
