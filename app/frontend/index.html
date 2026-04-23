@@ -718,7 +718,7 @@ function setTool(tool) {
     setStatus('Drag to draw a building rectangle');
   } else if (tool === 'road') {
     beginDraw('polyline');
-    setStatus('Click points to draw road - double-click to finish');
+    setStatus('Click points to draw road - press Enter or double-click to finish');
   } else if (tool === 'pond') {
     beginDraw('polygon', 'pond');
     setStatus('Click points to draw pond - double-click to finish');
@@ -1660,6 +1660,13 @@ document.getElementById('address-input').addEventListener('keydown', function(e)
 });
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') setTool('select');
+  if (e.key === 'Enter' && activeDraw && drawingMode === 'polyline') {
+    e.preventDefault();
+    // Finish the polyline if at least 2 points have been placed
+    if (activeDraw._markers && activeDraw._markers.length >= 2) {
+      activeDraw._finishShape();
+    }
+  }
 });
 
 /* ===== CLEAR ALL ===== */
