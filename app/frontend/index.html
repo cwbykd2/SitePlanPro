@@ -1006,17 +1006,30 @@ function drawBuildingOverlays(b) {
   }
 
   if (b.type === 'rear') {
-    // Rear load: truck court on one side (south/bottom)
-    // Base truck court (130ft) always shown in yellow
-    addRotatedRect(S, S - TRUCK_DEFAULT * ftLat, W, E, '#fbbf24', 0.2);
-    // If trailer parking enabled, show the extra 55ft (130→185) in orange
-    if (b.trailerRear) {
-      addRotatedRect(S - TRUCK_DEFAULT * ftLat, S - TRUCK_EXTENDED * ftLat, W, E, '#f97316', 0.18);
+    // Rear load: truck court on the LONGER side of the building
+    // Calculate building edge lengths in feet
+    var ewWidthFt = (E - W) / ftLng; // E-W span in feet
+    var nsDepthFt = (N - S) / ftLat; // N-S span in feet
+
+    if (ewWidthFt >= nsDepthFt) {
+      // E-W is the longer (or equal) side → truck court on south (bottom), car parking on north (top)
+      addRotatedRect(S, S - TRUCK_DEFAULT * ftLat, W, E, '#fbbf24', 0.2);
+      if (b.trailerRear) {
+        addRotatedRect(S - TRUCK_DEFAULT * ftLat, S - TRUCK_EXTENDED * ftLat, W, E, '#f97316', 0.18);
+      }
+      addRotatedRect(N, N + PARK * ftLat, W, E, '#60a5fa', 0.2);
+      if (b.leftParking) addRotatedRect(N, S, W - PARK * ftLng, W, '#60a5fa', 0.2);
+      if (b.rightParking) addRotatedRect(N, S, E, E + PARK * ftLng, '#60a5fa', 0.2);
+    } else {
+      // N-S is the longer side → truck court on west (left), car parking on east (right)
+      addRotatedRect(N, S, W - TRUCK_DEFAULT * ftLng, W, '#fbbf24', 0.2);
+      if (b.trailerRear) {
+        addRotatedRect(N, S, W - TRUCK_EXTENDED * ftLng, W - TRUCK_DEFAULT * ftLng, '#f97316', 0.18);
+      }
+      addRotatedRect(N, S, E, E + PARK * ftLng, '#60a5fa', 0.2);
+      if (b.leftParking) addRotatedRect(N, N + PARK * ftLat, W, E, '#60a5fa', 0.2);
+      if (b.rightParking) addRotatedRect(S - PARK * ftLat, S, W, E, '#60a5fa', 0.2);
     }
-    // Default car parking on opposite side (north/top) of truck court for rear load
-    addRotatedRect(N, N + PARK * ftLat, W, E, '#60a5fa', 0.2);
-    if (b.leftParking) addRotatedRect(N, S, W - PARK * ftLng, W, '#60a5fa', 0.2);
-    if (b.rightParking) addRotatedRect(N, S, E, E + PARK * ftLng, '#60a5fa', 0.2);
   } else {
     // Cross dock: truck court on both sides (top and bottom)
     // Top side (north)
