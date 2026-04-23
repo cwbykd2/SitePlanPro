@@ -24,6 +24,9 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Visual save indicator near site name
 - [x] Export PDF button - captures map view and site statistics as downloadable PDF
 - [x] Independent width/depth resizing - separate edge-midpoint handles for stretching width and depth independently
+- [x] Hashed black boundary line - after naming, boundary locks to black dashed line with no edit points or fill
+- [x] Adjust Site button - appears in sidebar when boundary is locked, click to re-enable editing
+- [x] Out-of-bounds red highlighting - areas of buildings/pavings/ponds outside the boundary turn solid red
 
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application
@@ -33,3 +36,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Fixed truck court/parking rotation pivot to use baseCenter instead of rotated center, ensuring overlays align perfectly with building edges at any angle
 - 2026-04-22: Rewrote overlay positioning to use edge-vector math instead of bounding boxes, fixing alignment after drag/rotate operations
 - 2026-04-22: Replaced single resize handle with independent width (blue ↔) and depth (green ↕) edge-midpoint handles for axis-specific resizing
+- 2026-04-22: Added hashed black boundary line (locked after naming), Adjust Site button, and out-of-bounds red highlighting for items outside boundary

@@ -102,6 +102,7 @@ select option{background:var(--panel2)}
 .site-item-actions{display:flex;gap:4px}
 .site-item-actions button{padding:3px 6px;font-size:10px;min-width:0}
 .no-sites-msg{font-size:11px;color:var(--muted);text-align:center;padding:16px 12px}
+#btn-adjust-site:hover{border-color:var(--warn);background:rgba(245,158,11,.1)}
 </style>
 </head>
 <body>
@@ -160,6 +161,10 @@ select option{background:var(--panel2)}
               Paving
             </button>
           </div>
+          <button id="btn-adjust-site" class="hidden" onclick="unlockSiteBoundary()" style="width:100%;margin-top:6px;padding:8px 10px;font-size:11px;font-weight:700;background:var(--panel);border:1px solid var(--border);color:var(--warn);border-radius:6px;cursor:pointer;transition:all .15s;font-family:'Syne',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Adjust Site
+          </button>
         </div>
       </div>
       <div id="building-opts-panel" class="hidden">
@@ -550,6 +555,7 @@ function showBuildingHandles(b) {
       recalcStats();
       drawBuildingOverlays(bld);
       refreshHandlePositions(bld);
+      checkOutOfBounds();
     }
     handleState = null;
   });
@@ -608,6 +614,7 @@ function showBuildingHandles(b) {
       recalcStats();
       drawBuildingOverlays(bld);
       refreshHandlePositions(bld);
+      checkOutOfBounds();
     }
     handleState = null;
   });
@@ -652,6 +659,7 @@ function showBuildingHandles(b) {
       updateTransformSliders(bld);
       recalcStats();
       drawBuildingOverlays(bld);
+      checkOutOfBounds();
     }
     handleState = null;
   });
@@ -758,6 +766,7 @@ map.on(L.Draw.Event.CREATED, function(e) {
       if (confirm('Delete this road?')) { drawnItems.removeLayer(layer); roads = roads.filter(function(r){return r!==layer}); recalcStats(); }
     });
     recalcStats();
+    checkOutOfBounds();
     setStatus('Road added - draw another or switch tools');
     currentTool = 'road';
     beginDraw('polyline');
@@ -770,6 +779,7 @@ map.on(L.Draw.Event.CREATED, function(e) {
       if (confirm('Delete this pond?')) { drawnItems.removeLayer(layer); ponds = ponds.filter(function(p){return p!==layer}); recalcStats(); }
     });
     recalcStats();
+    checkOutOfBounds();
     setStatus('Pond added - draw another or switch tools');
     currentTool = 'pond';
     beginDraw('polygon', 'pond');
@@ -792,6 +802,7 @@ map.on(L.Draw.Event.CREATED, function(e) {
       if (siteBoundary.editing) siteBoundary.editing.disable();
       drawnItems.removeLayer(siteBoundary);
     }
+    siteBoundaryLocked = false;
     layer.setStyle({color:'#a78bfa',weight:3,dashArray:'8,4',fillColor:'#a78bfa',fillOpacity:0.08});
     siteBoundary = layer;
     drawnItems.addLayer(layer);
@@ -837,6 +848,7 @@ function registerBuilding(layer, verts) {
   showBuildingOpts();
   updateBuildingList();
   recalcStats();
+  checkOutOfBounds();
   setStatus('Building placed! Drag to move. Use blue ⤡ handle to resize, yellow ↻ handle to rotate.');
 }
 
@@ -918,6 +930,7 @@ function onBuildingDragEnd(e) {
     recalcStats();
     drawBuildingOverlays(b);
     refreshHandlePositions(b);
+    checkOutOfBounds();
   }
   dragState = null;
 }
@@ -940,6 +953,7 @@ function applyTransform(b) {
   recalcStats();
   updateBuildingList();
   refreshHandlePositions(b);
+  checkOutOfBounds();
 }
 
 function onRotateSlider(val) {
@@ -1057,6 +1071,7 @@ function applyBuildingOptions() {
   updateBuildingList();
   recalcStats();
   showBuildingHandles(b);
+  checkOutOfBounds();
   setStatus('Options applied!');
 }
 
@@ -1258,6 +1273,7 @@ function registerPaving(layer, isRect) {
 
   updatePavingLabels(paving);
   recalcStats();
+  checkOutOfBounds();
   setStatus('Paving added! ' + (pavingMode === 'rect' ? 'Drag another rectangle' : 'Click to draw another') + ' or switch tools');
 }
 
@@ -1325,46 +1341,88 @@ function deletePaving(id) {
   if (p.labelGroup) map.removeLayer(p.labelGroup);
   pavings = pavings.filter(function(x) { return x.id !== id; });
   recalcStats();
+  checkOutOfBounds();
 }
 
 /* ===== SITE BOUNDARY ===== */
 
 var siteEditEnabled = false;
+var siteBoundaryLocked = false;
+var outOfBoundsLayers = []; // red overlay layers for out-of-bounds areas
 
 function enableSiteEditing() {
   if (!siteBoundary) return;
+  // Unlock: show purple editable style
+  siteBoundaryLocked = false;
+  siteBoundary.setStyle({color:'#a78bfa',weight:3,dashArray:'8,4',fillColor:'#a78bfa',fillOpacity:0.08});
   if (siteBoundary.editing) {
     siteBoundary.editing.enable();
     siteEditEnabled = true;
   }
   siteBoundary.off('edit');
-  siteBoundary.on('edit', function() { recalcStats(); });
+  siteBoundary.on('edit', function() { recalcStats(); checkOutOfBounds(); });
   map.off('mouseup.siteedit');
   map.on('mouseup.siteedit', function() {
-    if (siteEditEnabled && siteBoundary) recalcStats();
+    if (siteEditEnabled && siteBoundary) { recalcStats(); checkOutOfBounds(); }
   });
+  updateAdjustSiteBtn();
 }
 
 function disableSiteEditing() {
   if (siteBoundary && siteBoundary.editing) siteBoundary.editing.disable();
   siteEditEnabled = false;
   map.off('mouseup.siteedit');
+  updateAdjustSiteBtn();
+}
+
+function lockSiteBoundary() {
+  if (!siteBoundary) return;
+  disableSiteEditing();
+  siteBoundaryLocked = true;
+  // Black hashed line, no fill
+  siteBoundary.setStyle({color:'#000000',weight:3,dashArray:'12,8',fillColor:'transparent',fillOpacity:0});
+  updateAdjustSiteBtn();
+  checkOutOfBounds();
+}
+
+function unlockSiteBoundary() {
+  if (!siteBoundary) return;
+  enableSiteEditing();
+  clearOutOfBoundsLayers();
+  setStatus('Site editing enabled! Drag corners to reshape, drag midpoints to add new vertices.');
+}
+
+function updateAdjustSiteBtn() {
+  var btn = document.getElementById('btn-adjust-site');
+  if (!btn) return;
+  if (siteBoundary && siteBoundaryLocked) {
+    btn.classList.remove('hidden');
+  } else {
+    btn.classList.add('hidden');
+  }
 }
 
 function updateSiteButtons() {
   var btnSite = document.getElementById('btn-site');
   var btnRedraw = document.getElementById('btn-redraw-site');
   if (siteBoundary) {
-    btnSite.textContent = siteEditEnabled ? 'Done Editing' : 'Edit Site';
+    if (siteBoundaryLocked) {
+      btnSite.textContent = 'Edit Site';
+    } else {
+      btnSite.textContent = siteEditEnabled ? 'Done Editing' : 'Edit Site';
+    }
     btnRedraw.style.display = '';
   } else {
     btnSite.textContent = 'Draw Site';
     btnRedraw.style.display = 'none';
   }
+  updateAdjustSiteBtn();
 }
 
 function redrawSite() {
   disableSiteEditing();
+  siteBoundaryLocked = false;
+  clearOutOfBoundsLayers();
   if (siteBoundary) { drawnItems.removeLayer(siteBoundary); siteBoundary = null; }
   updateSiteButtons();
   drawingMode = 'site';
@@ -1380,11 +1438,18 @@ function redrawSite() {
 function toggleSiteTool() {
   stopDraw();
   if (siteBoundary) {
+    if (siteBoundaryLocked) {
+      // Unlock for editing
+      unlockSiteBoundary();
+      updateSiteButtons();
+      return;
+    }
     if (siteEditEnabled) {
-      disableSiteEditing();
+      // Lock the boundary
+      lockSiteBoundary();
       updateSiteButtons();
       recalcStats();
-      setStatus('Site editing saved. Click "Edit Site" to continue editing.');
+      setStatus('Site boundary locked. Click "Adjust Site" to edit.');
     } else {
       enableSiteEditing();
       updateSiteButtons();
@@ -1399,6 +1464,81 @@ function toggleSiteTool() {
   });
   activeDraw.enable();
   setStatus('Click to draw site boundary - double-click to finish');
+}
+
+/* ===== OUT-OF-BOUNDS DETECTION ===== */
+
+function clearOutOfBoundsLayers() {
+  outOfBoundsLayers.forEach(function(l) { map.removeLayer(l); });
+  outOfBoundsLayers = [];
+}
+
+function checkOutOfBounds() {
+  clearOutOfBoundsLayers();
+  if (!siteBoundary || !siteBoundaryLocked) return;
+
+  var boundaryGeo;
+  try {
+    boundaryGeo = siteBoundary.toGeoJSON();
+    // Ensure it's a valid polygon
+    if (!boundaryGeo || !boundaryGeo.geometry) return;
+  } catch(e) { return; }
+
+  // Check buildings
+  buildings.forEach(function(b) {
+    try {
+      var bldgGeo = b.layer.toGeoJSON();
+      var diff = turf.difference(turf.featureCollection([bldgGeo, boundaryGeo]));
+      if (diff) {
+        var redLayer = L.geoJSON(diff, {
+          style: { color: '#ef4444', weight: 2, fillColor: '#ef4444', fillOpacity: 0.5, interactive: false }
+        }).addTo(map);
+        outOfBoundsLayers.push(redLayer);
+      }
+    } catch(e) {}
+
+    // Check overlays
+    b.overlayGroup.eachLayer(function(ol) {
+      try {
+        var olGeo = ol.toGeoJSON();
+        var diff = turf.difference(turf.featureCollection([olGeo, boundaryGeo]));
+        if (diff) {
+          var redLayer = L.geoJSON(diff, {
+            style: { color: '#ef4444', weight: 1, fillColor: '#ef4444', fillOpacity: 0.4, interactive: false }
+          }).addTo(map);
+          outOfBoundsLayers.push(redLayer);
+        }
+      } catch(e) {}
+    });
+  });
+
+  // Check pavings
+  pavings.forEach(function(p) {
+    try {
+      var pGeo = p.layer.toGeoJSON();
+      var diff = turf.difference(turf.featureCollection([pGeo, boundaryGeo]));
+      if (diff) {
+        var redLayer = L.geoJSON(diff, {
+          style: { color: '#ef4444', weight: 2, fillColor: '#ef4444', fillOpacity: 0.45, interactive: false }
+        }).addTo(map);
+        outOfBoundsLayers.push(redLayer);
+      }
+    } catch(e) {}
+  });
+
+  // Check ponds
+  ponds.forEach(function(p) {
+    try {
+      var pGeo = p.toGeoJSON();
+      var diff = turf.difference(turf.featureCollection([pGeo, boundaryGeo]));
+      if (diff) {
+        var redLayer = L.geoJSON(diff, {
+          style: { color: '#ef4444', weight: 2, fillColor: '#ef4444', fillOpacity: 0.45, interactive: false }
+        }).addTo(map);
+        outOfBoundsLayers.push(redLayer);
+      }
+    } catch(e) {}
+  });
 }
 
 /* ===== STATISTICS ===== */
@@ -1476,6 +1616,7 @@ function deleteBuilding(id) {
   if (activeBuilding===id) { activeBuilding=null; document.getElementById('building-opts-panel').classList.add('hidden'); hideAllHandles(); }
   updateBuildingList();
   recalcStats();
+  checkOutOfBounds();
 }
 
 /* ===== GEOCODING ===== */
@@ -1674,6 +1815,8 @@ function clearAll() {
   if (!confirm('Clear everything?')) return;
   stopDraw();
   disableSiteEditing();
+  clearOutOfBoundsLayers();
+  siteBoundaryLocked = false;
   buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); if (b.labelGroup) map.removeLayer(b.labelGroup); });
   roads.forEach(function(r){ drawnItems.removeLayer(r); });
   ponds.forEach(function(p){ drawnItems.removeLayer(p); });
@@ -1846,9 +1989,9 @@ function deserializeSite(data) {
   // Restore site boundary
   if (data.siteBoundary && data.siteBoundary.length >= 3) {
     var bVerts = data.siteBoundary.map(function(v) { return L.latLng(v.lat, v.lng); });
-    siteBoundary = L.polygon(bVerts, { color: '#a78bfa', weight: 3, dashArray: '8,4', fillColor: '#a78bfa', fillOpacity: 0.08 });
+    siteBoundary = L.polygon(bVerts, { color: '#000000', weight: 3, dashArray: '12,8', fillColor: 'transparent', fillOpacity: 0 });
     drawnItems.addLayer(siteBoundary);
-    enableSiteEditing();
+    siteBoundaryLocked = true;
     updateSiteButtons();
   }
 
@@ -1950,6 +2093,8 @@ function deserializeSite(data) {
   updateBuildingList();
   recalcStats();
   updateSiteButtons();
+  // Check out-of-bounds after full restore
+  setTimeout(function() { checkOutOfBounds(); }, 100);
 }
 
 /* ===== AUTO-SAVE ===== */
@@ -1997,8 +2142,10 @@ function flashSaveIndicator() {
         var name = promptSiteName(false);
         if (name) {
           setSiteName(name);
+          lockSiteBoundary();
+          updateSiteButtons();
           autoSave();
-          setStatus('Site "' + name + '" created and auto-saving.');
+          setStatus('Site "' + name + '" created. Boundary locked.');
         }
       }, 200);
     }
@@ -2094,6 +2241,8 @@ function newSite() {
 function clearAll_noConfirm() {
   stopDraw();
   disableSiteEditing();
+  clearOutOfBoundsLayers();
+  siteBoundaryLocked = false;
   buildings.forEach(function(b) {
     drawnItems.removeLayer(b.layer);
     map.removeLayer(b.overlayGroup);
