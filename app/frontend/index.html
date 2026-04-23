@@ -155,8 +155,7 @@ select option{background:var(--panel2)}
 .save-indicator{font-family:'DM Mono',monospace;font-size:10px;color:var(--green);opacity:0;transition:opacity .3s;white-space:nowrap}
 .save-indicator.show{opacity:1}
 .save-indicator.hidden{display:none}
-.sites-dropdown-wrap{position:relative}
-.sites-dropdown{position:fixed;margin-top:6px;background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:240px;max-height:320px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:2000;display:flex;flex-direction:column}
+.sites-dropdown{position:fixed;background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:240px;max-height:320px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:99999;display:flex;flex-direction:column}
 .sites-dropdown.hidden{display:none!important}
 .sites-dropdown-footer{padding:8px;border-top:1px solid var(--border)}
 #sites-list{overflow-y:auto;max-height:260px;padding:6px}
@@ -210,15 +209,7 @@ select option{background:var(--panel2)}
     <button class="btn-primary" onclick="geocodeAddress()">Go</button>
   </div>
   <div class="toolbar-sep"></div>
-  <div class="sites-dropdown-wrap">
-    <button class="btn-ghost" id="btn-sites" onclick="toggleSitesDropdown()">📁 Sites</button>
-    <div id="sites-dropdown" class="sites-dropdown hidden">
-      <div id="sites-list"></div>
-      <div class="sites-dropdown-footer">
-        <button class="btn-ghost" onclick="newSite()" style="width:100%;font-size:11px">+ New Site</button>
-      </div>
-    </div>
-  </div>
+  <button class="btn-ghost" id="btn-sites" onclick="toggleSitesDropdown()">📁 Sites</button>
   <button class="btn-ghost" id="btn-site" onclick="toggleSiteTool()">Draw Site</button>
   <button class="btn-ghost" id="btn-redraw-site" onclick="redrawSite()" style="display:none">Redraw Site</button>
   <button class="btn-ghost" onclick="clearAll()">Clear All</button>
@@ -3913,9 +3904,10 @@ function toggleSitesDropdown() {
 
 // Close dropdown when clicking outside
 document.addEventListener('click', function(e) {
-  var wrap = document.querySelector('.sites-dropdown-wrap');
-  if (wrap && !wrap.contains(e.target)) {
-    document.getElementById('sites-dropdown').classList.add('hidden');
+  var btn = document.getElementById('btn-sites');
+  var dd = document.getElementById('sites-dropdown');
+  if (btn && dd && !btn.contains(e.target) && !dd.contains(e.target)) {
+    dd.classList.add('hidden');
   }
 });
 
@@ -4044,5 +4036,11 @@ function clearAll_noConfirm() {
 })();
 
 </script>
+<div id="sites-dropdown" class="sites-dropdown hidden">
+  <div id="sites-list"></div>
+  <div class="sites-dropdown-footer">
+    <button class="btn-ghost" onclick="newSite()" style="width:100%;font-size:11px">+ New Site</button>
+  </div>
+</div>
 </body>
 </html>
