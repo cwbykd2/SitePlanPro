@@ -288,21 +288,7 @@ select option{background:var(--panel2)}
                 <div class="type-card" id="opt-rear" onclick="selectType('rear')"><div class="type-icon">&#x1F69B;</div><div class="type-name">Rear Load</div></div>
               </div>
             </div>
-            <div>
-              <label>Bay Spacing</label>
-              <select id="opt-spacing" onchange="onSpacingChange()">
-                <option value="50x52">50 x 52 ft</option>
-                <option value="50x54">50 x 54 ft</option>
-                <option value="50x56">50 x 56 ft</option>
-                <option value="custom">Custom...</option>
-              </select>
-            </div>
-            <div id="custom-dims" class="hidden">
-              <div class="form-row">
-                <div><label>Width (ft)</label><input type="number" id="opt-cw" value="50" min="10"></div>
-                <div><label>Depth (ft)</label><input type="number" id="opt-cd" value="52" min="10"></div>
-              </div>
-            </div>
+
             <!-- Bay Configuration System -->
             <div class="bay-config" id="bay-config-panel">
               <div class="bay-config-header">
