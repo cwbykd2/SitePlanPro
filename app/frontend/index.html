@@ -961,88 +961,137 @@ function applyBuildingOptions() {
 
 function drawBuildingOverlays(b) {
   b.overlayGroup.clearLayers();
-  if (!b.vertices || b.vertices.length < 4 || !b.baseVertices || b.baseVertices.length < 4) return;
+  if (!b.vertices || b.vertices.length < 4) return;
 
-  // Get axis-aligned bounding box of the base (unrotated) vertices
-  var baseCenter = getPolygonCenter(b.baseVertices);
-  var scaleFactor = b.scale / 100;
+  // Work directly with the ACTUAL building vertices (already transformed)
+  // Vertices order from rectToVerts: [NW(0), NE(1), SE(2), SW(3)]
+  var v = b.vertices;
 
-  // Calculate building dimensions from base vertices
-  var minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-  b.baseVertices.forEach(function(v) {
-    if (v.lat < minLat) minLat = v.lat;
-    if (v.lat > maxLat) maxLat = v.lat;
-    if (v.lng < minLng) minLng = v.lng;
-    if (v.lng > maxLng) maxLng = v.lng;
-  });
+  // Compute edge vectors in real-world coordinates
+  // "top" edge: v[0] -> v[1], "right" edge: v[1] -> v[2]
+  var center = getPolygonCenter(v);
+  var latScale = Math.cos(center.lat * Math.PI / 180);
 
-  var lat = (minLat + maxLat) / 2;
-  var ftLat = 1 / (111320 * FEET_PER_METER);
-  var ftLng = 1 / (111320 * Math.cos(lat * Math.PI / 180) * FEET_PER_METER);
-  var TRUCK_DEFAULT = 130; // Default truck court depth in feet
-  var TRUCK_EXTENDED = 185; // Extended truck court with trailer parking
+  // Edge vectors (in a coordinate system where x=lng*latScale, y=lat)
+  var topDx = (v[1].lng - v[0].lng) * latScale;
+  var topDy = v[1].lat - v[0].lat;
+  var topLen = Math.sqrt(topDx * topDx + topDy * topDy);
+
+  var rightDx = (v[2].lng - v[1].lng) * latScale;
+  var rightDy = v[2].lat - v[1].lat;
+  var rightLen = Math.sqrt(rightDx * rightDx + rightDy * rightDy);
+
+  // Unit vectors along edges
+  var uTopX = topDx / topLen;   // unit along top edge (v0→v1 direction)
+  var uTopY = topDy / topLen;
+  var uRightX = rightDx / rightLen; // unit along right edge (v1→v2 direction)
+  var uRightY = rightDy / rightLen;
+
+  // Convert feet to the same coordinate units
+  var ftToCoord = 1 / (111320 * FEET_PER_METER);
+
+  var TRUCK_DEFAULT = 130;
+  var TRUCK_EXTENDED = 185;
   var PARK = 62;
 
-  // Scale the base bounds
-  var N = baseCenter.lat + (maxLat - baseCenter.lat) * scaleFactor;
-  var S = baseCenter.lat + (minLat - baseCenter.lat) * scaleFactor;
-  var E = baseCenter.lng + (maxLng - baseCenter.lng) * scaleFactor;
-  var W = baseCenter.lng + (minLng - baseCenter.lng) * scaleFactor;
+  // Edge lengths in feet
+  var topFt = topLen / ftToCoord;    // length of top/bottom edge in feet
+  var rightFt = rightLen / ftToCoord; // length of left/right edge in feet
 
-  // Use baseCenter as rotation pivot so overlays align exactly with building edges
-  function addRotatedRect(latN, latS, lngW, lngE, color, op) {
-    var corners = [
-      L.latLng(latN, lngW),
-      L.latLng(latN, lngE),
-      L.latLng(latS, lngE),
-      L.latLng(latS, lngW)
-    ];
-    var rotated = corners.map(function(c) {
-      var scaled = c; // already in scaled base coords
-      return rotatePoint(baseCenter, scaled, b.rotation);
-    });
-    L.polygon(rotated, {color:color, weight:1, fillColor:color, fillOpacity:op, interactive:false}).addTo(b.overlayGroup);
+  // Helper: offset a point by (along, perp) in feet using edge unit vectors
+  // "along" = along the top edge direction, "perp" = along the right edge direction
+  function offsetPt(pt, alongFt, perpFt) {
+    var along = alongFt * ftToCoord;
+    var perp = perpFt * ftToCoord;
+    return L.latLng(
+      pt.lat + uTopY * along + uRightY * perp,
+      pt.lng + (uTopX * along + uRightX * perp) / latScale
+    );
   }
 
-  if (b.type === 'rear') {
-    // Rear load: truck court on the LONGER side of the building
-    // Calculate building edge lengths in feet
-    var ewWidthFt = (E - W) / ftLng; // E-W span in feet
-    var nsDepthFt = (N - S) / ftLat; // N-S span in feet
+  // Helper: create a parallelogram overlay by offsetting an edge
+  // edge defined by two points (p1, p2), extruded in a perpendicular direction by 'depth' feet
+  // direction: 'outTop' = outward from top edge (opposite of right direction)
+  //            'outBottom' = outward from bottom edge (same as right direction from bottom)
+  //            'outLeft' = outward from left edge
+  //            'outRight' = outward from right edge
+  function addEdgeOverlay(p1, p2, depthFt, dirAlongFt, dirPerpFt, color, op) {
+    // p1, p2 define the base edge of the overlay
+    // dirAlongFt, dirPerpFt define the extrusion direction in (along, perp) units
+    var p3 = offsetPt(p2, dirAlongFt * depthFt, dirPerpFt * depthFt);
+    var p4 = offsetPt(p1, dirAlongFt * depthFt, dirPerpFt * depthFt);
+    L.polygon([p1, p2, p3, p4], {color:color, weight:1, fillColor:color, fillOpacity:op, interactive:false}).addTo(b.overlayGroup);
+  }
 
-    if (ewWidthFt >= nsDepthFt) {
-      // E-W is the longer (or equal) side → truck court on south (bottom), car parking on north (top)
-      addRotatedRect(S, S - TRUCK_DEFAULT * ftLat, W, E, '#fbbf24', 0.2);
+  // Identify edges:
+  // Top edge: v[0]→v[1] (NW→NE)
+  // Bottom edge: v[3]→v[2] (SW→SE)
+  // Left edge: v[0]→v[3] (NW→SW)
+  // Right edge: v[1]→v[2] (NE→SE)
+  //
+  // "Outward from top" = opposite of right-edge direction = (-uRightX, -uRightY)
+  //   In (along, perp) space: along=0, perp=-1 (negative right direction)
+  // "Outward from bottom" = same as right-edge direction = (uRightX, uRightY)
+  //   In (along, perp) space: along=0, perp=1
+  // "Outward from left" = opposite of top-edge direction = (-uTopX, -uTopY)
+  //   In (along, perp) space: along=-1, perp=0
+  // "Outward from right" = same as top-edge direction = (uTopX, uTopY)
+  //   In (along, perp) space: along=1, perp=0
+
+  if (b.type === 'rear') {
+    // Rear load: truck court on the LONGER side
+    if (topFt >= rightFt) {
+      // Top/bottom edges are longer → truck court on bottom (south), car parking on top (north)
+      // Truck court: extrude bottom edge outward (perp=+1 means along right-edge direction, which is outward from bottom)
+      addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#fbbf24', 0.2);
       if (b.trailerRear) {
-        addRotatedRect(S - TRUCK_DEFAULT * ftLat, S - TRUCK_EXTENDED * ftLat, W, E, '#f97316', 0.18);
+        // Trailer parking extends further beyond truck court
+        var tc1 = offsetPt(v[3], 0, TRUCK_DEFAULT);
+        var tc2 = offsetPt(v[2], 0, TRUCK_DEFAULT);
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18);
       }
-      addRotatedRect(N, N + PARK * ftLat, W, E, '#60a5fa', 0.2);
-      if (b.leftParking) addRotatedRect(N, S, W - PARK * ftLng, W, '#60a5fa', 0.2);
-      if (b.rightParking) addRotatedRect(N, S, E, E + PARK * ftLng, '#60a5fa', 0.2);
+      // Car parking on top (opposite side): extrude top edge outward (perp=-1)
+      addEdgeOverlay(v[0], v[1], PARK, 0, -1, '#60a5fa', 0.2);
+      // Left parking: extrude left edge outward (along=-1)
+      if (b.leftParking) addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#60a5fa', 0.2);
+      // Right parking: extrude right edge outward (along=+1)
+      if (b.rightParking) addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#60a5fa', 0.2);
     } else {
-      // N-S is the longer side → truck court on west (left), car parking on east (right)
-      addRotatedRect(N, S, W - TRUCK_DEFAULT * ftLng, W, '#fbbf24', 0.2);
+      // Left/right edges are longer → truck court on left (west), car parking on right (east)
+      // Truck court: extrude left edge outward (along=-1)
+      addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#fbbf24', 0.2);
       if (b.trailerRear) {
-        addRotatedRect(N, S, W - TRUCK_EXTENDED * ftLng, W - TRUCK_DEFAULT * ftLng, '#f97316', 0.18);
+        var tc1 = offsetPt(v[0], -TRUCK_DEFAULT, 0);
+        var tc2 = offsetPt(v[3], -TRUCK_DEFAULT, 0);
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18);
       }
-      addRotatedRect(N, S, E, E + PARK * ftLng, '#60a5fa', 0.2);
-      if (b.leftParking) addRotatedRect(N, N + PARK * ftLat, W, E, '#60a5fa', 0.2);
-      if (b.rightParking) addRotatedRect(S - PARK * ftLat, S, W, E, '#60a5fa', 0.2);
+      // Car parking on right (opposite side): extrude right edge outward (along=+1)
+      addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#60a5fa', 0.2);
+      // Top parking
+      if (b.leftParking) addEdgeOverlay(v[0], v[1], PARK, 0, -1, '#60a5fa', 0.2);
+      // Bottom parking
+      if (b.rightParking) addEdgeOverlay(v[3], v[2], PARK, 0, 1, '#60a5fa', 0.2);
     }
   } else {
-    // Cross dock: truck court on both sides (top and bottom)
-    // Top side (north)
-    addRotatedRect(N, N + TRUCK_DEFAULT * ftLat, W, E, '#fbbf24', 0.2);
+    // Cross dock: truck court on both top and bottom
+    // Top truck court: extrude top edge outward (perp=-1)
+    addEdgeOverlay(v[0], v[1], TRUCK_DEFAULT, 0, -1, '#fbbf24', 0.2);
     if (b.trailerTop) {
-      addRotatedRect(N + TRUCK_DEFAULT * ftLat, N + TRUCK_EXTENDED * ftLat, W, E, '#f97316', 0.18);
+      var tc1 = offsetPt(v[0], 0, -TRUCK_DEFAULT);
+      var tc2 = offsetPt(v[1], 0, -TRUCK_DEFAULT);
+      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#f97316', 0.18);
     }
-    // Bottom side (south)
-    addRotatedRect(S - TRUCK_DEFAULT * ftLat, S, W, E, '#fbbf24', 0.2);
+    // Bottom truck court: extrude bottom edge outward (perp=+1)
+    addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#fbbf24', 0.2);
     if (b.trailerBottom) {
-      addRotatedRect(S - TRUCK_EXTENDED * ftLat, S - TRUCK_DEFAULT * ftLat, W, E, '#f97316', 0.18);
+      var tc1 = offsetPt(v[3], 0, TRUCK_DEFAULT);
+      var tc2 = offsetPt(v[2], 0, TRUCK_DEFAULT);
+      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18);
     }
-    if (b.leftParking) addRotatedRect(N, S, W - PARK * ftLng, W, '#60a5fa', 0.2);
-    if (b.rightParking) addRotatedRect(N, S, E, E + PARK * ftLng, '#60a5fa', 0.2);
+    // Left parking: extrude left edge outward (along=-1)
+    if (b.leftParking) addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#60a5fa', 0.2);
+    // Right parking: extrude right edge outward (along=+1)
+    if (b.rightParking) addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#60a5fa', 0.2);
   }
 }
 
