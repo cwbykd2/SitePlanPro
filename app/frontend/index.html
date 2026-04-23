@@ -363,6 +363,26 @@ select option{background:var(--panel2)}
                 <label class="checkbox-row"><input type="checkbox" id="chk-left"> Parking on left side</label>
                 <label class="checkbox-row"><input type="checkbox" id="chk-right"> Parking on right side</label>
               </div>
+
+            <!-- Bump Out Configuration -->
+            <div>
+              <label style="margin-bottom:6px">Bump Outs <span style="font-size:10px;color:var(--muted)">(std bay size, truck court side)</span></label>
+              <div id="cross-bumpout-opts">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Top truck court:</div>
+                <label class="checkbox-row"><input type="checkbox" id="chk-bump-top-left"> Bump out — top left end</label>
+                <label class="checkbox-row"><input type="checkbox" id="chk-bump-top-right"> Bump out — top right end</label>
+                <div style="font-size:10px;color:var(--muted);margin-bottom:4px;margin-top:6px">Bottom truck court:</div>
+                <label class="checkbox-row"><input type="checkbox" id="chk-bump-bot-left"> Bump out — bottom left end</label>
+                <label class="checkbox-row"><input type="checkbox" id="chk-bump-bot-right"> Bump out — bottom right end</label>
+              </div>
+              <div id="rear-bumpout-opts" class="hidden">
+                <label class="checkbox-row"><input type="checkbox" id="chk-bump-rear-left"> Bump out — left end</label>
+                <label class="checkbox-row"><input type="checkbox" id="chk-bump-rear-right"> Bump out — right end</label>
+              </div>
+              <div style="font-size:10px;color:var(--muted);padding-top:2px">
+                Each bump out: 50' wide × std bay depth, at building ends facing truck court
+              </div>
+            </div>
               <div style="margin-top:8px;">
                 <label style="margin-bottom:4px;font-size:11px;">Truck Court Inset (ft)</label>
                 <div id="rear-inset-opts" class="hidden">
@@ -1184,7 +1204,14 @@ function registerBuilding(layer, verts) {
     tcInsetBottomRight: 0,
     clearHeight: '40',
     rotation: 0,
-    scale: 100
+    scale: 100,
+    // Bump out flags (at each end of building, facing truck court)
+    bumpTopLeft: false,
+    bumpTopRight: false,
+    bumpBotLeft: false,
+    bumpBotRight: false,
+    bumpRearLeft: false,
+    bumpRearRight: false
   };
   buildings.push(bldg);
   activeBuilding = id;
@@ -1375,6 +1402,19 @@ function showBuildingOpts() {
   if (elIR) elIR.value = b.tcInsetLeft || 0;
   if (elIT) elIT.value = b.tcInsetTopLeft || 0;
   if (elIB) elIB.value = b.tcInsetBottomLeft || 0;
+  // Populate bump out checkboxes
+  var elBTL = document.getElementById('chk-bump-top-left');
+  var elBTR = document.getElementById('chk-bump-top-right');
+  var elBBL = document.getElementById('chk-bump-bot-left');
+  var elBBR = document.getElementById('chk-bump-bot-right');
+  var elBRL = document.getElementById('chk-bump-rear-left');
+  var elBRR = document.getElementById('chk-bump-rear-right');
+  if (elBTL) elBTL.checked = b.bumpTopLeft || false;
+  if (elBTR) elBTR.checked = b.bumpTopRight || false;
+  if (elBBL) elBBL.checked = b.bumpBotLeft || false;
+  if (elBBR) elBBR.checked = b.bumpBotRight || false;
+  if (elBRL) elBRL.checked = b.bumpRearLeft || false;
+  if (elBRR) elBRR.checked = b.bumpRearRight || false;
   updateTrailerOpts(b.type);
   showBuildingHandles(b);
   // Update bay configuration UI
@@ -1386,6 +1426,11 @@ function updateTrailerOpts(type) {
   document.getElementById('rear-trailer-opts').classList.toggle('hidden', type !== 'rear');
   document.getElementById('rear-inset-opts').classList.toggle('hidden', type !== 'rear');
   document.getElementById('cross-inset-opts').classList.toggle('hidden', type !== 'cross');
+  // Toggle bump out options
+  var crossBump = document.getElementById('cross-bumpout-opts');
+  var rearBump = document.getElementById('rear-bumpout-opts');
+  if (crossBump) crossBump.classList.toggle('hidden', type !== 'cross');
+  if (rearBump) rearBump.classList.toggle('hidden', type !== 'rear');
 }
 
 function selectType(type) {
@@ -1403,6 +1448,22 @@ function applyBuildingOptions() {
   b.trailerRear = document.getElementById('chk-trailer-rear').checked;
   b.leftParking = document.getElementById('chk-left').checked;
   b.rightParking = document.getElementById('chk-right').checked;
+  // Read bump out flags
+  if (b.type === 'cross') {
+    b.bumpTopLeft = document.getElementById('chk-bump-top-left').checked;
+    b.bumpTopRight = document.getElementById('chk-bump-top-right').checked;
+    b.bumpBotLeft = document.getElementById('chk-bump-bot-left').checked;
+    b.bumpBotRight = document.getElementById('chk-bump-bot-right').checked;
+    b.bumpRearLeft = false;
+    b.bumpRearRight = false;
+  } else {
+    b.bumpRearLeft = document.getElementById('chk-bump-rear-left').checked;
+    b.bumpRearRight = document.getElementById('chk-bump-rear-right').checked;
+    b.bumpTopLeft = false;
+    b.bumpTopRight = false;
+    b.bumpBotLeft = false;
+    b.bumpBotRight = false;
+  }
   // Read inset values (single value per side, applied equally to both ends)
   if (b.type === 'rear') {
     var rearInset = parseFloat(document.getElementById('tc-inset-rear').value) || 0;
@@ -1592,6 +1653,103 @@ function drawBuildingOverlays(b) {
     }
     if (b.leftParking) addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#60a5fa', 0.2, 'carparking');
     if (b.rightParking) addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#60a5fa', 0.2, 'carparking');
+  }
+
+  // ===== BUMP OUTS =====
+  // Bump outs are rectangular protrusions at the ends of the building, facing the truck court.
+  // Each bump out is BAY_WIDTH (50 ft) along the building edge × bayStdDepth deep outward.
+  // Use the stored standard bay depth for this building, or the global default.
+  var bumpDepth = b._bayStdDepth || bayStdDepth || 52;
+  var bumpWidth = BAY_WIDTH; // 50 ft
+  var BUMP_COLOR = '#8b5cf6'; // purple to distinguish from other overlays
+  var BUMP_OP = 0.30;
+
+  if (topFt >= rightFt) {
+    // Top edge is width direction (v[0]→v[1]), right edge is depth direction
+    // "along" = along top edge, "perp" = along right edge
+    if (b.type === 'cross') {
+      // Top truck court bump outs (protrude outward from top = perp -1)
+      if (b.bumpTopLeft) {
+        // Left end of top edge: from v[0], bumpWidth along top edge
+        var bl1 = v[0];
+        var bl2 = offsetPt(v[0], bumpWidth, 0);
+        addEdgeOverlay(bl1, bl2, bumpDepth, 0, -1, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+      if (b.bumpTopRight) {
+        // Right end of top edge: from (v[1] - bumpWidth) to v[1]
+        var br1 = offsetPt(v[1], -bumpWidth, 0);
+        var br2 = v[1];
+        addEdgeOverlay(br1, br2, bumpDepth, 0, -1, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+      // Bottom truck court bump outs (protrude outward from bottom = perp +1)
+      if (b.bumpBotLeft) {
+        // Left end of bottom edge: from v[3], bumpWidth along top edge direction
+        var bl1 = v[3];
+        var bl2 = offsetPt(v[3], bumpWidth, 0);
+        addEdgeOverlay(bl1, bl2, bumpDepth, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+      if (b.bumpBotRight) {
+        // Right end of bottom edge: from (v[2] - bumpWidth) to v[2]
+        var br1 = offsetPt(v[2], -bumpWidth, 0);
+        var br2 = v[2];
+        addEdgeOverlay(br1, br2, bumpDepth, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+    } else {
+      // Rear load: truck court on bottom (south side)
+      if (b.bumpRearLeft) {
+        var bl1 = v[3];
+        var bl2 = offsetPt(v[3], bumpWidth, 0);
+        addEdgeOverlay(bl1, bl2, bumpDepth, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+      if (b.bumpRearRight) {
+        var br1 = offsetPt(v[2], -bumpWidth, 0);
+        var br2 = v[2];
+        addEdgeOverlay(br1, br2, bumpDepth, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+    }
+  } else {
+    // Right edge is width direction (v[1]→v[2]), top edge is depth direction
+    // "along" = along top edge, "perp" = along right edge
+    if (b.type === 'cross') {
+      // Top/left truck court bump outs (protrude outward from left = along -1)
+      if (b.bumpTopLeft) {
+        // Top end of left edge: from v[0], bumpWidth along right edge direction
+        var bl1 = v[0];
+        var bl2 = offsetPt(v[0], 0, bumpWidth);
+        addEdgeOverlay(bl1, bl2, bumpDepth, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+      if (b.bumpTopRight) {
+        // Bottom end of left edge: from (v[3] - bumpWidth along right) to v[3]
+        var br1 = offsetPt(v[3], 0, -bumpWidth);
+        var br2 = v[3];
+        addEdgeOverlay(br1, br2, bumpDepth, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+      // Bottom/right truck court bump outs (protrude outward from right = along +1)
+      if (b.bumpBotLeft) {
+        // Top end of right edge: from v[1], bumpWidth along right edge direction
+        var bl1 = v[1];
+        var bl2 = offsetPt(v[1], 0, bumpWidth);
+        addEdgeOverlay(bl1, bl2, bumpDepth, 1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+      if (b.bumpBotRight) {
+        // Bottom end of right edge: from (v[2] - bumpWidth along right) to v[2]
+        var br1 = offsetPt(v[2], 0, -bumpWidth);
+        var br2 = v[2];
+        addEdgeOverlay(br1, br2, bumpDepth, 1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+    } else {
+      // Rear load: truck court on left (west side)
+      if (b.bumpRearLeft) {
+        var bl1 = v[0];
+        var bl2 = offsetPt(v[0], 0, bumpWidth);
+        addEdgeOverlay(bl1, bl2, bumpDepth, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+      if (b.bumpRearRight) {
+        var br1 = offsetPt(v[3], 0, -bumpWidth);
+        var br2 = v[3];
+        addEdgeOverlay(br1, br2, bumpDepth, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+      }
+    }
   }
 }
 
