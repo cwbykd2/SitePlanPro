@@ -76,8 +76,9 @@ select option{background:var(--panel2)}
 .bldg-label{background:none;border:none;white-space:nowrap;pointer-events:none}
 .bldg-label-sf{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:#fff;text-shadow:0 0 6px rgba(0,0,0,.9),0 0 12px rgba(0,0,0,.7);text-align:center;pointer-events:none}
 .bldg-label-dim{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:#fbbf24;text-shadow:0 0 5px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.7);text-align:center;pointer-events:none}
-.handle-resize,.handle-rotate{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #fff;user-select:none;line-height:1}
+.handle-resize,.handle-depth,.handle-rotate{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #fff;user-select:none;line-height:1}
 .handle-resize{background:#3b82f6;color:#fff}
+.handle-depth{background:#10b981;color:#fff}
 .handle-rotate{background:#f59e0b;color:#fff}
 .site-name{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--accent2);cursor:pointer;padding:4px 8px;border-radius:4px;transition:background .15s;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block}
 .site-name:hover{background:var(--panel2)}
@@ -233,7 +234,7 @@ select option{background:var(--panel2)}
                 <button class="btn-ghost" onclick="scaleActiveBuilding(1.1)">Expand</button>
               </div>
               <div style="font-size:10px;color:var(--muted);text-align:center;padding-top:4px">
-                Drag building to move &bull; Blue ⤡ corner = resize &bull; Yellow ↻ corner = rotate
+                Drag building to move &bull; Blue ↔ = width &bull; Green ↕ = depth &bull; Yellow ↻ = rotate
               </div>
             </div>
           </div>
@@ -432,11 +433,29 @@ function updateBuildingLabels(b) {
   L.marker(depthMid, {icon: depthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
 }
 
+/* ===== AXIS PROJECTION HELPERS ===== */
+
+function normalizeAxis(axis) {
+  var len = Math.sqrt(axis.lat * axis.lat + axis.lng * axis.lng);
+  if (len < 1e-12) return { x: 1, y: 0 };
+  // Return in x,y coordinates where x=lng-direction, y=lat-direction
+  return { x: axis.lng / len, y: axis.lat / len };
+}
+
+function projectOntoAxis(point, center, axis) {
+  var latScale = Math.cos(center.lat * Math.PI / 180);
+  var ax = normalizeAxis(axis);
+  var dx = (point.lng - center.lng) * latScale;
+  var dy = point.lat - center.lat;
+  return dx * ax.x + dy * ax.y;
+}
+
 /* ===== CORNER HANDLES (RESIZE & ROTATE) ===== */
 
-var resizeHandle = null;
+var widthHandle = null;
+var depthHandle = null;
 var rotateHandle = null;
-var handleState = null; // {type:'resize'|'rotate', bldgId, startLatLng, ...}
+var handleState = null; // {type:'width'|'depth'|'rotate', bldgId, ...}
 
 function createHandleIcon(cls, symbol) {
   return L.divIcon({
@@ -451,9 +470,18 @@ function showBuildingHandles(b) {
   hideAllHandles();
   if (!b || b.vertices.length < 4) return;
 
-  // Resize handle at vertex[2] (bottom-right)
-  resizeHandle = L.marker(b.vertices[2], {
-    icon: createHandleIcon('handle-resize', '⤡'),
+  // Width handle at midpoint of edge v1-v2 (right edge)
+  var widthMid = getMidpoint(b.vertices[1], b.vertices[2]);
+  widthHandle = L.marker(widthMid, {
+    icon: createHandleIcon('handle-resize', '↔'),
+    draggable: true,
+    zIndexOffset: 2000
+  }).addTo(map);
+
+  // Depth handle at midpoint of edge v2-v3 (bottom edge)
+  var depthMid = getMidpoint(b.vertices[2], b.vertices[3]);
+  depthHandle = L.marker(depthMid, {
+    icon: createHandleIcon('handle-depth', '↕'),
     draggable: true,
     zIndexOffset: 2000
   }).addTo(map);
@@ -465,42 +493,121 @@ function showBuildingHandles(b) {
     zIndexOffset: 2000
   }).addTo(map);
 
-  // --- Resize drag ---
-  resizeHandle.on('dragstart', function(e) {
+  // --- Width drag (stretch along v0→v1 direction) ---
+  widthHandle.on('dragstart', function(e) {
     map.dragging.disable();
     var center = getPolygonCenter(b.vertices);
-    var startDist = center.distanceTo(b.vertices[2]);
+    // Project handle position onto the width axis (v0→v1 direction)
+    var widthAxis = { lat: b.vertices[1].lat - b.vertices[0].lat, lng: b.vertices[1].lng - b.vertices[0].lng };
+    var startMid = getMidpoint(b.vertices[1], b.vertices[2]);
+    var startDist = projectOntoAxis(startMid, center, widthAxis);
     handleState = {
-      type: 'resize',
+      type: 'width',
       bldgId: b.id,
       center: center,
+      widthAxis: widthAxis,
       startDist: startDist,
-      origBaseVerts: b.baseVertices.map(function(v) { return L.latLng(v.lat, v.lng); }),
-      origScale: b.scale,
-      origRotation: b.rotation
+      origVerts: b.vertices.map(function(v) { return L.latLng(v.lat, v.lng); }),
+      origBaseVerts: b.baseVertices.map(function(v) { return L.latLng(v.lat, v.lng); })
     };
   });
 
-  resizeHandle.on('drag', function(e) {
-    if (!handleState || handleState.type !== 'resize') return;
+  widthHandle.on('drag', function(e) {
+    if (!handleState || handleState.type !== 'width') return;
     var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
     if (!bld) return;
     var newPos = e.target.getLatLng();
-    var newDist = handleState.center.distanceTo(newPos);
+    var newDist = projectOntoAxis(newPos, handleState.center, handleState.widthAxis);
+    if (Math.abs(handleState.startDist) < 1e-12) return;
     var ratio = newDist / handleState.startDist;
-    ratio = Math.max(0.25, Math.min(4, ratio));
-    bld.scale = Math.round(handleState.origScale * ratio);
-    bld.scale = Math.max(25, Math.min(400, bld.scale));
-    applyTransformFromHandles(bld);
+    ratio = Math.max(0.2, Math.min(5, ratio));
+    // Scale only along width axis from center
+    var ov = handleState.origVerts;
+    var c = handleState.center;
+    var ax = normalizeAxis(handleState.widthAxis);
+    var latScale = Math.cos(c.lat * Math.PI / 180);
+    var newVerts = ov.map(function(v) {
+      var dx = (v.lng - c.lng) * latScale;
+      var dy = v.lat - c.lat;
+      var proj = dx * ax.x + dy * ax.y;
+      var newProj = proj * ratio;
+      var diff = newProj - proj;
+      return L.latLng(v.lat + diff * ax.y, v.lng + diff * ax.x / latScale);
+    });
+    updateBuildingPolygon(bld, newVerts);
+    refreshHandlePositions(bld);
   });
 
-  resizeHandle.on('dragend', function(e) {
+  widthHandle.on('dragend', function(e) {
     map.dragging.enable();
     var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
     if (bld) {
+      // Reset base vertices to current state
+      bld.baseVertices = bld.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+      bld.rotation = 0;
+      bld.scale = 100;
       updateTransformSliders(bld);
       recalcStats();
       drawBuildingOverlays(bld);
+      refreshHandlePositions(bld);
+    }
+    handleState = null;
+  });
+
+  // --- Depth drag (stretch along v1→v2 direction) ---
+  depthHandle.on('dragstart', function(e) {
+    map.dragging.disable();
+    var center = getPolygonCenter(b.vertices);
+    var depthAxis = { lat: b.vertices[2].lat - b.vertices[1].lat, lng: b.vertices[2].lng - b.vertices[1].lng };
+    var startMid = getMidpoint(b.vertices[2], b.vertices[3]);
+    var startDist = projectOntoAxis(startMid, center, depthAxis);
+    handleState = {
+      type: 'depth',
+      bldgId: b.id,
+      center: center,
+      depthAxis: depthAxis,
+      startDist: startDist,
+      origVerts: b.vertices.map(function(v) { return L.latLng(v.lat, v.lng); }),
+      origBaseVerts: b.baseVertices.map(function(v) { return L.latLng(v.lat, v.lng); })
+    };
+  });
+
+  depthHandle.on('drag', function(e) {
+    if (!handleState || handleState.type !== 'depth') return;
+    var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
+    if (!bld) return;
+    var newPos = e.target.getLatLng();
+    var newDist = projectOntoAxis(newPos, handleState.center, handleState.depthAxis);
+    if (Math.abs(handleState.startDist) < 1e-12) return;
+    var ratio = newDist / handleState.startDist;
+    ratio = Math.max(0.2, Math.min(5, ratio));
+    var ov = handleState.origVerts;
+    var c = handleState.center;
+    var ax = normalizeAxis(handleState.depthAxis);
+    var latScale = Math.cos(c.lat * Math.PI / 180);
+    var newVerts = ov.map(function(v) {
+      var dx = (v.lng - c.lng) * latScale;
+      var dy = v.lat - c.lat;
+      var proj = dx * ax.x + dy * ax.y;
+      var newProj = proj * ratio;
+      var diff = newProj - proj;
+      return L.latLng(v.lat + diff * ax.y, v.lng + diff * ax.x / latScale);
+    });
+    updateBuildingPolygon(bld, newVerts);
+    refreshHandlePositions(bld);
+  });
+
+  depthHandle.on('dragend', function(e) {
+    map.dragging.enable();
+    var bld = buildings.find(function(x) { return x.id === handleState.bldgId; });
+    if (bld) {
+      bld.baseVertices = bld.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+      bld.rotation = 0;
+      bld.scale = 100;
+      updateTransformSliders(bld);
+      recalcStats();
+      drawBuildingOverlays(bld);
+      refreshHandlePositions(bld);
     }
     handleState = null;
   });
@@ -558,26 +665,22 @@ function applyTransformFromHandles(b) {
     return rotatePoint(center, scaled, b.rotation);
   });
   updateBuildingPolygon(b, newVerts);
-  // Update handle positions to follow the building corners
-  if (resizeHandle && b.vertices.length >= 4) {
-    resizeHandle.setLatLng(b.vertices[2]);
-  }
-  if (rotateHandle && b.vertices.length >= 4) {
-    rotateHandle.setLatLng(b.vertices[0]);
-  }
+  refreshHandlePositions(b);
   updateTransformSliders(b);
   updateBuildingList();
 }
 
 function hideAllHandles() {
-  if (resizeHandle) { map.removeLayer(resizeHandle); resizeHandle = null; }
+  if (widthHandle) { map.removeLayer(widthHandle); widthHandle = null; }
+  if (depthHandle) { map.removeLayer(depthHandle); depthHandle = null; }
   if (rotateHandle) { map.removeLayer(rotateHandle); rotateHandle = null; }
   handleState = null;
 }
 
 function refreshHandlePositions(b) {
   if (!b || b.vertices.length < 4) return;
-  if (resizeHandle) resizeHandle.setLatLng(b.vertices[2]);
+  if (widthHandle) widthHandle.setLatLng(getMidpoint(b.vertices[1], b.vertices[2]));
+  if (depthHandle) depthHandle.setLatLng(getMidpoint(b.vertices[2], b.vertices[3]));
   if (rotateHandle) rotateHandle.setLatLng(b.vertices[0]);
 }
 
