@@ -46,3 +46,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Fixed road cleanup in clearAll_noConfirm and all load/reset functions to use new road object structure (r.layer, r.labelGroup)
 - 2026-04-22: Removed all snap-to-edges functionality (findSnapPoint, showSnapIndicator, hideSnapIndicator, snapMarker references) per user request
 - 2026-04-22: Added paved breakdown stats panel (Car Parking, Truck Court, Trailer Parking, Road, Paving) with overlay type tagging and PDF export integration
+- 2026-04-22: Fixed pond drawing bug - mode 'pond' was not matched in draw:created handler, causing completed ponds to disappear

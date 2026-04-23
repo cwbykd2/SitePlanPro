@@ -791,7 +791,7 @@ map.on(L.Draw.Event.CREATED, function(e) {
     pendingRoadPolyline = layer;
     showRoadWidthModal();
 
-  } else if (mode === 'polygon') {
+  } else if (mode === 'polygon' || mode === 'pond') {
     layer.setStyle({color:'#06b6d4',weight:2,fillColor:'#06b6d4',fillOpacity:0.35});
     drawnItems.addLayer(layer);
     ponds.push(layer);
