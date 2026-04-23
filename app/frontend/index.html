@@ -1952,12 +1952,11 @@ function updateRoadLabels(centerlineLatLngs, widthFt, labelGroup, curved) {
       var ratio = (halfLen - cumLen) / segLens[j];
       var midLat = centerlineLatLngs[j].lat + ratio * (centerlineLatLngs[j + 1].lat - centerlineLatLngs[j].lat);
       var midLng = centerlineLatLngs[j].lng + ratio * (centerlineLatLngs[j + 1].lng - centerlineLatLngs[j].lng);
-      var lengthFt = Math.round(totalLen * FEET_PER_METER);
       var typeLabel = curved ? ' ⌒' : '';
       var label = L.marker([midLat, midLng], {
         icon: L.divIcon({
           className: 'road-dim-label',
-          html: '<span style="background:rgba(107,114,128,0.85);color:#fff;padding:2px 6px;border-radius:4px;font-family:DM Mono,monospace;font-size:11px;white-space:nowrap;">' + widthFt + '\' W × ' + lengthFt + '\' L' + typeLabel + '</span>',
+          html: '<span style="background:rgba(107,114,128,0.85);color:#fff;padding:2px 6px;border-radius:4px;font-family:DM Mono,monospace;font-size:11px;white-space:nowrap;">' + widthFt + '\' W' + typeLabel + '</span>',
           iconSize: [0, 0],
           iconAnchor: [0, 0]
         }),
