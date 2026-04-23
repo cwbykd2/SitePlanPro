@@ -3873,137 +3873,174 @@ function drawBayGrid(b) {
   var speedBayColor = 'rgba(34,211,238,0.4)';
   var bayGridWeight = 1;
   var bayGridDash = '6,4';
-  
+
+  // Helper: interpolate between two latlngs by fraction
+  function lerpLL(a, b, f) {
+    return L.latLng(a.lat + (b.lat - a.lat) * f, a.lng + (b.lng - a.lng) * f);
+  }
+
+  // Helper: add a bay dimension label at a position
+  function addBayDimLabel(pos, text, color) {
+    var icon = L.divIcon({
+      className: 'bldg-label',
+      html: '<div style="font-family:DM Mono,monospace;font-size:9px;color:' + color + ';text-shadow:0 0 5px rgba(0,0,0,.95),0 0 10px rgba(0,0,0,.7);white-space:nowrap;text-align:center;pointer-events:none">' + text + '</div>',
+      iconSize: [90, 14], iconAnchor: [45, 7]
+    });
+    L.marker(pos, { icon: icon, interactive: false, zIndexOffset: 950 }).addTo(b._bayGridGroup);
+  }
+
   if (d01 >= d12) {
     // Top edge is width direction, right edge is depth direction
+    // Build depth row boundaries (fractions along right edge)
+    var depthRowFracs = [0]; // start at top
+    var depthRowLabels = []; // label for each row
+    var speedFrac = baySpeedDepth / d12;
+    depthRowFracs.push(Math.min(speedFrac, 1));
+    depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' }); // speed bay
+    for (var j = 1; j <= stdBays; j++) {
+      var dFrac = (baySpeedDepth + j * bayStdDepth) / d12;
+      if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+      depthRowFracs.push(dFrac);
+      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+    }
+
     // Vertical lines (width bays) every 50 ft along top edge
     for (var i = 1; i < widthBays; i++) {
       var ft = i * BAY_WIDTH;
-      var p1 = offsetFromPt(verts[0], ft * (topLen / d01) / ftToCoord * ftToCoord, 0);
-      // Actually let's use simpler fraction-based approach
-      var frac = ft / d01; // fraction along the top edge
+      var frac = ft / d01;
       if (frac > 1) break;
-      var lineStart = L.latLng(
-        verts[0].lat + (verts[1].lat - verts[0].lat) * frac,
-        verts[0].lng + (verts[1].lng - verts[0].lng) * frac
-      );
-      var lineEnd = L.latLng(
-        verts[3].lat + (verts[2].lat - verts[3].lat) * frac,
-        verts[3].lng + (verts[2].lng - verts[3].lng) * frac
-      );
+      var lineStart = lerpLL(verts[0], verts[1], frac);
+      var lineEnd = lerpLL(verts[3], verts[2], frac);
       L.polyline([lineStart, lineEnd], {
         color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
       }).addTo(b._bayGridGroup);
     }
-    
-    // Horizontal lines (depth bays) along right edge
-    // First line: speed bay boundary
-    var speedFrac = baySpeedDepth / d12;
+
+    // Horizontal lines (depth bays)
+    // Speed bay boundary line
     if (speedFrac <= 1) {
-      var speedStart = L.latLng(
-        verts[0].lat + (verts[3].lat - verts[0].lat) * speedFrac,
-        verts[0].lng + (verts[3].lng - verts[0].lng) * speedFrac
-      );
-      var speedEnd = L.latLng(
-        verts[1].lat + (verts[2].lat - verts[1].lat) * speedFrac,
-        verts[1].lng + (verts[2].lng - verts[1].lng) * speedFrac
-      );
+      var speedStart = lerpLL(verts[0], verts[3], speedFrac);
+      var speedEnd = lerpLL(verts[1], verts[2], speedFrac);
       L.polyline([speedStart, speedEnd], {
         color: speedBayColor, weight: 2, dashArray: '8,4', interactive: false
       }).addTo(b._bayGridGroup);
-      
-      // Speed bay label
-      var speedLabelPos = getMidpoint(
-        L.latLng((verts[0].lat + speedStart.lat) / 2, (verts[0].lng + speedStart.lng) / 2),
-        L.latLng((verts[1].lat + speedEnd.lat) / 2, (verts[1].lng + speedEnd.lng) / 2)
-      );
-      var speedIcon = L.divIcon({
-        className: 'bldg-label',
-        html: '<div style="font-family:DM Mono,monospace;font-size:9px;color:#22d3ee;text-shadow:0 0 4px rgba(0,0,0,.9);white-space:nowrap;text-align:center">Speed Bay ' + baySpeedDepth + '\'</div>',
-        iconSize: [80, 14], iconAnchor: [40, 7]
-      });
-      L.marker(speedLabelPos, { icon: speedIcon, interactive: false, zIndexOffset: 950 }).addTo(b._bayGridGroup);
     }
-    
+
     // Standard bay lines
     for (var j = 1; j <= stdBays; j++) {
       var depthFt = baySpeedDepth + j * bayStdDepth;
       var dFrac = depthFt / d12;
       if (dFrac > 1) break;
-      var dStart = L.latLng(
-        verts[0].lat + (verts[3].lat - verts[0].lat) * dFrac,
-        verts[0].lng + (verts[3].lng - verts[0].lng) * dFrac
-      );
-      var dEnd = L.latLng(
-        verts[1].lat + (verts[2].lat - verts[1].lat) * dFrac,
-        verts[1].lng + (verts[2].lng - verts[1].lng) * dFrac
-      );
+      var dStart = lerpLL(verts[0], verts[3], dFrac);
+      var dEnd = lerpLL(verts[1], verts[2], dFrac);
       L.polyline([dStart, dEnd], {
         color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
       }).addTo(b._bayGridGroup);
     }
+
+    // Bay dimension labels — one per bay cell
+    for (var row = 0; row < depthRowLabels.length; row++) {
+      var topFracR = depthRowFracs[row];
+      var botFracR = depthRowFracs[row + 1];
+      var midDepthFrac = (topFracR + botFracR) / 2;
+      for (var col = 0; col < widthBays; col++) {
+        var leftFracW = (col * BAY_WIDTH) / d01;
+        var rightFracW = ((col + 1) * BAY_WIDTH) / d01;
+        if (leftFracW >= 1) break;
+        if (rightFracW > 1) rightFracW = 1;
+        var midWidthFrac = (leftFracW + rightFracW) / 2;
+        // Four corners of this bay cell
+        var tl = lerpLL(verts[0], verts[3], topFracR);
+        var tr = lerpLL(verts[1], verts[2], topFracR);
+        var bl = lerpLL(verts[0], verts[3], botFracR);
+        var br = lerpLL(verts[1], verts[2], botFracR);
+        // Midpoint of the cell
+        var topMid = lerpLL(lerpLL(tl, tr, midWidthFrac / 1), lerpLL(bl, br, midWidthFrac / 1), 0);
+        // Actually compute properly: interpolate along top row and bottom row, then between them
+        var cellTopLeft = lerpLL(verts[0], verts[1], leftFracW);
+        var cellTopRight = lerpLL(verts[0], verts[1], rightFracW);
+        var cellBotLeft = lerpLL(verts[3], verts[2], leftFracW);
+        var cellBotRight = lerpLL(verts[3], verts[2], rightFracW);
+        // Top of cell at this depth
+        var cellTL = lerpLL(cellTopLeft, cellBotLeft, topFracR);
+        var cellTR = lerpLL(cellTopRight, cellBotRight, topFracR);
+        var cellBL = lerpLL(cellTopLeft, cellBotLeft, botFracR);
+        var cellBR = lerpLL(cellTopRight, cellBotRight, botFracR);
+        var cellCenter = getMidpoint(getMidpoint(cellTL, cellBR), getMidpoint(cellTR, cellBL));
+        addBayDimLabel(cellCenter, depthRowLabels[row].text, depthRowLabels[row].color);
+      }
+    }
   } else {
     // Right edge is width direction, top edge is depth direction
+    // Build depth column boundaries (fractions along top edge)
+    var depthColFracs = [0];
+    var depthColLabels = [];
+    var speedFrac = baySpeedDepth / d01;
+    depthColFracs.push(Math.min(speedFrac, 1));
+    depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+    for (var j = 1; j <= stdBays; j++) {
+      var dFrac = (baySpeedDepth + j * bayStdDepth) / d01;
+      if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+      depthColFracs.push(dFrac);
+      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+    }
+
     // Horizontal lines (width bays) every 50 ft along right edge
     for (var i = 1; i < widthBays; i++) {
       var ft = i * BAY_WIDTH;
       var frac = ft / d12;
       if (frac > 1) break;
-      var lineStart = L.latLng(
-        verts[1].lat + (verts[2].lat - verts[1].lat) * frac,
-        verts[1].lng + (verts[2].lng - verts[1].lng) * frac
-      );
-      var lineEnd = L.latLng(
-        verts[0].lat + (verts[3].lat - verts[0].lat) * frac,
-        verts[0].lng + (verts[3].lng - verts[0].lng) * frac
-      );
+      var lineStart = lerpLL(verts[1], verts[2], frac);
+      var lineEnd = lerpLL(verts[0], verts[3], frac);
       L.polyline([lineStart, lineEnd], {
         color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
       }).addTo(b._bayGridGroup);
     }
-    
+
     // Vertical lines (depth bays) along top edge
-    var speedFrac = baySpeedDepth / d01;
     if (speedFrac <= 1) {
-      var speedStart = L.latLng(
-        verts[0].lat + (verts[1].lat - verts[0].lat) * speedFrac,
-        verts[0].lng + (verts[1].lng - verts[0].lng) * speedFrac
-      );
-      var speedEnd = L.latLng(
-        verts[3].lat + (verts[2].lat - verts[3].lat) * speedFrac,
-        verts[3].lng + (verts[2].lng - verts[3].lng) * speedFrac
-      );
+      var speedStart = lerpLL(verts[0], verts[1], speedFrac);
+      var speedEnd = lerpLL(verts[3], verts[2], speedFrac);
       L.polyline([speedStart, speedEnd], {
         color: speedBayColor, weight: 2, dashArray: '8,4', interactive: false
       }).addTo(b._bayGridGroup);
-      
-      var speedLabelPos = getMidpoint(
-        L.latLng((verts[0].lat + speedStart.lat) / 2, (verts[0].lng + speedStart.lng) / 2),
-        L.latLng((verts[3].lat + speedEnd.lat) / 2, (verts[3].lng + speedEnd.lng) / 2)
-      );
-      var speedIcon = L.divIcon({
-        className: 'bldg-label',
-        html: '<div style="font-family:DM Mono,monospace;font-size:9px;color:#22d3ee;text-shadow:0 0 4px rgba(0,0,0,.9);white-space:nowrap;text-align:center">Speed Bay ' + baySpeedDepth + '\'</div>',
-        iconSize: [80, 14], iconAnchor: [40, 7]
-      });
-      L.marker(speedLabelPos, { icon: speedIcon, interactive: false, zIndexOffset: 950 }).addTo(b._bayGridGroup);
     }
-    
+
     for (var j = 1; j <= stdBays; j++) {
       var depthFt = baySpeedDepth + j * bayStdDepth;
       var dFrac = depthFt / d01;
       if (dFrac > 1) break;
-      var dStart = L.latLng(
-        verts[0].lat + (verts[1].lat - verts[0].lat) * dFrac,
-        verts[0].lng + (verts[1].lng - verts[0].lng) * dFrac
-      );
-      var dEnd = L.latLng(
-        verts[3].lat + (verts[2].lat - verts[3].lat) * dFrac,
-        verts[3].lng + (verts[2].lng - verts[3].lng) * dFrac
-      );
+      var dStart = lerpLL(verts[0], verts[1], dFrac);
+      var dEnd = lerpLL(verts[3], verts[2], dFrac);
       L.polyline([dStart, dEnd], {
         color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
       }).addTo(b._bayGridGroup);
+    }
+
+    // Bay dimension labels — one per bay cell
+    for (var col = 0; col < depthColLabels.length; col++) {
+      var leftFracD = depthColFracs[col];
+      var rightFracD = depthColFracs[col + 1];
+      var midDepthFrac = (leftFracD + rightFracD) / 2;
+      for (var row = 0; row < widthBays; row++) {
+        var topFracW = (row * BAY_WIDTH) / d12;
+        var botFracW = ((row + 1) * BAY_WIDTH) / d12;
+        if (topFracW >= 1) break;
+        if (botFracW > 1) botFracW = 1;
+        // Corners: top edge goes v0->v1 (depth), right edge goes v1->v2 (width)
+        var cellTL = lerpLL(lerpLL(verts[0], verts[1], leftFracD), lerpLL(verts[0], verts[1], rightFracD), 0);
+        // Proper 4-corner interpolation
+        var edgeTopL = lerpLL(verts[0], verts[1], leftFracD);
+        var edgeTopR = lerpLL(verts[0], verts[1], rightFracD);
+        var edgeBotL = lerpLL(verts[3], verts[2], leftFracD);
+        var edgeBotR = lerpLL(verts[3], verts[2], rightFracD);
+        var cTL = lerpLL(edgeTopL, edgeBotL, topFracW);
+        var cTR = lerpLL(edgeTopR, edgeBotR, topFracW);
+        var cBL = lerpLL(edgeTopL, edgeBotL, botFracW);
+        var cBR = lerpLL(edgeTopR, edgeBotR, botFracW);
+        var cellCenter = getMidpoint(getMidpoint(cTL, cBR), getMidpoint(cTR, cBL));
+        addBayDimLabel(cellCenter, depthColLabels[col].text, depthColLabels[col].color);
+      }
     }
   }
 }
