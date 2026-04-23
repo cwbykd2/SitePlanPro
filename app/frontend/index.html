@@ -1231,6 +1231,24 @@ function registerBuilding(layer, verts) {
     bumpRearLeft: false,
     bumpRearRight: false
   };
+  // Store the initial width-direction unit vector so resizeBuildingToBays
+  // can always determine which current edge aligns with the original width,
+  // even after arbitrary rotations.
+  (function initWidthDir() {
+    var latScale = Math.cos(verts[0].lat * Math.PI / 180);
+    var d01 = verts[0].distanceTo(verts[1]);
+    var d12 = verts[1].distanceTo(verts[2]);
+    var wEdge; // the edge that represents "width"
+    if (d01 >= d12) {
+      // top edge (0→1) is width
+      wEdge = { dx: (verts[1].lng - verts[0].lng) * latScale, dy: verts[1].lat - verts[0].lat };
+    } else {
+      // right edge (1→2) is width
+      wEdge = { dx: (verts[2].lng - verts[1].lng) * latScale, dy: verts[2].lat - verts[1].lat };
+    }
+    var len = Math.sqrt(wEdge.dx * wEdge.dx + wEdge.dy * wEdge.dy);
+    bldg._widthDir = { x: wEdge.dx / len, y: wEdge.dy / len };
+  })();
   buildings.push(bldg);
   activeBuilding = id;
 
@@ -4005,7 +4023,7 @@ function resizeBuildingToBays(b, config) {
   var center = getPolygonCenter(verts);
   var latScale = Math.cos(center.lat * Math.PI / 180);
   
-  // Determine which edge is width (longer) and which is depth (shorter)
+  // Measure current edge lengths
   var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
   var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
   
@@ -4024,14 +4042,26 @@ function resizeBuildingToBays(b, config) {
   
   var ftToCoord = 1 / (111320 * FEET_PER_METER);
   
-  // Determine which direction is width and which is depth
+  // Determine which current edge aligns with the original "width" direction.
+  // We compare the current top-edge unit vector against the stored width
+  // direction vector.  If the dot-product magnitude is high (i.e. they are
+  // roughly parallel), the top edge is still the width; otherwise the right
+  // edge is the width.  This survives arbitrary rotations.
+  var topIsWidth;
+  if (b._widthDir) {
+    var dotTop   = Math.abs(uTopX * b._widthDir.x + uTopY * b._widthDir.y);
+    var dotRight = Math.abs(uRightX * b._widthDir.x + uRightY * b._widthDir.y);
+    topIsWidth = (dotTop >= dotRight);
+  } else {
+    // Fallback for buildings created before this change
+    topIsWidth = (d01 >= d12);
+  }
+  
   var widthFt, depthFt;
-  if (d01 >= d12) {
-    // top edge is width, right edge is depth
+  if (topIsWidth) {
     widthFt = config.totalWidth;
     depthFt = config.totalDepth;
   } else {
-    // right edge is width, top edge is depth
     widthFt = config.totalDepth;
     depthFt = config.totalWidth;
   }
@@ -4039,8 +4069,8 @@ function resizeBuildingToBays(b, config) {
   // Scale factors for each axis
   var topScaleFt = d01;
   var rightScaleFt = d12;
-  var topRatio = (d01 >= d12 ? widthFt : depthFt) / topScaleFt;
-  var rightRatio = (d01 >= d12 ? depthFt : widthFt) / rightScaleFt;
+  var topRatio = (topIsWidth ? widthFt : depthFt) / topScaleFt;
+  var rightRatio = (topIsWidth ? depthFt : widthFt) / rightScaleFt;
   
   // Rebuild vertices from center using scaled edge vectors
   var halfTopLen = (topLen * topRatio) / 2;
@@ -4069,6 +4099,24 @@ function resizeBuildingToBays(b, config) {
   b.baseVertices = b.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
   b.rotation = 0;
   b.scale = 100;
+
+  // Update the stored width-direction vector from the freshly-baked vertices
+  // so future resizes (even after further rotations) stay consistent.
+  (function updateWidthDir() {
+    var v = b.vertices;
+    var ls = Math.cos(getPolygonCenter(v).lat * Math.PI / 180);
+    var wEdge;
+    if (topIsWidth) {
+      wEdge = { dx: (v[1].lng - v[0].lng) * ls, dy: v[1].lat - v[0].lat };
+    } else {
+      wEdge = { dx: (v[2].lng - v[1].lng) * ls, dy: v[2].lat - v[1].lat };
+    }
+    var len = Math.sqrt(wEdge.dx * wEdge.dx + wEdge.dy * wEdge.dy);
+    if (len > 1e-12) {
+      b._widthDir = { x: wEdge.dx / len, y: wEdge.dy / len };
+    }
+  })();
+
   drawBuildingOverlays(b);
   recalcStats();
   showBuildingHandles(b);
@@ -4200,7 +4248,18 @@ function drawBayGrid(b) {
   // Determine if this is a cross dock building (speed bays on both ends)
   var isCrossDock = b.type === 'cross';
 
-  if (d01 >= d12) {
+  // Use stored width-direction vector to determine which edge is width,
+  // consistent with resizeBuildingToBays (survives rotations).
+  var bayTopIsWidth;
+  if (b._widthDir) {
+    var dotTop   = Math.abs(uTopX * b._widthDir.x + uTopY * b._widthDir.y);
+    var dotRight = Math.abs(uRightX * b._widthDir.x + uRightY * b._widthDir.y);
+    bayTopIsWidth = (dotTop >= dotRight);
+  } else {
+    bayTopIsWidth = (d01 >= d12);
+  }
+
+  if (bayTopIsWidth) {
     // Top edge is width direction, right edge is depth direction
     // Build depth row boundaries (fractions along right edge)
     // For cross dock: speed bay at top AND bottom; standard bays in between
