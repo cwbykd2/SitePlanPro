@@ -295,7 +295,7 @@ select option{background:var(--panel2)}
                 <span class="bay-config-title">🏗 Bay Configuration</span>
                 <div class="bay-tooltip">
                   <span class="bay-tip-icon">?</span>
-                  <span class="bay-tip-text">Bays are structural units of the building. All bays are 52–56 ft wide. <b>Speed Bays</b> (along truck courts) are 60–70 ft deep. <b>Standard Bays</b> are 50 ft deep.</span>
+                  <span class="bay-tip-text">Bays are structural units of the building. All bays are 52–60 ft wide. <b>Speed Bays</b> (along truck courts) are 60–70 ft deep. <b>Standard Bays</b> are 50 ft deep.</span>
                 </div>
               </div>
               <button class="bay-snap-btn" onclick="autoSnapToOptimalBays()">⚡ Auto-Snap to Optimal Bays</button>
@@ -305,13 +305,14 @@ select option{background:var(--panel2)}
                     <span class="bay-tooltip" style="display:inline">
                       Bay Width
                       <span class="bay-tip-icon" style="margin-left:2px">?</span>
-                      <span class="bay-tip-text">Column spacing for all bays, measured parallel to the truck court. Standard bays: width × 50' deep. Speed bays: width × 60' or 70' deep.</span>
+                      <span class="bay-tip-text">Column spacing for all bays (52', 54', 56', or 60'), measured parallel to the truck court. Standard bays: width × 50' deep. Speed bays: width × 60' or 70' deep.</span>
                     </span>
                   </label>
                   <div class="bay-segmented" id="bay-width-seg">
                     <div class="bay-seg-btn active" onclick="setBayWidth(52)">52'</div>
                     <div class="bay-seg-btn" onclick="setBayWidth(54)">54'</div>
                     <div class="bay-seg-btn" onclick="setBayWidth(56)">56'</div>
+                    <div class="bay-seg-btn" onclick="setBayWidth(60)">60'</div>
                   </div>
                 </div>
                 <div class="bay-control-row">
@@ -1514,7 +1515,7 @@ function showBuildingOpts() {
   var elIR = document.getElementById('tc-inset-rear');
   var elIT = document.getElementById('tc-inset-top');
   var elIB = document.getElementById('tc-inset-bot');
-  var bumpW = bayWidth; // auto-inset per bump out (52/54/56)
+  var bumpW = bayWidth; // auto-inset per bump out (52/54/56/60)
   if (elIR) {
     var autoRL = b.bumpRearLeft ? bumpW : 0;
     elIR.value = Math.max(0, (b.tcInsetLeft || 0) - autoRL);
@@ -1701,9 +1702,9 @@ function applyBuildingOptions() {
     b.bumpBotRight = false;
   }
   // Auto-calculate truck court insets based on bump outs
-  // Each bump out is bayWidth (52/54/56 ft) wide at the building end, so the truck court
+  // Each bump out is bayWidth (52/54/56/60 ft) wide at the building end, so the truck court
   // should be inset by that amount on the corresponding end to sit inside the bump outs.
-  var bumpInset = bayWidth; // same width as bump out (52/54/56)
+  var bumpInset = bayWidth; // same width as bump out (52/54/56/60)
   if (b.type === 'rear') {
     var rearInsetBase = parseFloat(document.getElementById('tc-inset-rear').value) || 0;
     // Auto-add bump out inset on top of any manual inset
@@ -2106,9 +2107,9 @@ function drawBuildingOverlays(b) {
 
   // ===== BUMP OUTS =====
   // Bump outs are rectangular protrusions at the ends of the building, facing the truck court.
-  // Each bump out is bayWidth (52/54/56 ft) along the building edge × BAY_STD_DEPTH (50 ft) deep outward.
+  // Each bump out is bayWidth (52/54/56/60 ft) along the building edge × BAY_STD_DEPTH (50 ft) deep outward.
   var bumpDepth = BAY_STD_DEPTH; // bump outs are always 50 ft deep (standard bay depth)
-  var bumpWidth = b._bayWidth || bayWidth; // bay width (52/54/56)
+  var bumpWidth = b._bayWidth || bayWidth; // bay width (52/54/56/60)
   var BUMP_COLOR = '#ffffff'; // same color as building
   var BUMP_OP = 1;
 
@@ -3953,7 +3954,7 @@ function flashSaveIndicator() {
 
 /* ===== BAY SPACING SYSTEM ===== */
 
-var bayWidth = 52; // Bay width (52, 54, or 56) — applies to ALL bays (column spacing)
+var bayWidth = 52; // Bay width (52, 54, 56, or 60) — applies to ALL bays (column spacing)
 var BAY_STD_DEPTH = 50; // Standard bay depth is fixed at 50 ft
 var baySpeedDepth = 60; // Speed bay depth (60 or 70)
 var showBayGrid = true;
@@ -4015,7 +4016,7 @@ function resizeBuildingFromBayUI(b) {
 
 function calculateBestBayFit(drawnWidthFt, drawnDepthFt, bldgType) {
   // Find the optimal bay configuration that gets closest to the drawn dimensions
-  // Width direction: N bays × bayWidth (52/54/56) each
+  // Width direction: N bays × bayWidth (52/54/56/60) each
   // Depth direction: for cross dock = speed bay + M standard bays (50' each) + speed bay
   //                  for rear load = 1 speed bay + M standard bays (50' each)
   // Speed bays: bayWidth wide × speedDepth (60/70) deep
@@ -4026,7 +4027,7 @@ function calculateBestBayFit(drawnWidthFt, drawnDepthFt, bldgType) {
   var bestConfig = null;
   var bestDiff = Infinity;
   
-  var bayWidths = [52, 54, 56];
+  var bayWidths = [52, 54, 56, 60];
   var speedDepths = [60, 70];
   var stdDepth = 50; // standard bay depth is always 50 ft
   
