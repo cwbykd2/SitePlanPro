@@ -3614,10 +3614,13 @@ function onBayCountChange() {
   if (ab) drawBayGrid(ab);
 }
 
-function calculateBestBayFit(drawnWidthFt, drawnDepthFt) {
+function calculateBestBayFit(drawnWidthFt, drawnDepthFt, bldgType) {
   // Find the optimal bay configuration that gets closest to the drawn dimensions
   // Width direction: N bays × 50 ft each
-  // Depth direction: 1 speed bay + M standard bays
+  // Depth direction: for cross dock = speed bay + M standard bays + speed bay (both ends)
+  //                  for rear load = 1 speed bay + M standard bays
+  var isCross = (bldgType === 'cross');
+  var speedCount = isCross ? 2 : 1; // number of speed bays
   
   var bestConfig = null;
   var bestDiff = Infinity;
@@ -3634,28 +3637,20 @@ function calculateBestBayFit(drawnWidthFt, drawnDepthFt) {
       var nWidth = Math.max(1, Math.round(drawnWidthFt / BAY_WIDTH));
       var actualWidth = nWidth * BAY_WIDTH;
       
-      // Calculate optimal number of depth bays (1 speed + N standard)
-      // Total depth = speedDepth + nStd * stdDepth
-      // nStd = (drawnDepth - speedDepth) / stdDepth
-      var nStd = Math.max(0, Math.round((drawnDepthFt - spd) / sd));
-      var actualDepth = spd + nStd * sd;
+      // Total depth = speedCount * speedDepth + nStd * stdDepth
+      var nStd = Math.max(0, Math.round((drawnDepthFt - speedCount * spd) / sd));
       
-      // Calculate total difference (sum of absolute differences)
-      var widthDiff = Math.abs(actualWidth - drawnWidthFt);
-      var depthDiff = Math.abs(actualDepth - drawnDepthFt);
-      var totalDiff = widthDiff + depthDiff;
-      
-      // Also try nStd+1 and nStd-1 to find true best
+      // Try nStd-1, nStd, nStd+1 to find true best
       for (var adj = -1; adj <= 1; adj++) {
         var tryStd = Math.max(0, nStd + adj);
-        var tryDepth = spd + tryStd * sd;
+        var tryDepth = speedCount * spd + tryStd * sd;
         var tryDiff = Math.abs(actualWidth - drawnWidthFt) + Math.abs(tryDepth - drawnDepthFt);
         
         if (tryDiff < bestDiff) {
           bestDiff = tryDiff;
           bestConfig = {
             widthBays: nWidth,
-            depthBays: tryStd + 1, // +1 for the speed bay
+            depthBays: tryStd + speedCount, // speed bays + standard bays
             stdBays: tryStd,
             stdDepth: sd,
             speedDepth: spd,
@@ -3672,14 +3667,14 @@ function calculateBestBayFit(drawnWidthFt, drawnDepthFt) {
         var tryActualWidth = tryWidth * BAY_WIDTH;
         for (var dadj = -1; dadj <= 1; dadj++) {
           var tryStd2 = Math.max(0, nStd + dadj);
-          var tryDepth2 = spd + tryStd2 * sd;
+          var tryDepth2 = speedCount * spd + tryStd2 * sd;
           var tryDiff2 = Math.abs(tryActualWidth - drawnWidthFt) + Math.abs(tryDepth2 - drawnDepthFt);
           
           if (tryDiff2 < bestDiff) {
             bestDiff = tryDiff2;
             bestConfig = {
               widthBays: tryWidth,
-              depthBays: tryStd2 + 1,
+              depthBays: tryStd2 + speedCount,
               stdBays: tryStd2,
               stdDepth: sd,
               speedDepth: spd,
@@ -3703,7 +3698,7 @@ function autoSnapToOptimalBays() {
   var dims = getBuildingDimensions(b.vertices);
   if (dims.width < 10 || dims.depth < 10) { setStatus('Building too small for bay snapping'); return; }
   
-  var config = calculateBestBayFit(dims.width, dims.depth);
+  var config = calculateBestBayFit(dims.width, dims.depth, b.type);
   if (!config) { setStatus('Could not calculate bay fit'); return; }
   
   // Update UI controls
@@ -3808,16 +3803,21 @@ function resizeBuildingToBays(b, config) {
 function updateBayStats() {
   var widthBays = parseInt(document.getElementById('bay-count-width').value) || 1;
   var depthBays = parseInt(document.getElementById('bay-count-depth').value) || 1;
-  var stdBays = Math.max(0, depthBays - 1);
+  var ab = getActiveBuilding();
+  var isCross = ab && ab.type === 'cross';
+  var speedCount = isCross ? 2 : 1;
+  var stdBays = Math.max(0, depthBays - speedCount);
   
   var totalWidth = widthBays * BAY_WIDTH;
-  var totalDepth = baySpeedDepth + stdBays * bayStdDepth;
+  var totalDepth = speedCount * baySpeedDepth + stdBays * bayStdDepth;
   var totalSF = totalWidth * totalDepth;
   
   document.getElementById('bay-stat-width').textContent = widthBays + ' × 50\' = ' + totalWidth + ' ft';
-  document.getElementById('bay-stat-depth').textContent = '1 Speed + ' + stdBays + ' Std = ' + totalDepth + ' ft';
+  var depthLabel = isCross ? '2 Speed + ' + stdBays + ' Std = ' + totalDepth + ' ft' : '1 Speed + ' + stdBays + ' Std = ' + totalDepth + ' ft';
+  document.getElementById('bay-stat-depth').textContent = depthLabel;
   document.getElementById('bay-stat-sf').textContent = fmt(totalSF) + ' SF';
-  document.getElementById('bay-speed-info').textContent = 'Speed Bay: ' + baySpeedDepth + '\' deep · Std Bays: ' + bayStdDepth + '\' deep';
+  var speedInfo = isCross ? 'Speed Bays (both ends): ' + baySpeedDepth + '\' deep · Std Bays: ' + bayStdDepth + '\' deep' : 'Speed Bay: ' + baySpeedDepth + '\' deep · Std Bays: ' + bayStdDepth + '\' deep';
+  document.getElementById('bay-speed-info').textContent = speedInfo;
 }
 
 function drawBayGrid(b) {
@@ -3857,7 +3857,9 @@ function drawBayGrid(b) {
   
   var widthBays = parseInt(document.getElementById('bay-count-width').value) || 1;
   var depthBays = parseInt(document.getElementById('bay-count-depth').value) || 1;
-  var stdBays = Math.max(0, depthBays - 1);
+  var isCrossDockBays = b.type === 'cross';
+  var speedBayCount = isCrossDockBays ? 2 : 1;
+  var stdBays = Math.max(0, depthBays - speedBayCount);
   
   // Helper: offset from a point along top and right directions (in feet)
   function offsetFromPt(pt, alongTopFt, alongRightFt) {
@@ -3889,19 +3891,46 @@ function drawBayGrid(b) {
     L.marker(pos, { icon: icon, interactive: false, zIndexOffset: 950 }).addTo(b._bayGridGroup);
   }
 
+  // Determine if this is a cross dock building (speed bays on both ends)
+  var isCrossDock = b.type === 'cross';
+
   if (d01 >= d12) {
     // Top edge is width direction, right edge is depth direction
     // Build depth row boundaries (fractions along right edge)
+    // For cross dock: speed bay at top AND bottom; standard bays in between
+    // For rear load: speed bay at top only; standard bays after
     var depthRowFracs = [0]; // start at top
     var depthRowLabels = []; // label for each row
-    var speedFrac = baySpeedDepth / d12;
-    depthRowFracs.push(Math.min(speedFrac, 1));
-    depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' }); // speed bay
-    for (var j = 1; j <= stdBays; j++) {
-      var dFrac = (baySpeedDepth + j * bayStdDepth) / d12;
-      if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
-      depthRowFracs.push(dFrac);
-      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+
+    if (isCrossDock) {
+      // Cross dock: speed bay (top) + N standard bays + speed bay (bottom)
+      var topSpeedFrac = baySpeedDepth / d12;
+      depthRowFracs.push(Math.min(topSpeedFrac, 1));
+      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      // Standard bays in the middle
+      for (var j = 1; j <= stdBays; j++) {
+        var dFrac = (baySpeedDepth + j * bayStdDepth) / d12;
+        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+        depthRowFracs.push(dFrac);
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+      }
+      // Bottom speed bay - from last standard bay to end
+      var lastFrac = depthRowFracs[depthRowFracs.length - 1];
+      if (lastFrac < 1) {
+        depthRowFracs.push(1);
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      }
+    } else {
+      // Rear load: speed bay at top only
+      var speedFrac = baySpeedDepth / d12;
+      depthRowFracs.push(Math.min(speedFrac, 1));
+      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      for (var j = 1; j <= stdBays; j++) {
+        var dFrac = (baySpeedDepth + j * bayStdDepth) / d12;
+        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+        depthRowFracs.push(dFrac);
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+      }
     }
 
     // Vertical lines (width bays) every 50 ft along top edge
@@ -3916,52 +3945,36 @@ function drawBayGrid(b) {
       }).addTo(b._bayGridGroup);
     }
 
-    // Horizontal lines (depth bays)
-    // Speed bay boundary line
-    if (speedFrac <= 1) {
-      var speedStart = lerpLL(verts[0], verts[3], speedFrac);
-      var speedEnd = lerpLL(verts[1], verts[2], speedFrac);
-      L.polyline([speedStart, speedEnd], {
-        color: speedBayColor, weight: 2, dashArray: '8,4', interactive: false
+    // Horizontal lines (depth bays) - draw lines at each row boundary
+    for (var ri = 1; ri < depthRowFracs.length; ri++) {
+      var rowFrac = depthRowFracs[ri];
+      if (rowFrac >= 1) break;
+      var isSpeedLine = (ri === 1) || (isCrossDock && ri === depthRowFracs.length - 2);
+      var lineColor = isSpeedLine ? speedBayColor : bayGridColor;
+      var lineWeight = isSpeedLine ? 2 : bayGridWeight;
+      var lineDash = isSpeedLine ? '8,4' : bayGridDash;
+      var hStart = lerpLL(verts[0], verts[3], rowFrac);
+      var hEnd = lerpLL(verts[1], verts[2], rowFrac);
+      L.polyline([hStart, hEnd], {
+        color: lineColor, weight: lineWeight, dashArray: lineDash, interactive: false
       }).addTo(b._bayGridGroup);
     }
 
-    // Standard bay lines
-    for (var j = 1; j <= stdBays; j++) {
-      var depthFt = baySpeedDepth + j * bayStdDepth;
-      var dFrac = depthFt / d12;
-      if (dFrac > 1) break;
-      var dStart = lerpLL(verts[0], verts[3], dFrac);
-      var dEnd = lerpLL(verts[1], verts[2], dFrac);
-      L.polyline([dStart, dEnd], {
-        color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
-      }).addTo(b._bayGridGroup);
-    }
-
-    // Bay dimension labels — one per bay cell
+    // Bay dimension labels — only top row and left column
     for (var row = 0; row < depthRowLabels.length; row++) {
       var topFracR = depthRowFracs[row];
       var botFracR = depthRowFracs[row + 1];
-      var midDepthFrac = (topFracR + botFracR) / 2;
       for (var col = 0; col < widthBays; col++) {
+        // Only label top row (row===0) or left column (col===0)
+        if (row !== 0 && col !== 0) continue;
         var leftFracW = (col * BAY_WIDTH) / d01;
         var rightFracW = ((col + 1) * BAY_WIDTH) / d01;
         if (leftFracW >= 1) break;
         if (rightFracW > 1) rightFracW = 1;
-        var midWidthFrac = (leftFracW + rightFracW) / 2;
-        // Four corners of this bay cell
-        var tl = lerpLL(verts[0], verts[3], topFracR);
-        var tr = lerpLL(verts[1], verts[2], topFracR);
-        var bl = lerpLL(verts[0], verts[3], botFracR);
-        var br = lerpLL(verts[1], verts[2], botFracR);
-        // Midpoint of the cell
-        var topMid = lerpLL(lerpLL(tl, tr, midWidthFrac / 1), lerpLL(bl, br, midWidthFrac / 1), 0);
-        // Actually compute properly: interpolate along top row and bottom row, then between them
         var cellTopLeft = lerpLL(verts[0], verts[1], leftFracW);
         var cellTopRight = lerpLL(verts[0], verts[1], rightFracW);
         var cellBotLeft = lerpLL(verts[3], verts[2], leftFracW);
         var cellBotRight = lerpLL(verts[3], verts[2], rightFracW);
-        // Top of cell at this depth
         var cellTL = lerpLL(cellTopLeft, cellBotLeft, topFracR);
         var cellTR = lerpLL(cellTopRight, cellBotRight, topFracR);
         var cellBL = lerpLL(cellTopLeft, cellBotLeft, botFracR);
@@ -3975,14 +3988,33 @@ function drawBayGrid(b) {
     // Build depth column boundaries (fractions along top edge)
     var depthColFracs = [0];
     var depthColLabels = [];
-    var speedFrac = baySpeedDepth / d01;
-    depthColFracs.push(Math.min(speedFrac, 1));
-    depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
-    for (var j = 1; j <= stdBays; j++) {
-      var dFrac = (baySpeedDepth + j * bayStdDepth) / d01;
-      if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
-      depthColFracs.push(dFrac);
-      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+
+    if (isCrossDock) {
+      // Cross dock: speed bay at start + standard bays + speed bay at end
+      var topSpeedFrac = baySpeedDepth / d01;
+      depthColFracs.push(Math.min(topSpeedFrac, 1));
+      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      for (var j = 1; j <= stdBays; j++) {
+        var dFrac = (baySpeedDepth + j * bayStdDepth) / d01;
+        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+        depthColFracs.push(dFrac);
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+      }
+      var lastFrac = depthColFracs[depthColFracs.length - 1];
+      if (lastFrac < 1) {
+        depthColFracs.push(1);
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      }
+    } else {
+      var speedFrac = baySpeedDepth / d01;
+      depthColFracs.push(Math.min(speedFrac, 1));
+      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      for (var j = 1; j <= stdBays; j++) {
+        var dFrac = (baySpeedDepth + j * bayStdDepth) / d01;
+        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+        depthColFracs.push(dFrac);
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+      }
     }
 
     // Horizontal lines (width bays) every 50 ft along right edge
@@ -3997,39 +4029,32 @@ function drawBayGrid(b) {
       }).addTo(b._bayGridGroup);
     }
 
-    // Vertical lines (depth bays) along top edge
-    if (speedFrac <= 1) {
-      var speedStart = lerpLL(verts[0], verts[1], speedFrac);
-      var speedEnd = lerpLL(verts[3], verts[2], speedFrac);
-      L.polyline([speedStart, speedEnd], {
-        color: speedBayColor, weight: 2, dashArray: '8,4', interactive: false
-      }).addTo(b._bayGridGroup);
-    }
-
-    for (var j = 1; j <= stdBays; j++) {
-      var depthFt = baySpeedDepth + j * bayStdDepth;
-      var dFrac = depthFt / d01;
-      if (dFrac > 1) break;
-      var dStart = lerpLL(verts[0], verts[1], dFrac);
-      var dEnd = lerpLL(verts[3], verts[2], dFrac);
+    // Vertical lines (depth bays) along top edge - draw at each column boundary
+    for (var ci = 1; ci < depthColFracs.length; ci++) {
+      var colFrac = depthColFracs[ci];
+      if (colFrac >= 1) break;
+      var isSpeedLine = (ci === 1) || (isCrossDock && ci === depthColFracs.length - 2);
+      var lineColor = isSpeedLine ? speedBayColor : bayGridColor;
+      var lineWeight = isSpeedLine ? 2 : bayGridWeight;
+      var lineDash = isSpeedLine ? '8,4' : bayGridDash;
+      var dStart = lerpLL(verts[0], verts[1], colFrac);
+      var dEnd = lerpLL(verts[3], verts[2], colFrac);
       L.polyline([dStart, dEnd], {
-        color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
+        color: lineColor, weight: lineWeight, dashArray: lineDash, interactive: false
       }).addTo(b._bayGridGroup);
     }
 
-    // Bay dimension labels — one per bay cell
+    // Bay dimension labels — only top row (row===0) and left column (col===0)
     for (var col = 0; col < depthColLabels.length; col++) {
       var leftFracD = depthColFracs[col];
       var rightFracD = depthColFracs[col + 1];
-      var midDepthFrac = (leftFracD + rightFracD) / 2;
       for (var row = 0; row < widthBays; row++) {
+        // Only label top row (row===0) or left column (col===0)
+        if (row !== 0 && col !== 0) continue;
         var topFracW = (row * BAY_WIDTH) / d12;
         var botFracW = ((row + 1) * BAY_WIDTH) / d12;
         if (topFracW >= 1) break;
         if (botFracW > 1) botFracW = 1;
-        // Corners: top edge goes v0->v1 (depth), right edge goes v1->v2 (width)
-        var cellTL = lerpLL(lerpLL(verts[0], verts[1], leftFracD), lerpLL(verts[0], verts[1], rightFracD), 0);
-        // Proper 4-corner interpolation
         var edgeTopL = lerpLL(verts[0], verts[1], leftFracD);
         var edgeTopR = lerpLL(verts[0], verts[1], rightFracD);
         var edgeBotL = lerpLL(verts[3], verts[2], leftFracD);
@@ -4049,7 +4074,7 @@ function drawBayGrid(b) {
 function updateBayUIForBuilding(b) {
   if (!b) return;
   var dims = getBuildingDimensions(b.vertices);
-  var config = calculateBestBayFit(dims.width, dims.depth);
+  var config = calculateBestBayFit(dims.width, dims.depth, b.type);
   if (config) {
     document.getElementById('bay-count-width').value = config.widthBays;
     document.getElementById('bay-count-depth').value = config.depthBays;
