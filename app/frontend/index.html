@@ -3890,32 +3890,44 @@ function restoreFeeData(data) {
 var _sitesDropdownOpen = false;
 var _sitesDropdownEl = null;
 
-// Create dropdown element dynamically to avoid any HTML placement issues
-(function initSitesDropdown() {
-  var dd = document.createElement('div');
-  dd.id = 'sites-dropdown';
-  dd.className = 'sites-dropdown hidden';
-  dd.style.cssText = 'position:fixed;z-index:99999;';
-  dd.innerHTML = '<div id="sites-list"></div>'
-    + '<div class="sites-dropdown-footer">'
-    + '<button class="btn-ghost" style="width:100%;font-size:11px">+ New Site</button>'
-    + '</div>';
-  dd.addEventListener('click', function(e) { e.stopPropagation(); });
-  dd.querySelector('.sites-dropdown-footer button').addEventListener('click', function() { newSite(); });
-  document.body.appendChild(dd);
-  _sitesDropdownEl = dd;
-})();
+// Create dropdown element and attach button handler after DOM is ready
+function _setupSitesDropdown() {
+  // Create dropdown element dynamically
+  if (!document.getElementById('sites-dropdown')) {
+    var dd = document.createElement('div');
+    dd.id = 'sites-dropdown';
+    dd.className = 'sites-dropdown hidden';
+    dd.style.cssText = 'position:fixed;z-index:99999;';
+    dd.innerHTML = '<div id="sites-list"></div>'
+      + '<div class="sites-dropdown-footer">'
+      + '<button class="btn-ghost" style="width:100%;font-size:11px">+ New Site</button>'
+      + '</div>';
+    dd.addEventListener('click', function(e) { e.stopPropagation(); });
+    dd.querySelector('.sites-dropdown-footer button').addEventListener('click', function() { newSite(); });
+    document.body.appendChild(dd);
+    _sitesDropdownEl = dd;
+  }
 
-// Attach click handler via JS instead of relying on onclick attribute
-(function initSitesButton() {
+  // Attach click handler to Sites button
   var btn = document.getElementById('btn-sites');
-  if (!btn) return;
-  btn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    e.preventDefault();
-    toggleSitesDropdown();
-  });
-})();
+  if (btn && !btn._sitesHandlerAttached) {
+    btn._sitesHandlerAttached = true;
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      toggleSitesDropdown();
+    });
+  }
+}
+
+// Ensure setup runs after DOM is fully loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _setupSitesDropdown);
+} else {
+  _setupSitesDropdown();
+}
+// Also run on window load as a safety net for published builds
+window.addEventListener('load', _setupSitesDropdown);
 
 function toggleSitesDropdown() {
   var dd = _sitesDropdownEl || document.getElementById('sites-dropdown');
