@@ -46,6 +46,7 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Cross dock speed bays on both ends - cross dock buildings now have speed bays on top AND bottom (both truck court sides)
 - [x] Bay dimension labels reduced - labels only appear on top row and left column instead of every cell
 - [x] Remove Bay Spacing dropdown menu from Building Options (redundant with Bay Configuration system)
+- [x] Auto-resize building when bay parameters change (std depth, speed depth, bay counts)
 
 ## Progress Log
 - 2026-04-22: Fixed Sites dropdown not opening - header had overflow-y:hidden clipping the dropdown; changed to overflow:visible and switched dropdown to position:fixed with dynamic positioning

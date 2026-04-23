@@ -1354,9 +1354,6 @@ function showBuildingOpts() {
   if (!b) return;
   document.getElementById('opt-cross').classList.toggle('selected', b.type==='cross');
   document.getElementById('opt-rear').classList.toggle('selected', b.type==='rear');
-  document.getElementById('opt-spacing').value = b.spacing;
-  document.getElementById('opt-cw').value = b.customW;
-  document.getElementById('opt-cd').value = b.customD;
   document.getElementById('chk-trailer-top').checked = b.trailerTop;
   document.getElementById('chk-trailer-bottom').checked = b.trailerBottom;
   document.getElementById('chk-trailer-rear').checked = b.trailerRear;
@@ -1367,7 +1364,6 @@ function showBuildingOpts() {
   document.getElementById('tc-inset-top').value = b.tcInsetTopLeft || 0;
   document.getElementById('tc-inset-bot').value = b.tcInsetBottomLeft || 0;
   updateTrailerOpts(b.type);
-  onSpacingChange();
   showBuildingHandles(b);
   // Update bay configuration UI
   updateBayUIForBuilding(b);
@@ -1386,18 +1382,10 @@ function selectType(type) {
   updateTrailerOpts(type);
 }
 
-function onSpacingChange() {
-  document.getElementById('custom-dims').classList.toggle('hidden',
-    document.getElementById('opt-spacing').value !== 'custom');
-}
-
 function applyBuildingOptions() {
   var b = buildings.find(function(x){return x.id===activeBuilding});
   if (!b) return;
   b.type = document.getElementById('opt-cross').classList.contains('selected') ? 'cross' : 'rear';
-  b.spacing = document.getElementById('opt-spacing').value;
-  b.customW = parseFloat(document.getElementById('opt-cw').value) || 50;
-  b.customD = parseFloat(document.getElementById('opt-cd').value) || 52;
   b.trailerTop = document.getElementById('chk-trailer-top').checked;
   b.trailerBottom = document.getElementById('chk-trailer-bottom').checked;
   b.trailerRear = document.getElementById('chk-trailer-rear').checked;
@@ -3576,7 +3564,7 @@ function setBayStdDepth(val) {
   btns.forEach(function(b) { b.classList.toggle('active', parseInt(b.textContent) === val); });
   updateBayStats();
   var ab = getActiveBuilding();
-  if (ab) drawBayGrid(ab);
+  if (ab) { resizeBuildingFromBayUI(ab); drawBayGrid(ab); }
 }
 
 function setBaySpeedDepth(val) {
@@ -3585,7 +3573,7 @@ function setBaySpeedDepth(val) {
   btns.forEach(function(b) { b.classList.toggle('active', parseInt(b.textContent) === val); });
   updateBayStats();
   var ab = getActiveBuilding();
-  if (ab) drawBayGrid(ab);
+  if (ab) { resizeBuildingFromBayUI(ab); drawBayGrid(ab); }
 }
 
 function toggleBayGrid() {
@@ -3597,7 +3585,29 @@ function toggleBayGrid() {
 function onBayCountChange() {
   updateBayStats();
   var ab = getActiveBuilding();
-  if (ab) drawBayGrid(ab);
+  if (ab) { resizeBuildingFromBayUI(ab); drawBayGrid(ab); }
+}
+
+function resizeBuildingFromBayUI(b) {
+  // Build a config from the current UI values and resize the building
+  var widthBays = parseInt(document.getElementById('bay-count-width').value) || 1;
+  var depthBays = parseInt(document.getElementById('bay-count-depth').value) || 1;
+  var isCross = b.type === 'cross';
+  var speedCount = isCross ? 2 : 1;
+  var stdBays = Math.max(0, depthBays - speedCount);
+  var totalWidth = widthBays * BAY_WIDTH;
+  var totalDepth = speedCount * baySpeedDepth + stdBays * bayStdDepth;
+  var config = {
+    widthBays: widthBays,
+    depthBays: depthBays,
+    stdBays: stdBays,
+    stdDepth: bayStdDepth,
+    speedDepth: baySpeedDepth,
+    totalWidth: totalWidth,
+    totalDepth: totalDepth,
+    totalSF: totalWidth * totalDepth
+  };
+  resizeBuildingToBays(b, config);
 }
 
 function calculateBestBayFit(drawnWidthFt, drawnDepthFt, bldgType) {
