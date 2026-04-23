@@ -1072,28 +1072,67 @@ function setupBuildingDrag(bldg) {
     showBuildingOpts();
     updateBuildingList();
 
-    // Start drag
+    // Prepare for potential drag (don't start until threshold met)
     L.DomEvent.stopPropagation(e);
-    map.dragging.disable();
-    dragState = {
+    var pendingDrag = {
       bldgId: bldg.id,
       startLatLng: e.latlng,
+      startPx: map.latLngToContainerPoint(e.latlng),
       origVerts: bldg.vertices.map(function(v) { return L.latLng(v.lat, v.lng); }),
-      origOverlayPositions: []
+      activated: false
     };
-    // Store overlay vertex positions
-    bldg.overlayGroup.eachLayer(function(ol) {
-      if (ol.getLatLngs) {
-        var latlngs = ol.getLatLngs()[0] || ol.getLatLngs();
-        dragState.origOverlayPositions.push({
-          layer: ol,
-          verts: latlngs.map(function(v) { return L.latLng(v.lat, v.lng); })
+
+    function onPendingMove(ev) {
+      var px = map.latLngToContainerPoint(ev.latlng);
+      var dx = px.x - pendingDrag.startPx.x;
+      var dy = px.y - pendingDrag.startPx.y;
+      // Require 5px movement before starting drag
+      if (!pendingDrag.activated && Math.sqrt(dx*dx + dy*dy) < 5) return;
+
+      if (!pendingDrag.activated) {
+        // Activate drag
+        pendingDrag.activated = true;
+        map.dragging.disable();
+        dragState = {
+          bldgId: pendingDrag.bldgId,
+          startLatLng: pendingDrag.startLatLng,
+          origVerts: pendingDrag.origVerts,
+          origOverlayPositions: []
+        };
+        bldg.overlayGroup.eachLayer(function(ol) {
+          if (ol.getLatLngs) {
+            var latlngs = ol.getLatLngs()[0] || ol.getLatLngs();
+            dragState.origOverlayPositions.push({
+              layer: ol,
+              verts: latlngs.map(function(v) { return L.latLng(v.lat, v.lng); })
+            });
+          }
         });
       }
-    });
+      onBuildingDrag(ev);
+    }
 
-    map.on('mousemove', onBuildingDrag);
-    map.once('mouseup', onBuildingDragEnd);
+    function onPendingUp(ev) {
+      map.off('mousemove', onPendingMove);
+      if (pendingDrag.activated) {
+        onBuildingDragEnd(ev);
+      }
+      pendingDrag = null;
+    }
+
+    map.on('mousemove', onPendingMove);
+    map.once('mouseup', onPendingUp);
+    // Also listen on document for mouseup in case mouse leaves the map
+    document.addEventListener('mouseup', function docUp() {
+      document.removeEventListener('mouseup', docUp);
+      map.off('mousemove', onPendingMove);
+      if (pendingDrag && pendingDrag.activated) {
+        map.off('mousemove', onBuildingDrag);
+        map.dragging.enable();
+        dragState = null;
+      }
+      pendingDrag = null;
+    }, { once: true });
   });
 
   el.on('click', function(e) {
