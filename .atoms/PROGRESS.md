@@ -48,3 +48,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Added paved breakdown stats panel (Car Parking, Truck Court, Trailer Parking, Road, Paving) with overlay type tagging and PDF export integration
 - 2026-04-22: Fixed pond drawing bug - mode 'pond' was not matched in draw:created handler, causing completed ponds to disappear
 - 2026-04-22: Road labels now show only width (e.g. "40' W") instead of width × length
+- 2026-04-22: Fixed pond serialization in save function to use p.layer.getLatLngs() for new pond object structure

@@ -794,9 +794,16 @@ map.on(L.Draw.Event.CREATED, function(e) {
   } else if (mode === 'polygon' || mode === 'pond') {
     layer.setStyle({color:'#06b6d4',weight:2,fillColor:'#06b6d4',fillOpacity:0.35});
     drawnItems.addLayer(layer);
-    ponds.push(layer);
+    var pondObj = { layer: layer, labelGroup: L.featureGroup().addTo(map) };
+    ponds.push(pondObj);
+    updatePondLabel(pondObj);
     layer.on('click', function() {
-      if (confirm('Delete this pond?')) { drawnItems.removeLayer(layer); ponds = ponds.filter(function(p){return p!==layer}); recalcStats(); }
+      if (confirm('Delete this pond?')) {
+        drawnItems.removeLayer(layer);
+        if (pondObj.labelGroup) map.removeLayer(pondObj.labelGroup);
+        ponds = ponds.filter(function(p){return p!==pondObj});
+        recalcStats();
+      }
     });
     recalcStats();
     checkOutOfBounds();
@@ -1433,6 +1440,25 @@ function clearOutOfBoundsLayers() {
   outOfBoundsLayers = [];
 }
 
+function updatePondLabel(pond) {
+  if (!pond.labelGroup) pond.labelGroup = L.featureGroup().addTo(map);
+  pond.labelGroup.clearLayers();
+  var sf = areaSF(pond.layer);
+  if (sf <= 0) return;
+  var center = pond.layer.getBounds().getCenter();
+  var sfIcon = L.divIcon({
+    className: 'pond-sf-label',
+    html: '<span style="background:rgba(6,182,212,0.85);color:#fff;padding:2px 8px;border-radius:4px;font-family:DM Mono,monospace;font-size:12px;font-weight:600;white-space:nowrap;">' + fmt(sf) + ' SF</span>',
+    iconSize: [0, 0],
+    iconAnchor: [0, 0]
+  });
+  L.marker(center, { icon: sfIcon, interactive: false, zIndexOffset: 900 }).addTo(pond.labelGroup);
+}
+
+function updateAllPondLabels() {
+  ponds.forEach(function(p) { updatePondLabel(p); });
+}
+
 function checkOutOfBounds() {
   clearOutOfBoundsLayers();
   if (!siteBoundary || !siteBoundaryLocked) return;
@@ -1505,7 +1531,7 @@ function checkOutOfBounds() {
   // Check ponds
   ponds.forEach(function(p) {
     try {
-      var pGeo = p.toGeoJSON();
+      var pGeo = p.layer.toGeoJSON();
       var diff = turf.difference(turf.featureCollection([pGeo, boundaryGeo]));
       if (diff) {
         var redLayer = L.geoJSON(diff, {
@@ -1555,7 +1581,7 @@ function recalcStats() {
     pavedSF += sf;
     pavingAreaSF += sf;
   });
-  ponds.forEach(function(p){ pondSF += areaSF(p); });
+  ponds.forEach(function(p){ pondSF += areaSF(p.layer); });
   if (siteBoundary) siteSF = areaSF(siteBoundary);
   var cov = siteSF>0 ? Math.min(100,(bldgSF+pavedSF)/siteSF*100) : 0;
   document.getElementById('stat-bldg').textContent = fmt(bldgSF);
@@ -2260,7 +2286,7 @@ function clearAll() {
   siteBoundaryLocked = false;
   buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); if (b.labelGroup) map.removeLayer(b.labelGroup); });
   roads.forEach(function(r){ drawnItems.removeLayer(r.layer); if (r.labelGroup) map.removeLayer(r.labelGroup); });
-  ponds.forEach(function(p){ drawnItems.removeLayer(p); });
+  ponds.forEach(function(p){ drawnItems.removeLayer(p.layer); if (p.labelGroup) map.removeLayer(p.labelGroup); });
   pavings.forEach(function(p){ drawnItems.removeLayer(p.layer); if (p.labelGroup) map.removeLayer(p.labelGroup); });
   if (siteBoundary) drawnItems.removeLayer(siteBoundary);
   buildings=[]; roads=[]; ponds=[]; pavings=[]; siteBoundary=null; activeBuilding=null;
@@ -2388,7 +2414,7 @@ function serializeSite() {
       return { centerline: serializeLatlngs(r.centerline), width: r.width, curved: !!r.curved };
     }),
     ponds: ponds.map(function(p) {
-      var ll = p.getLatLngs();
+      var ll = p.layer.getLatLngs();
       return serializeLatlngs(ll[0] || ll);
     }),
     pavings: pavings.map(function(p) {
@@ -2467,11 +2493,14 @@ function deserializeSite(data) {
       var lls = pd.map(function(v) { return L.latLng(v.lat, v.lng); });
       var poly = L.polygon(lls, { color: '#06b6d4', weight: 2, fillColor: '#06b6d4', fillOpacity: 0.35 });
       drawnItems.addLayer(poly);
-      ponds.push(poly);
+      var pondObj = { layer: poly, labelGroup: L.featureGroup().addTo(map) };
+      ponds.push(pondObj);
+      updatePondLabel(pondObj);
       poly.on('click', function() {
         if (currentTool === 'select' && confirm('Delete this pond?')) {
           drawnItems.removeLayer(poly);
-          ponds = ponds.filter(function(p) { return p !== poly; });
+          if (pondObj.labelGroup) map.removeLayer(pondObj.labelGroup);
+          ponds = ponds.filter(function(p) { return p !== pondObj; });
           recalcStats();
           autoSave();
         }
@@ -2702,7 +2731,7 @@ function clearAll_noConfirm() {
     if (r.editGroup) map.removeLayer(r.editGroup);
     if (r._intersectionLayers) r._intersectionLayers.forEach(function(l) { map.removeLayer(l); });
   });
-  ponds.forEach(function(p) { drawnItems.removeLayer(p); });
+  ponds.forEach(function(p) { drawnItems.removeLayer(p.layer); if (p.labelGroup) map.removeLayer(p.labelGroup); });
   pavings.forEach(function(p) {
     drawnItems.removeLayer(p.layer);
     if (p.labelGroup) map.removeLayer(p.labelGroup);
