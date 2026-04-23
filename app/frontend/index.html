@@ -2979,9 +2979,14 @@ function applyRoadWidth() {
   recalcStats();
   checkOutOfBounds();
   autoSave();
-  setStatus('Road added (' + widthFt + '\' wide' + (curved ? ', curved' : '') + ') - draw another or switch tools');
-  currentTool = 'road';
-  beginDraw('polyline');
+
+  // Automatically enter edit mode on the new road so user can adjust vertices immediately
+  stopDraw();
+  currentTool = 'select';
+  document.querySelectorAll('.tool-btn').forEach(function(b) { b.classList.remove('active'); });
+  var selBtn = document.getElementById('tool-select');
+  if (selBtn) selBtn.classList.add('active');
+  enterRoadEditMode(road);
 }
 
 function createRoadFromCenterline(centerlineLatLngs, widthFt, curved) {
@@ -3069,7 +3074,7 @@ function enterRoadEditMode(road) {
   // Create vertex markers
   renderRoadEditHandles(road);
 
-  setStatus('Editing road — drag vertices to reshape, click midpoints to add, press Delete or click 🗑 to remove');
+  setStatus('Editing road — drag ● vertices to move, click ◦ midpoints to add new points, right-click a vertex to remove it, click outside to finish');
 }
 
 function renderRoadEditHandles(road) {
@@ -3124,7 +3129,28 @@ function renderRoadEditHandles(road) {
       var mid = getMidpoint(cl[idx], cl[idx + 1]);
       var mm = L.marker(mid, {
         icon: L.divIcon({ className: 'road-edit-midpoint', iconSize: [10, 10], iconAnchor: [5, 5] }),
-        draggable: false, zIndexOffset: 2500
+        draggable: true, zIndexOffset: 2500
+      });
+      mm.on('dragstart', function() {
+        // Insert the new vertex when user starts dragging the midpoint
+        map.dragging.disable();
+        road.centerline.splice(idx + 1, 0, L.latLng(mid.lat, mid.lng));
+        mm._insertedIdx = idx + 1;
+      });
+      mm.on('drag', function(e) {
+        var pos = e.target.getLatLng();
+        if (mm._insertedIdx !== undefined) {
+          road.centerline[mm._insertedIdx] = pos;
+          rebuildRoadGeometry(road);
+        }
+      });
+      mm.on('dragend', function() {
+        map.dragging.enable();
+        renderRoadEditHandles(road);
+        mergeRoadIntersections(road);
+        recalcStats();
+        checkOutOfBounds();
+        autoSave();
       });
       mm.on('click', function() {
         road.centerline.splice(idx + 1, 0, mid);
