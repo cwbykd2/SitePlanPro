@@ -1638,6 +1638,7 @@ function initParkingCheckboxes() {
     if (chk && div) {
       chk.addEventListener('change', function() {
         div.classList.toggle('hidden', !chk.checked);
+        applyBuildingOptions();
       });
     }
   });
