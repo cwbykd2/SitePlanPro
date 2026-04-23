@@ -564,6 +564,12 @@ var ponds = [];
 var pavings = [];
 var pavingMode = 'rect'; // 'rect' or 'free'
 var currentPavingType = 'carparking'; // 'carparking', 'trailer', 'other'
+var selectedPaving = null; // currently selected paving id
+var pavWidthHandle = null;
+var pavDepthHandle = null;
+var pavRotateHandle = null;
+var pavHandleState = null;
+var pavDragState = null;
 var siteBoundary = null;
 var activeBuilding = null;
 var activeDraw = null;
@@ -947,6 +953,14 @@ function hideAllHandles() {
   if (depthHandle) { map.removeLayer(depthHandle); depthHandle = null; }
   if (rotateHandle) { map.removeLayer(rotateHandle); rotateHandle = null; }
   handleState = null;
+  hidePavingHandles();
+}
+
+function hidePavingHandles() {
+  if (pavWidthHandle) { map.removeLayer(pavWidthHandle); pavWidthHandle = null; }
+  if (pavDepthHandle) { map.removeLayer(pavDepthHandle); pavDepthHandle = null; }
+  if (pavRotateHandle) { map.removeLayer(pavRotateHandle); pavRotateHandle = null; }
+  pavHandleState = null;
 }
 
 function refreshHandlePositions(b) {
@@ -1574,18 +1588,16 @@ function registerPaving(layer, isRect) {
     id: id,
     layer: layer,
     vertices: verts,
+    baseVertices: verts.map(function(v) { return L.latLng(v.lat, v.lng); }),
+    rotation: 0,
     isRect: isRect,
     pavingType: pType,
     labelGroup: L.featureGroup().addTo(map)
   };
   pavings.push(paving);
 
-  // Click to delete
-  layer.on('click', function() {
-    if (currentTool === 'select' && confirm('Delete this paving area?')) {
-      deletePaving(id);
-    }
-  });
+  // Setup drag & select interaction
+  setupPavingDrag(paving);
 
   updatePavingLabels(paving);
   recalcStats();
@@ -1659,8 +1671,334 @@ function deletePaving(id) {
   drawnItems.removeLayer(p.layer);
   if (p.labelGroup) map.removeLayer(p.labelGroup);
   pavings = pavings.filter(function(x) { return x.id !== id; });
+  if (selectedPaving === id) { selectedPaving = null; hidePavingHandles(); }
   recalcStats();
   checkOutOfBounds();
+}
+
+/* ===== PAVING INTERACTION (SELECT, DRAG, RESIZE, ROTATE) ===== */
+
+function updatePavingPolygon(p, newVerts) {
+  p.vertices = newVerts.map(function(v) { return L.latLng(v.lat, v.lng); });
+  p.layer.setLatLngs([p.vertices]);
+  updatePavingLabels(p);
+}
+
+function selectPaving(id) {
+  selectedPaving = id;
+  // Deselect building
+  activeBuilding = null;
+  document.getElementById('building-opts-panel').classList.add('hidden');
+  // Hide building handles, show paving handles
+  if (widthHandle) { map.removeLayer(widthHandle); widthHandle = null; }
+  if (depthHandle) { map.removeLayer(depthHandle); depthHandle = null; }
+  if (rotateHandle) { map.removeLayer(rotateHandle); rotateHandle = null; }
+  handleState = null;
+
+  var p = pavings.find(function(x) { return x.id === id; });
+  if (p && p.isRect && p.vertices.length >= 4) {
+    showPavingHandles(p);
+  }
+  // Highlight selected paving
+  pavings.forEach(function(pv) {
+    var c = getPavingColor(pv.pavingType || 'other');
+    if (pv.id === id) {
+      pv.layer.setStyle({ weight: 3, fillOpacity: 0.35 });
+    } else {
+      pv.layer.setStyle({ weight: 2, fillOpacity: 0.25 });
+    }
+  });
+  setStatus('Paving selected. Drag to move' + (p && p.isRect ? ', use handles to resize/rotate' : '') + '. Press Delete to remove.');
+}
+
+function deselectPaving() {
+  if (selectedPaving === null) return;
+  var prev = pavings.find(function(x) { return x.id === selectedPaving; });
+  if (prev) {
+    var c = getPavingColor(prev.pavingType || 'other');
+    prev.layer.setStyle({ weight: 2, fillOpacity: 0.25 });
+  }
+  selectedPaving = null;
+  hidePavingHandles();
+}
+
+function showPavingHandles(p) {
+  hidePavingHandles();
+  if (!p || !p.isRect || p.vertices.length < 4) return;
+
+  // Width handle at midpoint of edge v1-v2 (right edge)
+  var widthMid = getMidpoint(p.vertices[1], p.vertices[2]);
+  pavWidthHandle = L.marker(widthMid, {
+    icon: createHandleIcon('handle-resize', '↔'),
+    draggable: true,
+    zIndexOffset: 2000
+  }).addTo(map);
+
+  // Depth handle at midpoint of edge v2-v3 (bottom edge)
+  var depthMid = getMidpoint(p.vertices[2], p.vertices[3]);
+  pavDepthHandle = L.marker(depthMid, {
+    icon: createHandleIcon('handle-depth', '↕'),
+    draggable: true,
+    zIndexOffset: 2000
+  }).addTo(map);
+
+  // Rotate handle at vertex[0] (top-left)
+  pavRotateHandle = L.marker(p.vertices[0], {
+    icon: createHandleIcon('handle-rotate', '↻'),
+    draggable: true,
+    zIndexOffset: 2000
+  }).addTo(map);
+
+  // --- Width drag ---
+  pavWidthHandle.on('dragstart', function() {
+    map.dragging.disable();
+    var center = getPolygonCenter(p.vertices);
+    var widthAxis = { lat: p.vertices[1].lat - p.vertices[0].lat, lng: p.vertices[1].lng - p.vertices[0].lng };
+    var startMid = getMidpoint(p.vertices[1], p.vertices[2]);
+    var startDist = projectOntoAxis(startMid, center, widthAxis);
+    pavHandleState = {
+      type: 'width',
+      pavId: p.id,
+      center: center,
+      widthAxis: widthAxis,
+      startDist: startDist,
+      origVerts: p.vertices.map(function(v) { return L.latLng(v.lat, v.lng); })
+    };
+  });
+
+  pavWidthHandle.on('drag', function(e) {
+    if (!pavHandleState || pavHandleState.type !== 'width') return;
+    var pav = pavings.find(function(x) { return x.id === pavHandleState.pavId; });
+    if (!pav) return;
+    var newPos = e.target.getLatLng();
+    var newDist = projectOntoAxis(newPos, pavHandleState.center, pavHandleState.widthAxis);
+    if (Math.abs(pavHandleState.startDist) < 1e-12) return;
+    var ratio = newDist / pavHandleState.startDist;
+    ratio = Math.max(0.2, Math.min(5, ratio));
+    var ov = pavHandleState.origVerts;
+    var c = pavHandleState.center;
+    var ax = normalizeAxis(pavHandleState.widthAxis);
+    var latScale = Math.cos(c.lat * Math.PI / 180);
+    var newVerts = ov.map(function(v) {
+      var dx = (v.lng - c.lng) * latScale;
+      var dy = v.lat - c.lat;
+      var proj = dx * ax.x + dy * ax.y;
+      var newProj = proj * ratio;
+      var diff = newProj - proj;
+      return L.latLng(v.lat + diff * ax.y, v.lng + diff * ax.x / latScale);
+    });
+    updatePavingPolygon(pav, newVerts);
+    refreshPavingHandlePositions(pav);
+  });
+
+  pavWidthHandle.on('dragend', function() {
+    map.dragging.enable();
+    var pav = pavings.find(function(x) { return x.id === pavHandleState.pavId; });
+    if (pav) {
+      pav.baseVertices = pav.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+      pav.rotation = 0;
+      recalcStats();
+      refreshPavingHandlePositions(pav);
+      checkOutOfBounds();
+      autoSave();
+    }
+    pavHandleState = null;
+  });
+
+  // --- Depth drag ---
+  pavDepthHandle.on('dragstart', function() {
+    map.dragging.disable();
+    var center = getPolygonCenter(p.vertices);
+    var depthAxis = { lat: p.vertices[2].lat - p.vertices[1].lat, lng: p.vertices[2].lng - p.vertices[1].lng };
+    var startMid = getMidpoint(p.vertices[2], p.vertices[3]);
+    var startDist = projectOntoAxis(startMid, center, depthAxis);
+    pavHandleState = {
+      type: 'depth',
+      pavId: p.id,
+      center: center,
+      depthAxis: depthAxis,
+      startDist: startDist,
+      origVerts: p.vertices.map(function(v) { return L.latLng(v.lat, v.lng); })
+    };
+  });
+
+  pavDepthHandle.on('drag', function(e) {
+    if (!pavHandleState || pavHandleState.type !== 'depth') return;
+    var pav = pavings.find(function(x) { return x.id === pavHandleState.pavId; });
+    if (!pav) return;
+    var newPos = e.target.getLatLng();
+    var newDist = projectOntoAxis(newPos, pavHandleState.center, pavHandleState.depthAxis);
+    if (Math.abs(pavHandleState.startDist) < 1e-12) return;
+    var ratio = newDist / pavHandleState.startDist;
+    ratio = Math.max(0.2, Math.min(5, ratio));
+    var ov = pavHandleState.origVerts;
+    var c = pavHandleState.center;
+    var ax = normalizeAxis(pavHandleState.depthAxis);
+    var latScale = Math.cos(c.lat * Math.PI / 180);
+    var newVerts = ov.map(function(v) {
+      var dx = (v.lng - c.lng) * latScale;
+      var dy = v.lat - c.lat;
+      var proj = dx * ax.x + dy * ax.y;
+      var newProj = proj * ratio;
+      var diff = newProj - proj;
+      return L.latLng(v.lat + diff * ax.y, v.lng + diff * ax.x / latScale);
+    });
+    updatePavingPolygon(pav, newVerts);
+    refreshPavingHandlePositions(pav);
+  });
+
+  pavDepthHandle.on('dragend', function() {
+    map.dragging.enable();
+    var pav = pavings.find(function(x) { return x.id === pavHandleState.pavId; });
+    if (pav) {
+      pav.baseVertices = pav.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+      pav.rotation = 0;
+      recalcStats();
+      refreshPavingHandlePositions(pav);
+      checkOutOfBounds();
+      autoSave();
+    }
+    pavHandleState = null;
+  });
+
+  // --- Rotate drag ---
+  pavRotateHandle.on('dragstart', function() {
+    map.dragging.disable();
+    var center = getPolygonCenter(p.vertices);
+    var startAngle = Math.atan2(
+      p.vertices[0].lat - center.lat,
+      (p.vertices[0].lng - center.lng) * Math.cos(center.lat * Math.PI / 180)
+    ) * 180 / Math.PI;
+    pavHandleState = {
+      type: 'rotate',
+      pavId: p.id,
+      center: center,
+      startAngle: startAngle,
+      origRotation: p.rotation || 0
+    };
+  });
+
+  pavRotateHandle.on('drag', function(e) {
+    if (!pavHandleState || pavHandleState.type !== 'rotate') return;
+    var pav = pavings.find(function(x) { return x.id === pavHandleState.pavId; });
+    if (!pav) return;
+    var newPos = e.target.getLatLng();
+    var newAngle = Math.atan2(
+      newPos.lat - pavHandleState.center.lat,
+      (newPos.lng - pavHandleState.center.lng) * Math.cos(pavHandleState.center.lat * Math.PI / 180)
+    ) * 180 / Math.PI;
+    var delta = newAngle - pavHandleState.startAngle;
+    pav.rotation = (pavHandleState.origRotation || 0) + delta;
+    if (pav.rotation > 180) pav.rotation -= 360;
+    if (pav.rotation < -180) pav.rotation += 360;
+    applyPavingTransform(pav);
+  });
+
+  pavRotateHandle.on('dragend', function() {
+    map.dragging.enable();
+    var pav = pavings.find(function(x) { return x.id === pavHandleState.pavId; });
+    if (pav) {
+      recalcStats();
+      checkOutOfBounds();
+      autoSave();
+    }
+    pavHandleState = null;
+  });
+}
+
+function applyPavingTransform(p) {
+  if (!p.baseVertices) return;
+  var center = getPolygonCenter(p.baseVertices);
+  var newVerts = p.baseVertices.map(function(v) {
+    return rotatePoint(center, v, p.rotation || 0);
+  });
+  updatePavingPolygon(p, newVerts);
+  refreshPavingHandlePositions(p);
+}
+
+function refreshPavingHandlePositions(p) {
+  if (!p || p.vertices.length < 4) return;
+  if (pavWidthHandle) pavWidthHandle.setLatLng(getMidpoint(p.vertices[1], p.vertices[2]));
+  if (pavDepthHandle) pavDepthHandle.setLatLng(getMidpoint(p.vertices[2], p.vertices[3]));
+  if (pavRotateHandle) pavRotateHandle.setLatLng(p.vertices[0]);
+}
+
+function setupPavingDrag(paving) {
+  var el = paving.layer;
+  el.on('mousedown', function(e) {
+    if (currentTool !== 'select') return;
+    L.DomEvent.stopPropagation(e);
+    selectPaving(paving.id);
+
+    var pendingDrag = {
+      pavId: paving.id,
+      startLatLng: e.latlng,
+      startPx: map.latLngToContainerPoint(e.latlng),
+      origVerts: paving.vertices.map(function(v) { return L.latLng(v.lat, v.lng); }),
+      activated: false
+    };
+
+    function onPendingMove(ev) {
+      var px = map.latLngToContainerPoint(ev.latlng);
+      var dx = px.x - pendingDrag.startPx.x;
+      var dy = px.y - pendingDrag.startPx.y;
+      if (!pendingDrag.activated && Math.sqrt(dx*dx + dy*dy) < 5) return;
+
+      if (!pendingDrag.activated) {
+        pendingDrag.activated = true;
+        map.dragging.disable();
+        hidePavingHandles();
+        pavDragState = {
+          pavId: pendingDrag.pavId,
+          startLatLng: pendingDrag.startLatLng,
+          origVerts: pendingDrag.origVerts
+        };
+      }
+      // Drag move
+      var pav = pavings.find(function(x) { return x.id === pavDragState.pavId; });
+      if (!pav) return;
+      var dLat = ev.latlng.lat - pavDragState.startLatLng.lat;
+      var dLng = ev.latlng.lng - pavDragState.startLatLng.lng;
+      var newVerts = translateVerts(pavDragState.origVerts, dLat, dLng);
+      updatePavingPolygon(pav, newVerts);
+    }
+
+    function onPendingUp() {
+      map.off('mousemove', onPendingMove);
+      if (pendingDrag.activated) {
+        map.dragging.enable();
+        var pav = pavings.find(function(x) { return x.id === pavDragState.pavId; });
+        if (pav) {
+          pav.baseVertices = pav.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+          pav.rotation = 0;
+          recalcStats();
+          checkOutOfBounds();
+          showPavingHandles(pav);
+          autoSave();
+        }
+        pavDragState = null;
+      }
+      pendingDrag = null;
+    }
+
+    map.on('mousemove', onPendingMove);
+    map.once('mouseup', onPendingUp);
+    document.addEventListener('mouseup', function docUp() {
+      document.removeEventListener('mouseup', docUp);
+      map.off('mousemove', onPendingMove);
+      if (pendingDrag && pendingDrag.activated) {
+        map.dragging.enable();
+        pavDragState = null;
+      }
+      pendingDrag = null;
+    }, { once: true });
+  });
+
+  el.on('click', function(e) {
+    if (currentTool !== 'select') return;
+    L.DomEvent.stopPropagation(e);
+    selectPaving(paving.id);
+  });
 }
 
 /* ===== SITE BOUNDARY ===== */
@@ -2258,8 +2596,6 @@ function deleteEditingRoad() {
 // Exit road edit mode when clicking on the map background or switching tools
 map.on('click', function(e) {
   if (editingRoad && currentTool === 'select') {
-    // Check if click is on the editing road's polygon
-    // If not, exit edit mode
     var pt = turf.point([e.latlng.lng, e.latlng.lat]);
     try {
       var roadGeo = editingRoad.layer.toGeoJSON();
@@ -2270,13 +2606,24 @@ map.on('click', function(e) {
       exitRoadEditMode();
     }
   }
+  // Deselect paving when clicking on empty map area
+  if (selectedPaving !== null && currentTool === 'select') {
+    deselectPaving();
+  }
 });
 
-// Keyboard: Delete key removes editing road
+// Keyboard: Delete key removes editing road or selected paving
 document.addEventListener('keydown', function(e) {
-  if ((e.key === 'Delete' || e.key === 'Backspace') && editingRoad && currentTool === 'select') {
-    e.preventDefault();
-    deleteEditingRoad();
+  if ((e.key === 'Delete' || e.key === 'Backspace') && currentTool === 'select') {
+    if (editingRoad) {
+      e.preventDefault();
+      deleteEditingRoad();
+    } else if (selectedPaving !== null) {
+      e.preventDefault();
+      if (confirm('Delete this paving area?')) {
+        deletePaving(selectedPaving);
+      }
+    }
   }
 });
 
@@ -2958,6 +3305,8 @@ function serializeSite() {
       return {
         id: p.id,
         vertices: serializeLatlngs(p.vertices),
+        baseVertices: serializeLatlngs(p.baseVertices || p.vertices),
+        rotation: p.rotation || 0,
         isRect: p.isRect,
         pavingType: p.pavingType || 'other'
       };
@@ -3051,6 +3400,7 @@ function deserializeSite(data) {
   if (data.pavings) {
     data.pavings.forEach(function(pd) {
       var lls = pd.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+      var baseVerts = pd.baseVertices ? pd.baseVertices.map(function(v) { return L.latLng(v.lat, v.lng); }) : lls.map(function(v) { return L.latLng(v.lat, v.lng); });
       var pType = pd.pavingType || 'other';
       var c = getPavingColor(pType);
       var poly = L.polygon(lls, { color: c, weight: 2, fillColor: c, fillOpacity: 0.25 });
@@ -3059,17 +3409,14 @@ function deserializeSite(data) {
         id: pd.id || Date.now() + Math.random(),
         layer: poly,
         vertices: lls,
+        baseVertices: baseVerts,
+        rotation: pd.rotation || 0,
         isRect: pd.isRect,
         pavingType: pType,
         labelGroup: L.featureGroup().addTo(map)
       };
       pavings.push(paving);
-      poly.on('click', function() {
-        if (currentTool === 'select' && confirm('Delete this paving area?')) {
-          deletePaving(paving.id);
-          autoSave();
-        }
-      });
+      setupPavingDrag(paving);
       updatePavingLabels(paving);
     });
   }
