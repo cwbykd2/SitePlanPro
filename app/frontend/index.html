@@ -1350,20 +1350,31 @@ function applyTransform(b) {
 /* ===== BUILDING OPTIONS ===== */
 
 function showBuildingOpts() {
-  document.getElementById('building-opts-panel').classList.remove('hidden');
+  var panel = document.getElementById('building-opts-panel');
+  if (panel) panel.classList.remove('hidden');
   var b = buildings.find(function(x){return x.id===activeBuilding});
   if (!b) return;
-  document.getElementById('opt-cross').classList.toggle('selected', b.type==='cross');
-  document.getElementById('opt-rear').classList.toggle('selected', b.type==='rear');
-  document.getElementById('chk-trailer-top').checked = b.trailerTop;
-  document.getElementById('chk-trailer-bottom').checked = b.trailerBottom;
-  document.getElementById('chk-trailer-rear').checked = b.trailerRear;
-  document.getElementById('chk-left').checked = b.leftParking;
-  document.getElementById('chk-right').checked = b.rightParking;
+  var elCross = document.getElementById('opt-cross');
+  var elRear = document.getElementById('opt-rear');
+  if (elCross) elCross.classList.toggle('selected', b.type==='cross');
+  if (elRear) elRear.classList.toggle('selected', b.type==='rear');
+  var elTT = document.getElementById('chk-trailer-top');
+  var elTB = document.getElementById('chk-trailer-bottom');
+  var elTR = document.getElementById('chk-trailer-rear');
+  var elLP = document.getElementById('chk-left');
+  var elRP = document.getElementById('chk-right');
+  if (elTT) elTT.checked = b.trailerTop;
+  if (elTB) elTB.checked = b.trailerBottom;
+  if (elTR) elTR.checked = b.trailerRear;
+  if (elLP) elLP.checked = b.leftParking;
+  if (elRP) elRP.checked = b.rightParking;
   // Populate inset fields (single value per side, applied equally to both ends)
-  document.getElementById('tc-inset-rear').value = b.tcInsetLeft || 0;
-  document.getElementById('tc-inset-top').value = b.tcInsetTopLeft || 0;
-  document.getElementById('tc-inset-bot').value = b.tcInsetBottomLeft || 0;
+  var elIR = document.getElementById('tc-inset-rear');
+  var elIT = document.getElementById('tc-inset-top');
+  var elIB = document.getElementById('tc-inset-bot');
+  if (elIR) elIR.value = b.tcInsetLeft || 0;
+  if (elIT) elIT.value = b.tcInsetTopLeft || 0;
+  if (elIB) elIB.value = b.tcInsetBottomLeft || 0;
   updateTrailerOpts(b.type);
   showBuildingHandles(b);
   // Update bay configuration UI
@@ -2391,9 +2402,10 @@ function showRoadWidthModal() {
   opts[2].classList.add('selected');
   opts[2].querySelector('input').checked = true;
   selectedRoadWidth = 40;
-  document.getElementById('road-custom-width').classList.remove('visible');
-  document.getElementById('road-custom-width').value = '';
-  document.getElementById('chk-curved-road').checked = false;
+  var elRCW = document.getElementById('road-custom-width');
+  if (elRCW) { elRCW.classList.remove('visible'); elRCW.value = ''; }
+  var elCCR = document.getElementById('chk-curved-road');
+  if (elCCR) elCCR.checked = false;
 }
 
 function selectRoadWidth(val) {
@@ -3710,8 +3722,10 @@ function autoSnapToOptimalBays() {
   var spdBtns = document.querySelectorAll('#bay-speed-depth-seg .bay-seg-btn');
   spdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.speedDepth); });
   
-  document.getElementById('bay-count-width').value = config.widthBays;
-  document.getElementById('bay-count-depth').value = config.depthBays;
+  var elBCW = document.getElementById('bay-count-width');
+  var elBCD = document.getElementById('bay-count-depth');
+  if (elBCW) elBCW.value = config.widthBays;
+  if (elBCD) elBCD.value = config.depthBays;
   
   // Resize the building to exact bay dimensions
   resizeBuildingToBays(b, config);
@@ -4113,8 +4127,10 @@ function updateBayUIForBuilding(b) {
   var dims = getBuildingDimensions(b.vertices);
   var config = calculateBestBayFit(dims.width, dims.depth, b.type);
   if (config) {
-    document.getElementById('bay-count-width').value = config.widthBays;
-    document.getElementById('bay-count-depth').value = config.depthBays;
+    var elBCW2 = document.getElementById('bay-count-width');
+    var elBCD2 = document.getElementById('bay-count-depth');
+    if (elBCW2) elBCW2.value = config.widthBays;
+    if (elBCD2) elBCD2.value = config.depthBays;
     bayStdDepth = config.stdDepth;
     baySpeedDepth = config.speedDepth;
     
@@ -4373,8 +4389,10 @@ function loadFeeTemplate(name) {
   if (!tpl) return;
   feeCategories.forEach(function(cat) {
     if (tpl[cat]) {
-      document.getElementById('fee-mode-' + cat).value = tpl[cat].mode || 'per_bldg_sf';
-      document.getElementById('fee-rate-' + cat).value = tpl[cat].rate || 0;
+      var elMode = document.getElementById('fee-mode-' + cat);
+      var elRate = document.getElementById('fee-rate-' + cat);
+      if (elMode) elMode.value = tpl[cat].mode || 'per_bldg_sf';
+      if (elRate) elRate.value = tpl[cat].rate || 0;
     }
   });
   recalcFees();
@@ -4462,13 +4480,16 @@ function restoreFeeData(data) {
     detectedCounty = data.county || '';
     var display = detectedCity || detectedCounty || 'Unknown';
     if (detectedState) display += ', ' + detectedState;
-    document.getElementById('fee-city-name').textContent = display;
+    var elFCNR = document.getElementById('fee-city-name');
+    if (elFCNR) elFCNR.textContent = display;
   }
   if (data.categories) {
     feeCategories.forEach(function(cat) {
       if (data.categories[cat]) {
-        document.getElementById('fee-mode-' + cat).value = data.categories[cat].mode || 'per_bldg_sf';
-        document.getElementById('fee-rate-' + cat).value = data.categories[cat].rate || 0;
+        var elM = document.getElementById('fee-mode-' + cat);
+        var elR = document.getElementById('fee-rate-' + cat);
+        if (elM) elM.value = data.categories[cat].mode || 'per_bldg_sf';
+        if (elR) elR.value = data.categories[cat].rate || 0;
       }
     });
   }
@@ -4696,14 +4717,19 @@ function clearAll_noConfirm() {
   buildings = []; roads = []; ponds = []; pavings = []; siteBoundary = null; activeBuilding = null;
   editingRoad = null;
   hideAllHandles();
-  document.getElementById('building-opts-panel').classList.add('hidden');
+  var elBOP = document.getElementById('building-opts-panel');
+  if (elBOP) elBOP.classList.add('hidden');
   // Reset fee estimator
   detectedCity = ''; detectedState = ''; detectedCounty = '';
-  document.getElementById('fee-city-name').textContent = 'No city detected';
-  document.getElementById('fee-city-status').textContent = '';
+  var elFCN = document.getElementById('fee-city-name');
+  if (elFCN) elFCN.textContent = 'No city detected';
+  var elFCS = document.getElementById('fee-city-status');
+  if (elFCS) elFCS.textContent = '';
   feeCategories.forEach(function(cat) {
-    document.getElementById('fee-mode-' + cat).value = 'per_bldg_sf';
-    document.getElementById('fee-rate-' + cat).value = 0;
+    var elFM = document.getElementById('fee-mode-' + cat);
+    var elFR = document.getElementById('fee-rate-' + cat);
+    if (elFM) elFM.value = 'per_bldg_sf';
+    if (elFR) elFR.value = 0;
   });
   recalcFees();
   updateBuildingList();
