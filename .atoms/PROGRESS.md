@@ -43,6 +43,7 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Paving interaction - click to select, drag to move, resize (width/depth handles), rotate (yellow handle), Delete key to remove
 
 ## Progress Log
+- 2026-04-22: Fixed Sites dropdown not opening - header had overflow-y:hidden clipping the dropdown; changed to overflow:visible and switched dropdown to position:fixed with dynamic positioning
 - 2026-04-22: Started deployment of SitePlan Pro HTML application
 - 2026-04-22: Added PDF export feature with html2canvas + jsPDF
 - 2026-04-22: Added default car parking on opposite side of truck court for rear load buildings
