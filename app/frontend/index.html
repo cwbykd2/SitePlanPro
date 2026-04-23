@@ -28,6 +28,16 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height
 .road-width-modal .btn-cancel:hover{background:var(--border)}
 .road-width-modal .btn-apply{background:#6b7280;color:#fff}
 .road-width-modal .btn-apply:hover{background:#9ca3af}
+.road-width-modal .curve-toggle{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;margin-bottom:16px;cursor:pointer;font-family:'DM Mono',monospace;font-size:13px;color:var(--text);transition:all 0.15s}
+.road-width-modal .curve-toggle:hover{border-color:var(--muted);background:var(--border)}
+.road-width-modal .curve-toggle input[type="checkbox"]{accent-color:var(--accent)}
+.snap-indicator{width:10px;height:10px;background:#22d3ee;border:2px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(34,211,238,0.6);pointer-events:none}
+.road-edit-vertex{width:12px;height:12px;background:#6366f1;border:2px solid #fff;border-radius:50%;cursor:grab;box-shadow:0 0 6px rgba(99,102,241,0.5)}
+.road-edit-vertex:hover{background:#818cf8;transform:scale(1.2)}
+.road-edit-midpoint{width:10px;height:10px;background:rgba(99,102,241,0.5);border:2px solid rgba(255,255,255,0.6);border-radius:50%;cursor:pointer;box-shadow:0 0 4px rgba(99,102,241,0.3)}
+.road-edit-midpoint:hover{background:#6366f1;transform:scale(1.2)}
+.road-edit-delete{background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-family:'DM Mono',monospace;cursor:pointer;box-shadow:0 2px 8px rgba(239,68,68,0.4)}
+.road-edit-delete:hover{background:#dc2626}
 header{display:flex;align-items:center;gap:16px;padding:0 20px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative;overflow-x:auto;overflow-y:hidden}
 header::-webkit-scrollbar{height:3px}
 header::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
@@ -279,6 +289,9 @@ select option{background:var(--panel2)}
           <label class="width-opt" onclick="selectRoadWidth(-1)"><input type="radio" name="rw" value="custom"> Custom</label>
           <input type="number" id="road-custom-width" class="custom-input" placeholder="Enter width in feet..." min="10" max="200">
         </div>
+        <label class="curve-toggle">
+          <input type="checkbox" id="chk-curved-road"> Curved road (smooth spline)
+        </label>
         <div class="modal-actions">
           <button class="btn-cancel" onclick="cancelRoadWidth()">Cancel</button>
           <button class="btn-apply" onclick="applyRoadWidth()">Apply</button>
@@ -299,9 +312,12 @@ select option{background:var(--panel2)}
 var FEET_PER_METER = 3.28084;
 var currentTool = 'select';
 var buildings = [];
-var roads = []; // Each road: { centerline: L.Polyline (temp), width: number (feet), layer: L.Polygon, labelGroup: L.LayerGroup }
+var roads = []; // Each road: { centerline: [], width: number, layer: L.Polygon, labelGroup: L.LayerGroup, curved: bool, editGroup: L.LayerGroup|null }
 var pendingRoadPolyline = null;
 var selectedRoadWidth = 40;
+var editingRoad = null; // currently editing road object
+var snapMarker = null; // visual snap indicator
+var SNAP_DIST_PX = 20; // snap distance in pixels
 var ponds = [];
 var pavings = [];
 var pavingMode = 'rect'; // 'rect' or 'free'
@@ -1542,19 +1558,148 @@ function fmt(n) {
   return Math.round(n).toLocaleString();
 }
 
+/* ===== SNAP-TO-EDGES HELPERS ===== */
+
+function getAllSnappableEdges() {
+  var edges = [];
+  // Collect edges from building overlays (truck courts, parking)
+  buildings.forEach(function(b) {
+    b.overlayGroup.eachLayer(function(ol) {
+      if (ol.getLatLngs) {
+        var lls = ol.getLatLngs()[0] || ol.getLatLngs();
+        for (var i = 0; i < lls.length; i++) {
+          edges.push([lls[i], lls[(i + 1) % lls.length]]);
+        }
+      }
+    });
+    // Building edges themselves
+    if (b.vertices && b.vertices.length >= 4) {
+      for (var i = 0; i < b.vertices.length; i++) {
+        edges.push([b.vertices[i], b.vertices[(i + 1) % b.vertices.length]]);
+      }
+    }
+  });
+  // Paving edges
+  pavings.forEach(function(p) {
+    if (p.vertices && p.vertices.length >= 3) {
+      for (var i = 0; i < p.vertices.length; i++) {
+        edges.push([p.vertices[i], p.vertices[(i + 1) % p.vertices.length]]);
+      }
+    }
+  });
+  // Other road polygon edges
+  roads.forEach(function(r) {
+    if (r.isPolygon && r.layer) {
+      var lls = r.layer.getLatLngs()[0] || r.layer.getLatLngs();
+      for (var i = 0; i < lls.length; i++) {
+        edges.push([lls[i], lls[(i + 1) % lls.length]]);
+      }
+    }
+  });
+  return edges;
+}
+
+function closestPointOnSegment(p, a, b) {
+  var dx = b.lng - a.lng, dy = b.lat - a.lat;
+  var lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-18) return { lat: a.lat, lng: a.lng };
+  var t = ((p.lng - a.lng) * dx + (p.lat - a.lat) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return L.latLng(a.lat + t * dy, a.lng + t * dx);
+}
+
+function findSnapPoint(latlng) {
+  var edges = getAllSnappableEdges();
+  var bestDist = Infinity;
+  var bestPt = null;
+  var pt = map.latLngToContainerPoint(latlng);
+  for (var i = 0; i < edges.length; i++) {
+    var cp = closestPointOnSegment(latlng, edges[i][0], edges[i][1]);
+    var cpPx = map.latLngToContainerPoint(cp);
+    var dist = pt.distanceTo(cpPx);
+    if (dist < SNAP_DIST_PX && dist < bestDist) {
+      bestDist = dist;
+      bestPt = cp;
+    }
+  }
+  return bestPt;
+}
+
+function showSnapIndicator(latlng) {
+  if (!snapMarker) {
+    snapMarker = L.marker(latlng, {
+      icon: L.divIcon({ className: 'snap-indicator', iconSize: [10, 10], iconAnchor: [5, 5] }),
+      interactive: false, zIndexOffset: 3000
+    }).addTo(map);
+  } else {
+    snapMarker.setLatLng(latlng);
+    if (!map.hasLayer(snapMarker)) snapMarker.addTo(map);
+  }
+}
+
+function hideSnapIndicator() {
+  if (snapMarker && map.hasLayer(snapMarker)) map.removeLayer(snapMarker);
+}
+
+// Hook into Leaflet.Draw to add snap behavior during polyline drawing
+(function hookDrawSnap() {
+  map.on('mousemove', function(e) {
+    if (currentTool !== 'road' || !activeDraw) { hideSnapIndicator(); return; }
+    var snap = findSnapPoint(e.latlng);
+    if (snap) {
+      showSnapIndicator(snap);
+    } else {
+      hideSnapIndicator();
+    }
+  });
+
+  // Override the addVertex method of polyline draw to snap
+  var origAddVertex = L.Draw.Polyline.prototype.addVertex;
+  L.Draw.Polyline.prototype.addVertex = function(latlng) {
+    if (currentTool === 'road') {
+      var snap = findSnapPoint(latlng);
+      if (snap) latlng = snap;
+    }
+    origAddVertex.call(this, latlng);
+  };
+})();
+
+/* ===== CATMULL-ROM SPLINE ===== */
+
+function catmullRomSpline(points, numSegments) {
+  if (points.length < 2) return points;
+  numSegments = numSegments || 16;
+  var result = [];
+  // Pad endpoints
+  var pts = [points[0]].concat(points).concat([points[points.length - 1]]);
+  for (var i = 1; i < pts.length - 2; i++) {
+    for (var t = 0; t < numSegments; t++) {
+      var f = t / numSegments;
+      var f2 = f * f;
+      var f3 = f2 * f;
+      var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
+      var lat = 0.5 * ((2 * p1.lat) + (-p0.lat + p2.lat) * f + (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * f2 + (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * f3);
+      var lng = 0.5 * ((2 * p1.lng) + (-p0.lng + p2.lng) * f + (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * f2 + (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * f3);
+      result.push(L.latLng(lat, lng));
+    }
+  }
+  result.push(pts[pts.length - 2]); // last original point
+  return result;
+}
+
 /* ===== ROAD WIDTH MODAL ===== */
 
 function showRoadWidthModal() {
   var modal = document.getElementById('road-width-modal');
   modal.classList.add('active');
-  // Reset to default selection (40')
   var opts = modal.querySelectorAll('.width-opt');
   opts.forEach(function(o) { o.classList.remove('selected'); });
-  opts[2].classList.add('selected'); // 40' default
+  opts[2].classList.add('selected');
   opts[2].querySelector('input').checked = true;
   selectedRoadWidth = 40;
   document.getElementById('road-custom-width').classList.remove('visible');
   document.getElementById('road-custom-width').value = '';
+  document.getElementById('chk-curved-road').checked = false;
 }
 
 function selectRoadWidth(val) {
@@ -1570,7 +1715,6 @@ function selectRoadWidth(val) {
   } else {
     selectedRoadWidth = val;
     customInput.classList.remove('visible');
-    // Find and highlight the correct option
     for (var i = 0; i < opts.length; i++) {
       var radio = opts[i].querySelector('input');
       if (radio && parseInt(radio.value) === val) {
@@ -1585,6 +1729,7 @@ function cancelRoadWidth() {
   var modal = document.getElementById('road-width-modal');
   modal.classList.remove('active');
   pendingRoadPolyline = null;
+  hideSnapIndicator();
   setStatus('Road cancelled - draw another or switch tools');
   currentTool = 'road';
   beginDraw('polyline');
@@ -1593,6 +1738,7 @@ function cancelRoadWidth() {
 function applyRoadWidth() {
   var modal = document.getElementById('road-width-modal');
   modal.classList.remove('active');
+  hideSnapIndicator();
 
   var widthFt = selectedRoadWidth;
   if (widthFt === -1) {
@@ -1607,78 +1753,286 @@ function applyRoadWidth() {
   if (!pendingRoadPolyline) return;
 
   var centerlineLatLngs = pendingRoadPolyline.getLatLngs();
-  createRoadFromCenterline(centerlineLatLngs, widthFt);
+  var curved = document.getElementById('chk-curved-road').checked;
+
+  // Snap first and last points
+  if (centerlineLatLngs.length >= 2) {
+    var snapFirst = findSnapPoint(centerlineLatLngs[0]);
+    if (snapFirst) centerlineLatLngs[0] = snapFirst;
+    var snapLast = findSnapPoint(centerlineLatLngs[centerlineLatLngs.length - 1]);
+    if (snapLast) centerlineLatLngs[centerlineLatLngs.length - 1] = snapLast;
+  }
+
+  var road = createRoadFromCenterline(centerlineLatLngs, widthFt, curved);
   pendingRoadPolyline = null;
 
+  mergeRoadIntersections(road);
   recalcStats();
   checkOutOfBounds();
   autoSave();
-  setStatus('Road added (' + widthFt + '\' wide) - draw another or switch tools');
+  setStatus('Road added (' + widthFt + '\' wide' + (curved ? ', curved' : '') + ') - draw another or switch tools');
   currentTool = 'road';
   beginDraw('polyline');
 }
 
-function createRoadFromCenterline(centerlineLatLngs, widthFt) {
-  // Convert width from feet to meters, then halve for buffer radius
+function createRoadFromCenterline(centerlineLatLngs, widthFt, curved) {
   var widthMeters = widthFt / FEET_PER_METER;
   var bufferRadius = widthMeters / 2;
 
-  // Create GeoJSON line from centerline
-  var coords = centerlineLatLngs.map(function(ll) { return [ll.lng, ll.lat]; });
-  var line = turf.lineString(coords);
+  // If curved, generate spline from control points
+  var displayLine = centerlineLatLngs;
+  if (curved && centerlineLatLngs.length >= 3) {
+    displayLine = catmullRomSpline(centerlineLatLngs, 12);
+  }
 
-  // Buffer the line to create a polygon
+  var coords = displayLine.map(function(ll) { return [ll.lng, ll.lat]; });
+  var line = turf.lineString(coords);
   var buffered = turf.buffer(line, bufferRadius / 1000, { units: 'kilometers' });
 
   if (!buffered || !buffered.geometry) {
-    // Fallback: just add as a thin polyline
-    var fallbackLayer = L.polyline(centerlineLatLngs, { color: '#9ca3af', weight: 6, opacity: 0.85 });
+    var fallbackLayer = L.polyline(displayLine, { color: '#9ca3af', weight: 6, opacity: 0.85 });
     drawnItems.addLayer(fallbackLayer);
-    var road = { centerline: centerlineLatLngs, width: widthFt, layer: fallbackLayer, labelGroup: L.layerGroup().addTo(map), isPolygon: false };
+    var road = { centerline: centerlineLatLngs, width: widthFt, layer: fallbackLayer, labelGroup: L.layerGroup().addTo(map), isPolygon: false, curved: !!curved, editGroup: null };
     roads.push(road);
     attachRoadClickHandler(road);
     return road;
   }
 
-  // Create Leaflet polygon from buffered GeoJSON
   var polyCoords = buffered.geometry.coordinates[0].map(function(c) { return L.latLng(c[1], c[0]); });
   var roadPolygon = L.polygon(polyCoords, {
-    color: '#6b7280',
-    weight: 1,
-    fillColor: '#9ca3af',
-    fillOpacity: 0.7,
-    opacity: 0.9
+    color: '#6b7280', weight: 1, fillColor: '#9ca3af', fillOpacity: 0.7, opacity: 0.9
   });
   drawnItems.addLayer(roadPolygon);
 
-  // Create label group for width annotation
   var labelGroup = L.layerGroup().addTo(map);
-  updateRoadLabels(centerlineLatLngs, widthFt, labelGroup);
+  updateRoadLabels(displayLine, widthFt, labelGroup, curved);
 
-  var road = { centerline: centerlineLatLngs, width: widthFt, layer: roadPolygon, labelGroup: labelGroup, isPolygon: true };
+  var road = { centerline: centerlineLatLngs, width: widthFt, layer: roadPolygon, labelGroup: labelGroup, isPolygon: true, curved: !!curved, editGroup: null };
   roads.push(road);
   attachRoadClickHandler(road);
   return road;
 }
 
+function rebuildRoadGeometry(road) {
+  // Rebuild the polygon and labels from the current centerline
+  var widthMeters = road.width / FEET_PER_METER;
+  var bufferRadius = widthMeters / 2;
+
+  var displayLine = road.centerline;
+  if (road.curved && road.centerline.length >= 3) {
+    displayLine = catmullRomSpline(road.centerline, 12);
+  }
+
+  var coords = displayLine.map(function(ll) { return [ll.lng, ll.lat]; });
+  var line = turf.lineString(coords);
+  var buffered = turf.buffer(line, bufferRadius / 1000, { units: 'kilometers' });
+
+  if (buffered && buffered.geometry) {
+    var polyCoords = buffered.geometry.coordinates[0].map(function(c) { return L.latLng(c[1], c[0]); });
+    road.layer.setLatLngs([polyCoords]);
+  }
+
+  if (road.labelGroup) {
+    updateRoadLabels(displayLine, road.width, road.labelGroup, road.curved);
+  }
+}
+
 function attachRoadClickHandler(road) {
-  road.layer.on('click', function() {
-    if (currentTool === 'select' && confirm('Delete this road?')) {
-      drawnItems.removeLayer(road.layer);
-      if (road.labelGroup) map.removeLayer(road.labelGroup);
-      roads = roads.filter(function(r) { return r !== road; });
-      recalcStats();
-      checkOutOfBounds();
-      autoSave();
-    }
+  road.layer.on('click', function(e) {
+    if (currentTool !== 'select') return;
+    L.DomEvent.stopPropagation(e);
+    if (editingRoad === road) return; // already editing
+    enterRoadEditMode(road);
   });
 }
 
-function updateRoadLabels(centerlineLatLngs, widthFt, labelGroup) {
+/* ===== ROAD EDITING ===== */
+
+function enterRoadEditMode(road) {
+  exitRoadEditMode(); // exit any previous edit
+  editingRoad = road;
+
+  // Highlight the road
+  road.layer.setStyle({ color: '#818cf8', weight: 2, fillColor: '#a5b4fc', fillOpacity: 0.5 });
+
+  road.editGroup = L.layerGroup().addTo(map);
+
+  // Create vertex markers
+  renderRoadEditHandles(road);
+
+  setStatus('Editing road — drag vertices to reshape, click midpoints to add, press Delete or click 🗑 to remove');
+}
+
+function renderRoadEditHandles(road) {
+  if (!road.editGroup) return;
+  road.editGroup.clearLayers();
+
+  var cl = road.centerline;
+
+  // Vertex markers
+  cl.forEach(function(ll, idx) {
+    var m = L.marker(ll, {
+      icon: L.divIcon({ className: 'road-edit-vertex', iconSize: [12, 12], iconAnchor: [6, 6] }),
+      draggable: true, zIndexOffset: 3000
+    });
+    m._vertexIdx = idx;
+
+    m.on('dragstart', function() { map.dragging.disable(); });
+    m.on('drag', function(e) {
+      var snap = findSnapPoint(e.target.getLatLng());
+      var pos = snap || e.target.getLatLng();
+      if (snap) { e.target.setLatLng(snap); showSnapIndicator(snap); } else { hideSnapIndicator(); }
+      road.centerline[idx] = pos;
+      rebuildRoadGeometry(road);
+    });
+    m.on('dragend', function() {
+      map.dragging.enable();
+      hideSnapIndicator();
+      renderRoadEditHandles(road);
+      mergeRoadIntersections(road);
+      recalcStats();
+      checkOutOfBounds();
+      autoSave();
+    });
+
+    // Right-click to delete vertex (if more than 2)
+    m.on('contextmenu', function(e) {
+      L.DomEvent.preventDefault(e);
+      if (road.centerline.length > 2) {
+        road.centerline.splice(idx, 1);
+        rebuildRoadGeometry(road);
+        renderRoadEditHandles(road);
+        mergeRoadIntersections(road);
+        recalcStats();
+        checkOutOfBounds();
+        autoSave();
+      }
+    });
+
+    road.editGroup.addLayer(m);
+  });
+
+  // Midpoint markers (for adding new vertices)
+  for (var i = 0; i < cl.length - 1; i++) {
+    (function(idx) {
+      var mid = getMidpoint(cl[idx], cl[idx + 1]);
+      var mm = L.marker(mid, {
+        icon: L.divIcon({ className: 'road-edit-midpoint', iconSize: [10, 10], iconAnchor: [5, 5] }),
+        draggable: false, zIndexOffset: 2500
+      });
+      mm.on('click', function() {
+        road.centerline.splice(idx + 1, 0, mid);
+        rebuildRoadGeometry(road);
+        renderRoadEditHandles(road);
+        autoSave();
+      });
+      road.editGroup.addLayer(mm);
+    })(i);
+  }
+
+  // Delete button at the midpoint of the road
+  if (cl.length >= 2) {
+    var roadMid = getMidpoint(cl[0], cl[cl.length - 1]);
+    var delBtn = L.marker(roadMid, {
+      icon: L.divIcon({
+        className: '',
+        html: '<button class="road-edit-delete" onclick="deleteEditingRoad()">🗑 Delete Road</button>',
+        iconSize: [100, 24], iconAnchor: [50, -10]
+      }),
+      interactive: true, zIndexOffset: 3500
+    });
+    road.editGroup.addLayer(delBtn);
+  }
+}
+
+function exitRoadEditMode() {
+  if (!editingRoad) return;
+  // Restore road style
+  editingRoad.layer.setStyle({ color: '#6b7280', weight: 1, fillColor: '#9ca3af', fillOpacity: 0.7, opacity: 0.9 });
+  if (editingRoad.editGroup) {
+    map.removeLayer(editingRoad.editGroup);
+    editingRoad.editGroup = null;
+  }
+  editingRoad = null;
+  hideSnapIndicator();
+}
+
+function deleteEditingRoad() {
+  if (!editingRoad) return;
+  var road = editingRoad;
+  exitRoadEditMode();
+  drawnItems.removeLayer(road.layer);
+  if (road.labelGroup) map.removeLayer(road.labelGroup);
+  roads = roads.filter(function(r) { return r !== road; });
+  recalcStats();
+  checkOutOfBounds();
+  autoSave();
+  setStatus('Road deleted');
+}
+
+// Exit road edit mode when clicking on the map background or switching tools
+map.on('click', function(e) {
+  if (editingRoad && currentTool === 'select') {
+    // Check if click is on the editing road's polygon
+    // If not, exit edit mode
+    var pt = turf.point([e.latlng.lng, e.latlng.lat]);
+    try {
+      var roadGeo = editingRoad.layer.toGeoJSON();
+      if (!turf.booleanPointInPolygon(pt, roadGeo)) {
+        exitRoadEditMode();
+      }
+    } catch(ex) {
+      exitRoadEditMode();
+    }
+  }
+});
+
+// Keyboard: Delete key removes editing road
+document.addEventListener('keydown', function(e) {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && editingRoad && currentTool === 'select') {
+    e.preventDefault();
+    deleteEditingRoad();
+  }
+});
+
+/* ===== ROAD INTERSECTIONS ===== */
+
+function mergeRoadIntersections(newRoad) {
+  // For each pair of roads, detect if their polygons overlap and visually merge
+  // We use Turf.js intersect to detect overlapping areas and style them
+  // This is a visual merge — we don't actually combine the road objects
+  // Remove old intersection layers
+  roads.forEach(function(r) {
+    if (r._intersectionLayers) {
+      r._intersectionLayers.forEach(function(l) { map.removeLayer(l); });
+    }
+    r._intersectionLayers = [];
+  });
+
+  for (var i = 0; i < roads.length; i++) {
+    for (var j = i + 1; j < roads.length; j++) {
+      if (!roads[i].isPolygon || !roads[j].isPolygon) continue;
+      try {
+        var g1 = roads[i].layer.toGeoJSON();
+        var g2 = roads[j].layer.toGeoJSON();
+        var inter = turf.intersect(turf.featureCollection([g1, g2]));
+        if (inter) {
+          // Draw intersection area with a slightly different style to show the merge
+          var interLayer = L.geoJSON(inter, {
+            style: { color: '#9ca3af', weight: 0, fillColor: '#b0b8c8', fillOpacity: 0.85, interactive: false }
+          }).addTo(map);
+          roads[i]._intersectionLayers = roads[i]._intersectionLayers || [];
+          roads[i]._intersectionLayers.push(interLayer);
+        }
+      } catch(e) {}
+    }
+  }
+}
+
+function updateRoadLabels(centerlineLatLngs, widthFt, labelGroup, curved) {
   labelGroup.clearLayers();
   if (centerlineLatLngs.length < 2) return;
 
-  // Place a width label at the midpoint of the centerline
   var totalLen = 0;
   var segLens = [];
   for (var i = 0; i < centerlineLatLngs.length - 1; i++) {
@@ -1695,10 +2049,11 @@ function updateRoadLabels(centerlineLatLngs, widthFt, labelGroup) {
       var midLat = centerlineLatLngs[j].lat + ratio * (centerlineLatLngs[j + 1].lat - centerlineLatLngs[j].lat);
       var midLng = centerlineLatLngs[j].lng + ratio * (centerlineLatLngs[j + 1].lng - centerlineLatLngs[j].lng);
       var lengthFt = Math.round(totalLen * FEET_PER_METER);
+      var typeLabel = curved ? ' ⌒' : '';
       var label = L.marker([midLat, midLng], {
         icon: L.divIcon({
           className: 'road-dim-label',
-          html: '<span style="background:rgba(107,114,128,0.85);color:#fff;padding:2px 6px;border-radius:4px;font-family:DM Mono,monospace;font-size:11px;white-space:nowrap;">' + widthFt + '\' W × ' + lengthFt + '\' L</span>',
+          html: '<span style="background:rgba(107,114,128,0.85);color:#fff;padding:2px 6px;border-radius:4px;font-family:DM Mono,monospace;font-size:11px;white-space:nowrap;">' + widthFt + '\' W × ' + lengthFt + '\' L' + typeLabel + '</span>',
           iconSize: [0, 0],
           iconAnchor: [0, 0]
         }),
@@ -2088,7 +2443,7 @@ function serializeSite() {
       };
     }),
     roads: roads.map(function(r) {
-      return { centerline: serializeLatlngs(r.centerline), width: r.width };
+      return { centerline: serializeLatlngs(r.centerline), width: r.width, curved: !!r.curved };
     }),
     ponds: ponds.map(function(p) {
       var ll = p.getLatLngs();
@@ -2109,13 +2464,20 @@ function serializeSite() {
 function deserializeSite(data) {
   // Clear current state without confirmation
   stopDraw();
+  exitRoadEditMode();
   disableSiteEditing();
+  clearOutOfBoundsLayers();
   buildings.forEach(function(b) {
     drawnItems.removeLayer(b.layer);
     map.removeLayer(b.overlayGroup);
     if (b.labelGroup) map.removeLayer(b.labelGroup);
   });
-  roads.forEach(function(r) { drawnItems.removeLayer(r.layer); if (r.labelGroup) map.removeLayer(r.labelGroup); });
+  roads.forEach(function(r) {
+    drawnItems.removeLayer(r.layer);
+    if (r.labelGroup) map.removeLayer(r.labelGroup);
+    if (r.editGroup) map.removeLayer(r.editGroup);
+    if (r._intersectionLayers) r._intersectionLayers.forEach(function(l) { map.removeLayer(l); });
+  });
   ponds.forEach(function(p) { drawnItems.removeLayer(p); });
   pavings.forEach(function(p) {
     drawnItems.removeLayer(p.layer);
@@ -2123,7 +2485,9 @@ function deserializeSite(data) {
   });
   if (siteBoundary) drawnItems.removeLayer(siteBoundary);
   buildings = []; roads = []; ponds = []; pavings = []; siteBoundary = null; activeBuilding = null;
+  editingRoad = null;
   hideAllHandles();
+  hideSnapIndicator();
 
   // Restore map view
   if (data.mapCenter && data.mapZoom) {
@@ -2152,7 +2516,7 @@ function deserializeSite(data) {
         lls = rd.centerline.map(function(v) { return L.latLng(v.lat, v.lng); });
         widthFt = rd.width || 40;
       }
-      createRoadFromCenterline(lls, widthFt);
+      createRoadFromCenterline(lls, widthFt, !!rd.curved);
     });
   }
 
@@ -2382,6 +2746,7 @@ function newSite() {
 
 function clearAll_noConfirm() {
   stopDraw();
+  exitRoadEditMode();
   disableSiteEditing();
   clearOutOfBoundsLayers();
   siteBoundaryLocked = false;
@@ -2390,7 +2755,12 @@ function clearAll_noConfirm() {
     map.removeLayer(b.overlayGroup);
     if (b.labelGroup) map.removeLayer(b.labelGroup);
   });
-  roads.forEach(function(r) { drawnItems.removeLayer(r.layer); if (r.labelGroup) map.removeLayer(r.labelGroup); });
+  roads.forEach(function(r) {
+    drawnItems.removeLayer(r.layer);
+    if (r.labelGroup) map.removeLayer(r.labelGroup);
+    if (r.editGroup) map.removeLayer(r.editGroup);
+    if (r._intersectionLayers) r._intersectionLayers.forEach(function(l) { map.removeLayer(l); });
+  });
   ponds.forEach(function(p) { drawnItems.removeLayer(p); });
   pavings.forEach(function(p) {
     drawnItems.removeLayer(p.layer);
@@ -2398,7 +2768,9 @@ function clearAll_noConfirm() {
   });
   if (siteBoundary) drawnItems.removeLayer(siteBoundary);
   buildings = []; roads = []; ponds = []; pavings = []; siteBoundary = null; activeBuilding = null;
+  editingRoad = null;
   hideAllHandles();
+  hideSnapIndicator();
   document.getElementById('building-opts-panel').classList.add('hidden');
   updateBuildingList();
   recalcStats();
