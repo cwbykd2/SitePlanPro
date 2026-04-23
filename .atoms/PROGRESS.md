@@ -41,6 +41,7 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Per-building clear height dropdown - each building has its own independent clear height selector instead of a global one
 - [x] Paving type selector - choose Car Parking, Trailer Parking, or Other when drawing pavings; colors match overlay types; stats breakdown and PDF updated
 - [x] Paving interaction - click to select, drag to move, resize (width/depth handles), rotate (yellow handle), Delete key to remove
+- [x] Bay Spacing System - Auto-Snap to Optimal Bays, visual bay grid lines, speed bay labels, manual bay controls (std depth 52/54/56, speed depth 60/70), live bay stats
 
 ## Progress Log
 - 2026-04-22: Fixed Sites dropdown not opening - header had overflow-y:hidden clipping the dropdown; changed to overflow:visible and switched dropdown to position:fixed with dynamic positioning

@@ -192,6 +192,35 @@ select option{background:var(--panel2)}
 .cost-grand-label{font-size:12px;font-weight:700;color:var(--warn)}
 .cost-grand-value{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#fff}
 .cost-no-buildings{font-size:11px;color:var(--muted);text-align:center;padding:12px}
+
+/* Bay Spacing System Styles */
+.bay-config{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.bay-config-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.bay-config-title{font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:0.5px;text-transform:uppercase}
+.bay-snap-btn{padding:8px 12px;font-size:11px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:6px;cursor:pointer;width:100%;margin-bottom:8px;transition:all .2s;font-family:'Syne',sans-serif;letter-spacing:0.3px}
+.bay-snap-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(59,130,246,0.3)}
+.bay-snap-btn:active{transform:translateY(0)}
+.bay-controls{display:flex;flex-direction:column;gap:6px}
+.bay-control-row{display:flex;align-items:center;gap:6px}
+.bay-control-row label{font-size:10px;color:var(--muted);min-width:70px;flex-shrink:0}
+.bay-control-row select,.bay-control-row input[type=number]{flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:11px;padding:5px 8px;border-radius:5px;outline:none}
+.bay-control-row select:focus,.bay-control-row input[type=number]:focus{border-color:var(--accent)}
+.bay-segmented{display:flex;gap:2px;flex:1}
+.bay-seg-btn{flex:1;padding:5px 4px;font-size:10px;font-weight:600;text-align:center;background:var(--panel);border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .15s;font-family:'DM Mono',monospace;border-radius:4px}
+.bay-seg-btn:first-child{border-radius:4px 0 0 4px}
+.bay-seg-btn:last-child{border-radius:0 4px 4px 0}
+.bay-seg-btn.active{background:rgba(59,130,246,.15);border-color:var(--accent);color:var(--accent)}
+.bay-seg-btn:hover:not(.active){border-color:var(--muted);color:var(--text)}
+.bay-stats{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-top:6px;font-family:'DM Mono',monospace;font-size:11px;line-height:1.7}
+.bay-stats .bay-stat-row{display:flex;justify-content:space-between;align-items:center}
+.bay-stats .bay-stat-label{color:var(--muted);font-size:10px}
+.bay-stats .bay-stat-value{color:#fff;font-weight:500}
+.bay-stats .bay-stat-value.highlight{color:var(--accent2)}
+.bay-speed-label{font-size:9px;color:var(--accent2);font-style:italic;margin-top:2px}
+.bay-tooltip{position:relative;display:inline-flex;align-items:center;gap:3px}
+.bay-tooltip .bay-tip-icon{width:14px;height:14px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);color:var(--muted);font-size:9px;display:flex;align-items:center;justify-content:center;cursor:help;flex-shrink:0}
+.bay-tooltip .bay-tip-text{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:10px;color:var(--text);width:200px;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.4);line-height:1.4}
+.bay-tooltip:hover .bay-tip-text{display:block}
 </style>
 </head>
 <body>
@@ -272,6 +301,67 @@ select option{background:var(--panel2)}
               <div class="form-row">
                 <div><label>Width (ft)</label><input type="number" id="opt-cw" value="50" min="10"></div>
                 <div><label>Depth (ft)</label><input type="number" id="opt-cd" value="52" min="10"></div>
+              </div>
+            </div>
+            <!-- Bay Configuration System -->
+            <div class="bay-config" id="bay-config-panel">
+              <div class="bay-config-header">
+                <span class="bay-config-title">🏗 Bay Configuration</span>
+                <div class="bay-tooltip">
+                  <span class="bay-tip-icon">?</span>
+                  <span class="bay-tip-text">Bays are structural units of the building. The <b>Speed Bay</b> is the first bay from the truck court — typically deeper (60–70 ft) for faster loading. Standard bays are 50 ft wide × 52–56 ft deep.</span>
+                </div>
+              </div>
+              <button class="bay-snap-btn" onclick="autoSnapToOptimalBays()">⚡ Auto-Snap to Optimal Bays</button>
+              <div class="bay-controls">
+                <div class="bay-control-row">
+                  <label>Std Bay Depth</label>
+                  <div class="bay-segmented" id="bay-std-depth-seg">
+                    <div class="bay-seg-btn active" onclick="setBayStdDepth(52)">52'</div>
+                    <div class="bay-seg-btn" onclick="setBayStdDepth(54)">54'</div>
+                    <div class="bay-seg-btn" onclick="setBayStdDepth(56)">56'</div>
+                  </div>
+                </div>
+                <div class="bay-control-row">
+                  <label>
+                    <span class="bay-tooltip" style="display:inline">
+                      Speed Bay
+                      <span class="bay-tip-icon" style="margin-left:2px">?</span>
+                      <span class="bay-tip-text">The first bay from the truck court side. Deeper than standard bays for faster truck loading/unloading operations.</span>
+                    </span>
+                  </label>
+                  <div class="bay-segmented" id="bay-speed-depth-seg">
+                    <div class="bay-seg-btn active" onclick="setBaySpeedDepth(60)">60'</div>
+                    <div class="bay-seg-btn" onclick="setBaySpeedDepth(70)">70'</div>
+                  </div>
+                </div>
+                <div class="bay-control-row">
+                  <label># Width Bays</label>
+                  <input type="number" id="bay-count-width" value="1" min="1" max="50" onchange="onBayCountChange()" oninput="onBayCountChange()">
+                </div>
+                <div class="bay-control-row">
+                  <label># Depth Bays</label>
+                  <input type="number" id="bay-count-depth" value="1" min="1" max="20" onchange="onBayCountChange()" oninput="onBayCountChange()">
+                </div>
+                <label class="checkbox-row" style="border-bottom:none;padding:4px 0">
+                  <input type="checkbox" id="chk-show-bay-grid" checked onchange="toggleBayGrid()">
+                  Show bay grid lines
+                </label>
+              </div>
+              <div class="bay-stats" id="bay-stats-display">
+                <div class="bay-stat-row">
+                  <span class="bay-stat-label">Total Width</span>
+                  <span class="bay-stat-value" id="bay-stat-width">—</span>
+                </div>
+                <div class="bay-stat-row">
+                  <span class="bay-stat-label">Total Depth</span>
+                  <span class="bay-stat-value" id="bay-stat-depth">—</span>
+                </div>
+                <div class="bay-stat-row">
+                  <span class="bay-stat-label">Total SF</span>
+                  <span class="bay-stat-value highlight" id="bay-stat-sf">—</span>
+                </div>
+                <div class="bay-speed-label" id="bay-speed-info"></div>
               </div>
             </div>
             <div>
@@ -1293,6 +1383,8 @@ function showBuildingOpts() {
   updateTrailerOpts(b.type);
   onSpacingChange();
   showBuildingHandles(b);
+  // Update bay configuration UI
+  updateBayUIForBuilding(b);
 }
 
 function updateTrailerOpts(type) {
@@ -2725,6 +2817,7 @@ function deleteBuilding(id) {
   drawnItems.removeLayer(b.layer);
   map.removeLayer(b.overlayGroup);
   if (b.labelGroup) map.removeLayer(b.labelGroup);
+  if (b._bayGridGroup) map.removeLayer(b._bayGridGroup);
   buildings = buildings.filter(function(x){return x.id!==id});
   if (activeBuilding===id) { activeBuilding=null; document.getElementById('building-opts-panel').classList.add('hidden'); hideAllHandles(); }
   updateBuildingList();
@@ -3151,7 +3244,7 @@ function clearAll() {
   disableSiteEditing();
   clearOutOfBoundsLayers();
   siteBoundaryLocked = false;
-  buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); if (b.labelGroup) map.removeLayer(b.labelGroup); });
+  buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); if (b.labelGroup) map.removeLayer(b.labelGroup); if (b._bayGridGroup) map.removeLayer(b._bayGridGroup); });
   roads.forEach(function(r){ drawnItems.removeLayer(r.layer); if (r.labelGroup) map.removeLayer(r.labelGroup); });
   ponds.forEach(function(p){ drawnItems.removeLayer(p.layer); if (p.labelGroup) map.removeLayer(p.labelGroup); });
   pavings.forEach(function(p){ drawnItems.removeLayer(p.layer); if (p.labelGroup) map.removeLayer(p.labelGroup); });
@@ -3317,6 +3410,7 @@ function deserializeSite(data) {
     drawnItems.removeLayer(b.layer);
     map.removeLayer(b.overlayGroup);
     if (b.labelGroup) map.removeLayer(b.labelGroup);
+    if (b._bayGridGroup) map.removeLayer(b._bayGridGroup);
   });
   roads.forEach(function(r) {
     drawnItems.removeLayer(r.layer);
@@ -3481,6 +3575,457 @@ function flashSaveIndicator() {
   el.classList.remove('hidden');
   el.classList.add('show');
   setTimeout(function() { el.classList.remove('show'); }, 1500);
+}
+
+/* ===== BAY SPACING SYSTEM ===== */
+
+var BAY_WIDTH = 50; // All bays are 50 ft wide
+var bayStdDepth = 52; // Standard bay depth (52, 54, or 56)
+var baySpeedDepth = 60; // Speed bay depth (60 or 70)
+var showBayGrid = true;
+
+function setBayStdDepth(val) {
+  bayStdDepth = val;
+  var btns = document.querySelectorAll('#bay-std-depth-seg .bay-seg-btn');
+  btns.forEach(function(b) { b.classList.toggle('active', parseInt(b.textContent) === val); });
+  updateBayStats();
+  var ab = getActiveBuilding();
+  if (ab) drawBayGrid(ab);
+}
+
+function setBaySpeedDepth(val) {
+  baySpeedDepth = val;
+  var btns = document.querySelectorAll('#bay-speed-depth-seg .bay-seg-btn');
+  btns.forEach(function(b) { b.classList.toggle('active', parseInt(b.textContent) === val); });
+  updateBayStats();
+  var ab = getActiveBuilding();
+  if (ab) drawBayGrid(ab);
+}
+
+function toggleBayGrid() {
+  showBayGrid = document.getElementById('chk-show-bay-grid').checked;
+  var ab = getActiveBuilding();
+  if (ab) drawBayGrid(ab);
+}
+
+function onBayCountChange() {
+  updateBayStats();
+  var ab = getActiveBuilding();
+  if (ab) drawBayGrid(ab);
+}
+
+function calculateBestBayFit(drawnWidthFt, drawnDepthFt) {
+  // Find the optimal bay configuration that gets closest to the drawn dimensions
+  // Width direction: N bays × 50 ft each
+  // Depth direction: 1 speed bay + M standard bays
+  
+  var bestConfig = null;
+  var bestDiff = Infinity;
+  
+  var stdDepths = [52, 54, 56];
+  var speedDepths = [60, 70];
+  
+  for (var si = 0; si < stdDepths.length; si++) {
+    for (var spi = 0; spi < speedDepths.length; spi++) {
+      var sd = stdDepths[si];
+      var spd = speedDepths[spi];
+      
+      // Calculate optimal number of width bays
+      var nWidth = Math.max(1, Math.round(drawnWidthFt / BAY_WIDTH));
+      var actualWidth = nWidth * BAY_WIDTH;
+      
+      // Calculate optimal number of depth bays (1 speed + N standard)
+      // Total depth = speedDepth + nStd * stdDepth
+      // nStd = (drawnDepth - speedDepth) / stdDepth
+      var nStd = Math.max(0, Math.round((drawnDepthFt - spd) / sd));
+      var actualDepth = spd + nStd * sd;
+      
+      // Calculate total difference (sum of absolute differences)
+      var widthDiff = Math.abs(actualWidth - drawnWidthFt);
+      var depthDiff = Math.abs(actualDepth - drawnDepthFt);
+      var totalDiff = widthDiff + depthDiff;
+      
+      // Also try nStd+1 and nStd-1 to find true best
+      for (var adj = -1; adj <= 1; adj++) {
+        var tryStd = Math.max(0, nStd + adj);
+        var tryDepth = spd + tryStd * sd;
+        var tryDiff = Math.abs(actualWidth - drawnWidthFt) + Math.abs(tryDepth - drawnDepthFt);
+        
+        if (tryDiff < bestDiff) {
+          bestDiff = tryDiff;
+          bestConfig = {
+            widthBays: nWidth,
+            depthBays: tryStd + 1, // +1 for the speed bay
+            stdBays: tryStd,
+            stdDepth: sd,
+            speedDepth: spd,
+            totalWidth: actualWidth,
+            totalDepth: tryDepth,
+            totalSF: actualWidth * tryDepth
+          };
+        }
+      }
+      
+      // Also try nWidth+1 and nWidth-1
+      for (var wadj = -1; wadj <= 1; wadj += 2) {
+        var tryWidth = Math.max(1, nWidth + wadj);
+        var tryActualWidth = tryWidth * BAY_WIDTH;
+        for (var dadj = -1; dadj <= 1; dadj++) {
+          var tryStd2 = Math.max(0, nStd + dadj);
+          var tryDepth2 = spd + tryStd2 * sd;
+          var tryDiff2 = Math.abs(tryActualWidth - drawnWidthFt) + Math.abs(tryDepth2 - drawnDepthFt);
+          
+          if (tryDiff2 < bestDiff) {
+            bestDiff = tryDiff2;
+            bestConfig = {
+              widthBays: tryWidth,
+              depthBays: tryStd2 + 1,
+              stdBays: tryStd2,
+              stdDepth: sd,
+              speedDepth: spd,
+              totalWidth: tryActualWidth,
+              totalDepth: tryDepth2,
+              totalSF: tryActualWidth * tryDepth2
+            };
+          }
+        }
+      }
+    }
+  }
+  
+  return bestConfig;
+}
+
+function autoSnapToOptimalBays() {
+  var b = getActiveBuilding();
+  if (!b) { setStatus('Select a building first'); return; }
+  
+  var dims = getBuildingDimensions(b.vertices);
+  if (dims.width < 10 || dims.depth < 10) { setStatus('Building too small for bay snapping'); return; }
+  
+  var config = calculateBestBayFit(dims.width, dims.depth);
+  if (!config) { setStatus('Could not calculate bay fit'); return; }
+  
+  // Update UI controls
+  bayStdDepth = config.stdDepth;
+  baySpeedDepth = config.speedDepth;
+  
+  // Update segmented buttons
+  var stdBtns = document.querySelectorAll('#bay-std-depth-seg .bay-seg-btn');
+  stdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.stdDepth); });
+  var spdBtns = document.querySelectorAll('#bay-speed-depth-seg .bay-seg-btn');
+  spdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.speedDepth); });
+  
+  document.getElementById('bay-count-width').value = config.widthBays;
+  document.getElementById('bay-count-depth').value = config.depthBays;
+  
+  // Resize the building to exact bay dimensions
+  resizeBuildingToBays(b, config);
+  
+  updateBayStats();
+  drawBayGrid(b);
+  
+  setStatus('Snapped to ' + config.widthBays + '×' + config.depthBays + ' bays (' + config.totalWidth + '×' + config.totalDepth + ' ft = ' + fmt(config.totalSF) + ' SF)');
+}
+
+function resizeBuildingToBays(b, config) {
+  if (!b || b.vertices.length < 4) return;
+  
+  var verts = b.vertices;
+  var center = getPolygonCenter(verts);
+  var latScale = Math.cos(center.lat * Math.PI / 180);
+  
+  // Determine which edge is width (longer) and which is depth (shorter)
+  var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
+  var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
+  
+  // Edge vectors
+  var topDx = (verts[1].lng - verts[0].lng) * latScale;
+  var topDy = verts[1].lat - verts[0].lat;
+  var topLen = Math.sqrt(topDx * topDx + topDy * topDy);
+  var uTopX = topDx / topLen;
+  var uTopY = topDy / topLen;
+  
+  var rightDx = (verts[2].lng - verts[1].lng) * latScale;
+  var rightDy = verts[2].lat - verts[1].lat;
+  var rightLen = Math.sqrt(rightDx * rightDx + rightDy * rightDy);
+  var uRightX = rightDx / rightLen;
+  var uRightY = rightDy / rightLen;
+  
+  var ftToCoord = 1 / (111320 * FEET_PER_METER);
+  
+  // Determine which direction is width and which is depth
+  var widthFt, depthFt;
+  if (d01 >= d12) {
+    // top edge is width, right edge is depth
+    widthFt = config.totalWidth;
+    depthFt = config.totalDepth;
+  } else {
+    // right edge is width, top edge is depth
+    widthFt = config.totalDepth;
+    depthFt = config.totalWidth;
+  }
+  
+  // Scale factors for each axis
+  var topScaleFt = d01;
+  var rightScaleFt = d12;
+  var topRatio = (d01 >= d12 ? widthFt : depthFt) / topScaleFt;
+  var rightRatio = (d01 >= d12 ? depthFt : widthFt) / rightScaleFt;
+  
+  // Rebuild vertices from center using scaled edge vectors
+  var halfTopLen = (topLen * topRatio) / 2;
+  var halfRightLen = (rightLen * rightRatio) / 2;
+  
+  var newVerts = [
+    L.latLng(
+      center.lat - uTopY * halfTopLen - uRightY * halfRightLen,
+      center.lng + (-uTopX * halfTopLen - uRightX * halfRightLen) / latScale
+    ),
+    L.latLng(
+      center.lat + uTopY * halfTopLen - uRightY * halfRightLen,
+      center.lng + (uTopX * halfTopLen - uRightX * halfRightLen) / latScale
+    ),
+    L.latLng(
+      center.lat + uTopY * halfTopLen + uRightY * halfRightLen,
+      center.lng + (uTopX * halfTopLen + uRightX * halfRightLen) / latScale
+    ),
+    L.latLng(
+      center.lat - uTopY * halfTopLen + uRightY * halfRightLen,
+      center.lng + (-uTopX * halfTopLen + uRightX * halfRightLen) / latScale
+    )
+  ];
+  
+  updateBuildingPolygon(b, newVerts);
+  b.baseVertices = b.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+  b.rotation = 0;
+  b.scale = 100;
+  drawBuildingOverlays(b);
+  recalcStats();
+  showBuildingHandles(b);
+  checkOutOfBounds();
+}
+
+function updateBayStats() {
+  var widthBays = parseInt(document.getElementById('bay-count-width').value) || 1;
+  var depthBays = parseInt(document.getElementById('bay-count-depth').value) || 1;
+  var stdBays = Math.max(0, depthBays - 1);
+  
+  var totalWidth = widthBays * BAY_WIDTH;
+  var totalDepth = baySpeedDepth + stdBays * bayStdDepth;
+  var totalSF = totalWidth * totalDepth;
+  
+  document.getElementById('bay-stat-width').textContent = widthBays + ' × 50\' = ' + totalWidth + ' ft';
+  document.getElementById('bay-stat-depth').textContent = '1 Speed + ' + stdBays + ' Std = ' + totalDepth + ' ft';
+  document.getElementById('bay-stat-sf').textContent = fmt(totalSF) + ' SF';
+  document.getElementById('bay-speed-info').textContent = 'Speed Bay: ' + baySpeedDepth + '\' deep · Std Bays: ' + bayStdDepth + '\' deep';
+}
+
+function drawBayGrid(b) {
+  // Remove existing bay grid
+  if (b._bayGridGroup) {
+    map.removeLayer(b._bayGridGroup);
+    b._bayGridGroup = null;
+  }
+  
+  if (!showBayGrid || !b || b.vertices.length < 4) return;
+  
+  b._bayGridGroup = L.featureGroup().addTo(map);
+  
+  var verts = b.vertices;
+  var center = getPolygonCenter(verts);
+  var latScale = Math.cos(center.lat * Math.PI / 180);
+  
+  // Edge vectors
+  var topDx = (verts[1].lng - verts[0].lng) * latScale;
+  var topDy = verts[1].lat - verts[0].lat;
+  var topLen = Math.sqrt(topDx * topDx + topDy * topDy);
+  
+  var rightDx = (verts[2].lng - verts[1].lng) * latScale;
+  var rightDy = verts[2].lat - verts[1].lat;
+  var rightLen = Math.sqrt(rightDx * rightDx + rightDy * rightDy);
+  
+  var uTopX = topDx / topLen;
+  var uTopY = topDy / topLen;
+  var uRightX = rightDx / rightLen;
+  var uRightY = rightDy / rightLen;
+  
+  var ftToCoord = 1 / (111320 * FEET_PER_METER);
+  
+  // Determine which edge is width (longer) and which is depth
+  var d01 = topLen / ftToCoord;
+  var d12 = rightLen / ftToCoord;
+  
+  var widthBays = parseInt(document.getElementById('bay-count-width').value) || 1;
+  var depthBays = parseInt(document.getElementById('bay-count-depth').value) || 1;
+  var stdBays = Math.max(0, depthBays - 1);
+  
+  // Helper: offset from a point along top and right directions (in feet)
+  function offsetFromPt(pt, alongTopFt, alongRightFt) {
+    var along = alongTopFt * ftToCoord;
+    var perp = alongRightFt * ftToCoord;
+    return L.latLng(
+      pt.lat + uTopY * along + uRightY * perp,
+      pt.lng + (uTopX * along + uRightX * perp) / latScale
+    );
+  }
+  
+  var bayGridColor = 'rgba(255,255,255,0.35)';
+  var speedBayColor = 'rgba(34,211,238,0.4)';
+  var bayGridWeight = 1;
+  var bayGridDash = '6,4';
+  
+  if (d01 >= d12) {
+    // Top edge is width direction, right edge is depth direction
+    // Vertical lines (width bays) every 50 ft along top edge
+    for (var i = 1; i < widthBays; i++) {
+      var ft = i * BAY_WIDTH;
+      var p1 = offsetFromPt(verts[0], ft * (topLen / d01) / ftToCoord * ftToCoord, 0);
+      // Actually let's use simpler fraction-based approach
+      var frac = ft / d01; // fraction along the top edge
+      if (frac > 1) break;
+      var lineStart = L.latLng(
+        verts[0].lat + (verts[1].lat - verts[0].lat) * frac,
+        verts[0].lng + (verts[1].lng - verts[0].lng) * frac
+      );
+      var lineEnd = L.latLng(
+        verts[3].lat + (verts[2].lat - verts[3].lat) * frac,
+        verts[3].lng + (verts[2].lng - verts[3].lng) * frac
+      );
+      L.polyline([lineStart, lineEnd], {
+        color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
+      }).addTo(b._bayGridGroup);
+    }
+    
+    // Horizontal lines (depth bays) along right edge
+    // First line: speed bay boundary
+    var speedFrac = baySpeedDepth / d12;
+    if (speedFrac <= 1) {
+      var speedStart = L.latLng(
+        verts[0].lat + (verts[3].lat - verts[0].lat) * speedFrac,
+        verts[0].lng + (verts[3].lng - verts[0].lng) * speedFrac
+      );
+      var speedEnd = L.latLng(
+        verts[1].lat + (verts[2].lat - verts[1].lat) * speedFrac,
+        verts[1].lng + (verts[2].lng - verts[1].lng) * speedFrac
+      );
+      L.polyline([speedStart, speedEnd], {
+        color: speedBayColor, weight: 2, dashArray: '8,4', interactive: false
+      }).addTo(b._bayGridGroup);
+      
+      // Speed bay label
+      var speedLabelPos = getMidpoint(
+        L.latLng((verts[0].lat + speedStart.lat) / 2, (verts[0].lng + speedStart.lng) / 2),
+        L.latLng((verts[1].lat + speedEnd.lat) / 2, (verts[1].lng + speedEnd.lng) / 2)
+      );
+      var speedIcon = L.divIcon({
+        className: 'bldg-label',
+        html: '<div style="font-family:DM Mono,monospace;font-size:9px;color:#22d3ee;text-shadow:0 0 4px rgba(0,0,0,.9);white-space:nowrap;text-align:center">Speed Bay ' + baySpeedDepth + '\'</div>',
+        iconSize: [80, 14], iconAnchor: [40, 7]
+      });
+      L.marker(speedLabelPos, { icon: speedIcon, interactive: false, zIndexOffset: 950 }).addTo(b._bayGridGroup);
+    }
+    
+    // Standard bay lines
+    for (var j = 1; j <= stdBays; j++) {
+      var depthFt = baySpeedDepth + j * bayStdDepth;
+      var dFrac = depthFt / d12;
+      if (dFrac > 1) break;
+      var dStart = L.latLng(
+        verts[0].lat + (verts[3].lat - verts[0].lat) * dFrac,
+        verts[0].lng + (verts[3].lng - verts[0].lng) * dFrac
+      );
+      var dEnd = L.latLng(
+        verts[1].lat + (verts[2].lat - verts[1].lat) * dFrac,
+        verts[1].lng + (verts[2].lng - verts[1].lng) * dFrac
+      );
+      L.polyline([dStart, dEnd], {
+        color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
+      }).addTo(b._bayGridGroup);
+    }
+  } else {
+    // Right edge is width direction, top edge is depth direction
+    // Horizontal lines (width bays) every 50 ft along right edge
+    for (var i = 1; i < widthBays; i++) {
+      var ft = i * BAY_WIDTH;
+      var frac = ft / d12;
+      if (frac > 1) break;
+      var lineStart = L.latLng(
+        verts[1].lat + (verts[2].lat - verts[1].lat) * frac,
+        verts[1].lng + (verts[2].lng - verts[1].lng) * frac
+      );
+      var lineEnd = L.latLng(
+        verts[0].lat + (verts[3].lat - verts[0].lat) * frac,
+        verts[0].lng + (verts[3].lng - verts[0].lng) * frac
+      );
+      L.polyline([lineStart, lineEnd], {
+        color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
+      }).addTo(b._bayGridGroup);
+    }
+    
+    // Vertical lines (depth bays) along top edge
+    var speedFrac = baySpeedDepth / d01;
+    if (speedFrac <= 1) {
+      var speedStart = L.latLng(
+        verts[0].lat + (verts[1].lat - verts[0].lat) * speedFrac,
+        verts[0].lng + (verts[1].lng - verts[0].lng) * speedFrac
+      );
+      var speedEnd = L.latLng(
+        verts[3].lat + (verts[2].lat - verts[3].lat) * speedFrac,
+        verts[3].lng + (verts[2].lng - verts[3].lng) * speedFrac
+      );
+      L.polyline([speedStart, speedEnd], {
+        color: speedBayColor, weight: 2, dashArray: '8,4', interactive: false
+      }).addTo(b._bayGridGroup);
+      
+      var speedLabelPos = getMidpoint(
+        L.latLng((verts[0].lat + speedStart.lat) / 2, (verts[0].lng + speedStart.lng) / 2),
+        L.latLng((verts[3].lat + speedEnd.lat) / 2, (verts[3].lng + speedEnd.lng) / 2)
+      );
+      var speedIcon = L.divIcon({
+        className: 'bldg-label',
+        html: '<div style="font-family:DM Mono,monospace;font-size:9px;color:#22d3ee;text-shadow:0 0 4px rgba(0,0,0,.9);white-space:nowrap;text-align:center">Speed Bay ' + baySpeedDepth + '\'</div>',
+        iconSize: [80, 14], iconAnchor: [40, 7]
+      });
+      L.marker(speedLabelPos, { icon: speedIcon, interactive: false, zIndexOffset: 950 }).addTo(b._bayGridGroup);
+    }
+    
+    for (var j = 1; j <= stdBays; j++) {
+      var depthFt = baySpeedDepth + j * bayStdDepth;
+      var dFrac = depthFt / d01;
+      if (dFrac > 1) break;
+      var dStart = L.latLng(
+        verts[0].lat + (verts[1].lat - verts[0].lat) * dFrac,
+        verts[0].lng + (verts[1].lng - verts[0].lng) * dFrac
+      );
+      var dEnd = L.latLng(
+        verts[3].lat + (verts[2].lat - verts[3].lat) * dFrac,
+        verts[3].lng + (verts[2].lng - verts[3].lng) * dFrac
+      );
+      L.polyline([dStart, dEnd], {
+        color: bayGridColor, weight: bayGridWeight, dashArray: bayGridDash, interactive: false
+      }).addTo(b._bayGridGroup);
+    }
+  }
+}
+
+// Update bay UI when a building is selected
+function updateBayUIForBuilding(b) {
+  if (!b) return;
+  var dims = getBuildingDimensions(b.vertices);
+  var config = calculateBestBayFit(dims.width, dims.depth);
+  if (config) {
+    document.getElementById('bay-count-width').value = config.widthBays;
+    document.getElementById('bay-count-depth').value = config.depthBays;
+    bayStdDepth = config.stdDepth;
+    baySpeedDepth = config.speedDepth;
+    
+    var stdBtns = document.querySelectorAll('#bay-std-depth-seg .bay-seg-btn');
+    stdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.stdDepth); });
+    var spdBtns = document.querySelectorAll('#bay-speed-depth-seg .bay-seg-btn');
+    spdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.speedDepth); });
+  }
+  updateBayStats();
+  drawBayGrid(b);
 }
 
 /* ===== BUILDING COST ESTIMATOR ===== */
@@ -4035,6 +4580,7 @@ function clearAll_noConfirm() {
     drawnItems.removeLayer(b.layer);
     map.removeLayer(b.overlayGroup);
     if (b.labelGroup) map.removeLayer(b.labelGroup);
+    if (b._bayGridGroup) map.removeLayer(b._bayGridGroup);
   });
   roads.forEach(function(r) {
     drawnItems.removeLayer(r.layer);
