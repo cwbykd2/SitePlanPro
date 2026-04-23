@@ -27,3 +27,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application
 - 2026-04-22: Added PDF export feature with html2canvas + jsPDF
+- 2026-04-22: Added default car parking on opposite side of truck court for rear load buildings
