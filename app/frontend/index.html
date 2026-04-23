@@ -366,13 +366,52 @@ select option{background:var(--panel2)}
                 <div id="rear-trailer-opts" class="hidden">
                   <label class="checkbox-row"><input type="checkbox" id="chk-trailer-rear"> Trailer parking (130→185 ft)</label>
                 </div>
-                <label class="checkbox-row"><input type="checkbox" id="chk-left"> Parking on left side</label>
-                <label class="checkbox-row"><input type="checkbox" id="chk-right"> Parking on right side</label>
-                <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
-                  <label style="font-size:11px;margin-bottom:4px;display:block">Car Parking Depth</label>
-                  <div style="display:flex;gap:4px">
-                    <div class="bay-seg-btn active" id="park-double" onclick="setParkingRows('double')" style="flex:1;text-align:center">Double Row (76')</div>
-                    <div class="bay-seg-btn" id="park-single" onclick="setParkingRows('single')" style="flex:1;text-align:center">Single Row (56')</div>
+                <!-- Cross-dock parking options: top, left, right -->
+                <div id="cross-parking-opts">
+                  <label class="checkbox-row"><input type="checkbox" id="chk-top-park-cross"> Parking on top side</label>
+                  <div id="top-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
+                    <div style="display:flex;gap:4px">
+                      <div class="bay-seg-btn active" id="park-top-double" onclick="setParkingSide('top','double')" style="flex:1;text-align:center;font-size:9px">Double (76')</div>
+                      <div class="bay-seg-btn" id="park-top-single" onclick="setParkingSide('top','single')" style="flex:1;text-align:center;font-size:9px">Single (56')</div>
+                    </div>
+                  </div>
+                  <label class="checkbox-row"><input type="checkbox" id="chk-left-cross"> Parking on left side</label>
+                  <div id="left-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
+                    <div style="display:flex;gap:4px">
+                      <div class="bay-seg-btn active" id="park-left-double" onclick="setParkingSide('left','double')" style="flex:1;text-align:center;font-size:9px">Double (76')</div>
+                      <div class="bay-seg-btn" id="park-left-single" onclick="setParkingSide('left','single')" style="flex:1;text-align:center;font-size:9px">Single (56')</div>
+                    </div>
+                  </div>
+                  <label class="checkbox-row"><input type="checkbox" id="chk-right-cross"> Parking on right side</label>
+                  <div id="right-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
+                    <div style="display:flex;gap:4px">
+                      <div class="bay-seg-btn active" id="park-right-double" onclick="setParkingSide('right','double')" style="flex:1;text-align:center;font-size:9px">Double (76')</div>
+                      <div class="bay-seg-btn" id="park-right-single" onclick="setParkingSide('right','single')" style="flex:1;text-align:center;font-size:9px">Single (56')</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Rear-load parking options: left, right (main parking always shown) -->
+                <div id="rear-parking-opts" class="hidden">
+                  <div style="margin-bottom:4px">
+                    <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px">Main parking (opposite truck court)</label>
+                    <div style="display:flex;gap:4px">
+                      <div class="bay-seg-btn active" id="park-main-double" onclick="setParkingSide('main','double')" style="flex:1;text-align:center;font-size:9px">Double (76')</div>
+                      <div class="bay-seg-btn" id="park-main-single" onclick="setParkingSide('main','single')" style="flex:1;text-align:center;font-size:9px">Single (56')</div>
+                    </div>
+                  </div>
+                  <label class="checkbox-row"><input type="checkbox" id="chk-left-rear"> Parking on left side</label>
+                  <div id="left-park-depth-rear" class="hidden" style="margin-left:18px;margin-bottom:4px">
+                    <div style="display:flex;gap:4px">
+                      <div class="bay-seg-btn active" id="park-rleft-double" onclick="setParkingSide('rleft','double')" style="flex:1;text-align:center;font-size:9px">Double (76')</div>
+                      <div class="bay-seg-btn" id="park-rleft-single" onclick="setParkingSide('rleft','single')" style="flex:1;text-align:center;font-size:9px">Single (56')</div>
+                    </div>
+                  </div>
+                  <label class="checkbox-row"><input type="checkbox" id="chk-right-rear"> Parking on right side</label>
+                  <div id="right-park-depth-rear" class="hidden" style="margin-left:18px;margin-bottom:4px">
+                    <div style="display:flex;gap:4px">
+                      <div class="bay-seg-btn active" id="park-rright-double" onclick="setParkingSide('rright','double')" style="flex:1;text-align:center;font-size:9px">Double (76')</div>
+                      <div class="bay-seg-btn" id="park-rright-single" onclick="setParkingSide('rright','single')" style="flex:1;text-align:center;font-size:9px">Single (56')</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1221,7 +1260,11 @@ function registerBuilding(layer, verts) {
     trailerRear: false,
     leftParking: false,
     rightParking: false,
-    parkingRows: 'double',
+    topParking: false,
+    parkingRowsTop: 'double',
+    parkingRowsLeft: 'double',
+    parkingRowsRight: 'double',
+    parkingRowsMain: 'double',
     tcInsetLeft: 0,
     tcInsetRight: 0,
     tcInsetTopLeft: 0,
@@ -1432,19 +1475,28 @@ function showBuildingOpts() {
   var elTT = document.getElementById('chk-trailer-top');
   var elTB = document.getElementById('chk-trailer-bottom');
   var elTR = document.getElementById('chk-trailer-rear');
-  var elLP = document.getElementById('chk-left');
-  var elRP = document.getElementById('chk-right');
   if (elTT) elTT.checked = b.trailerTop;
   if (elTB) elTB.checked = b.trailerBottom;
   if (elTR) elTR.checked = b.trailerRear;
-  if (elLP) elLP.checked = b.leftParking;
-  if (elRP) elRP.checked = b.rightParking;
-  // Populate parking row toggle
-  var parkMode = b.parkingRows || 'double';
-  var elPD = document.getElementById('park-double');
-  var elPS = document.getElementById('park-single');
-  if (elPD) elPD.classList.toggle('active', parkMode === 'double');
-  if (elPS) elPS.classList.toggle('active', parkMode === 'single');
+  // Populate per-side parking checkboxes and depth toggles
+  // Cross-dock: top, left, right
+  var elTopCross = document.getElementById('chk-top-park-cross');
+  var elLeftCross = document.getElementById('chk-left-cross');
+  var elRightCross = document.getElementById('chk-right-cross');
+  if (elTopCross) { elTopCross.checked = b.topParking || false; document.getElementById('top-park-depth-cross').classList.toggle('hidden', !elTopCross.checked); }
+  if (elLeftCross) { elLeftCross.checked = b.leftParking || false; document.getElementById('left-park-depth-cross').classList.toggle('hidden', !elLeftCross.checked); }
+  if (elRightCross) { elRightCross.checked = b.rightParking || false; document.getElementById('right-park-depth-cross').classList.toggle('hidden', !elRightCross.checked); }
+  setParkingSide('top', b.parkingRowsTop || 'double');
+  setParkingSide('left', b.parkingRowsLeft || 'double');
+  setParkingSide('right', b.parkingRowsRight || 'double');
+  // Rear-load: main, left, right
+  var elLeftRear = document.getElementById('chk-left-rear');
+  var elRightRear = document.getElementById('chk-right-rear');
+  if (elLeftRear) { elLeftRear.checked = b.leftParking || false; document.getElementById('left-park-depth-rear').classList.toggle('hidden', !elLeftRear.checked); }
+  if (elRightRear) { elRightRear.checked = b.rightParking || false; document.getElementById('right-park-depth-rear').classList.toggle('hidden', !elRightRear.checked); }
+  setParkingSide('main', b.parkingRowsMain || 'double');
+  setParkingSide('rleft', b.parkingRowsLeft || 'double');
+  setParkingSide('rright', b.parkingRowsRight || 'double');
   // Populate inset fields with manual-only values (subtract auto bump-out inset)
   var elIR = document.getElementById('tc-inset-rear');
   var elIT = document.getElementById('tc-inset-top');
@@ -1491,6 +1543,11 @@ function updateTrailerOpts(type) {
   var rearBump = document.getElementById('rear-bumpout-opts');
   if (crossBump) crossBump.classList.toggle('hidden', type !== 'cross');
   if (rearBump) rearBump.classList.toggle('hidden', type !== 'rear');
+  // Toggle parking options
+  var crossPark = document.getElementById('cross-parking-opts');
+  var rearPark = document.getElementById('rear-parking-opts');
+  if (crossPark) crossPark.classList.toggle('hidden', type !== 'cross');
+  if (rearPark) rearPark.classList.toggle('hidden', type !== 'rear');
 }
 
 function selectType(type) {
@@ -1499,11 +1556,31 @@ function selectType(type) {
   updateTrailerOpts(type);
 }
 
-function setParkingRows(mode) {
-  var dbl = document.getElementById('park-double');
-  var sgl = document.getElementById('park-single');
+function setParkingSide(side, mode) {
+  var dbl = document.getElementById('park-' + side + '-double');
+  var sgl = document.getElementById('park-' + side + '-single');
   if (dbl) dbl.classList.toggle('active', mode === 'double');
   if (sgl) sgl.classList.toggle('active', mode === 'single');
+}
+
+// Toggle depth selector visibility when parking checkbox changes
+function initParkingCheckboxes() {
+  var pairs = [
+    ['chk-top-park-cross', 'top-park-depth-cross'],
+    ['chk-left-cross', 'left-park-depth-cross'],
+    ['chk-right-cross', 'right-park-depth-cross'],
+    ['chk-left-rear', 'left-park-depth-rear'],
+    ['chk-right-rear', 'right-park-depth-rear']
+  ];
+  pairs.forEach(function(p) {
+    var chk = document.getElementById(p[0]);
+    var div = document.getElementById(p[1]);
+    if (chk && div) {
+      chk.addEventListener('change', function() {
+        div.classList.toggle('hidden', !chk.checked);
+      });
+    }
+  });
 }
 
 function applyBuildingOptions() {
@@ -1513,9 +1590,22 @@ function applyBuildingOptions() {
   b.trailerTop = document.getElementById('chk-trailer-top').checked;
   b.trailerBottom = document.getElementById('chk-trailer-bottom').checked;
   b.trailerRear = document.getElementById('chk-trailer-rear').checked;
-  b.leftParking = document.getElementById('chk-left').checked;
-  b.rightParking = document.getElementById('chk-right').checked;
-  b.parkingRows = document.getElementById('park-single').classList.contains('active') ? 'single' : 'double';
+  // Per-side parking: read from cross or rear UI depending on type
+  if (b.type === 'cross') {
+    b.topParking = document.getElementById('chk-top-park-cross').checked;
+    b.leftParking = document.getElementById('chk-left-cross').checked;
+    b.rightParking = document.getElementById('chk-right-cross').checked;
+    b.parkingRowsTop = document.getElementById('park-top-single').classList.contains('active') ? 'single' : 'double';
+    b.parkingRowsLeft = document.getElementById('park-left-single').classList.contains('active') ? 'single' : 'double';
+    b.parkingRowsRight = document.getElementById('park-right-single').classList.contains('active') ? 'single' : 'double';
+  } else {
+    b.topParking = false;
+    b.leftParking = document.getElementById('chk-left-rear').checked;
+    b.rightParking = document.getElementById('chk-right-rear').checked;
+    b.parkingRowsMain = document.getElementById('park-main-single').classList.contains('active') ? 'single' : 'double';
+    b.parkingRowsLeft = document.getElementById('park-rleft-single').classList.contains('active') ? 'single' : 'double';
+    b.parkingRowsRight = document.getElementById('park-rright-single').classList.contains('active') ? 'single' : 'double';
+  }
   // Read bump out flags
   if (b.type === 'cross') {
     b.bumpTopLeft = document.getElementById('chk-bump-top-left').checked;
@@ -1611,7 +1701,11 @@ function drawBuildingOverlays(b) {
 
   var TRUCK_DEFAULT = 130;
   var TRUCK_EXTENDED = 185;
-  var PARK = (b.parkingRows === 'single') ? 56 : 76;
+  // Per-side parking depths
+  var PARK_TOP = (b.parkingRowsTop === 'single') ? 56 : 76;
+  var PARK_LEFT = (b.parkingRowsLeft === 'single') ? 56 : 76;
+  var PARK_RIGHT = (b.parkingRowsRight === 'single') ? 56 : 76;
+  var PARK_MAIN = (b.parkingRowsMain === 'single') ? 56 : 76;
 
   // Edge lengths in feet
   var topFt = topLen / ftToCoord;    // length of top/bottom edge in feet
@@ -1716,10 +1810,10 @@ function drawBuildingOverlays(b) {
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
       }
       // Car parking on top (opposite side)
-      var cpTop = addEdgeOverlay(v[0], v[1], PARK, 0, -1, '#b0b0b0', 0.5, 'carparking');
-      addOverlayDepthLabel(cpTop, PARK + ' ft');
-      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft'); }
-      if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft'); }
+      var cpTop = addEdgeOverlay(v[0], v[1], PARK_MAIN, 0, -1, '#b0b0b0', 0.5, 'carparking');
+      addOverlayDepthLabel(cpTop, PARK_MAIN + ' ft');
+      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK_LEFT, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK_LEFT + ' ft'); }
+      if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK_RIGHT, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK_RIGHT + ' ft'); }
     } else {
       // Left/right edges are longer → truck court on left (west), car parking on right (east)
       var tcEdge = addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#808080', 0.5, 'truckcourt', tcInsetL, tcInsetR);
@@ -1729,10 +1823,10 @@ function drawBuildingOverlays(b) {
         var tc2 = offsetPt(tcEdge.ep2, -TRUCK_DEFAULT, 0);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
       }
-      var cpRight = addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#b0b0b0', 0.5, 'carparking');
-      addOverlayDepthLabel(cpRight, PARK + ' ft');
-      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[1], PARK, 0, -1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft'); }
-      if (b.rightParking) { var cpR = addEdgeOverlay(v[3], v[2], PARK, 0, 1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft'); }
+      var cpRight = addEdgeOverlay(v[1], v[2], PARK_MAIN, 1, 0, '#b0b0b0', 0.5, 'carparking');
+      addOverlayDepthLabel(cpRight, PARK_MAIN + ' ft');
+      if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[1], PARK_LEFT, 0, -1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK_LEFT + ' ft'); }
+      if (b.rightParking) { var cpR = addEdgeOverlay(v[3], v[2], PARK_RIGHT, 0, 1, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK_RIGHT + ' ft'); }
     }
   } else {
     // Cross dock: truck court on both top and bottom
@@ -1750,8 +1844,8 @@ function drawBuildingOverlays(b) {
       var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
     }
-    if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK + ' ft'); }
-    if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK + ' ft'); }
+    if (b.leftParking) { var cpL = addEdgeOverlay(v[0], v[3], PARK_LEFT, -1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpL, PARK_LEFT + ' ft'); }
+    if (b.rightParking) { var cpR = addEdgeOverlay(v[1], v[2], PARK_RIGHT, 1, 0, '#b0b0b0', 0.5, 'carparking'); addOverlayDepthLabel(cpR, PARK_RIGHT + ' ft'); }
   }
 
   // ===== BUMP OUTS =====
