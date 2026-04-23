@@ -1683,8 +1683,22 @@ function drawBuildingOverlays(b) {
   // Use the stored standard bay depth for this building, or the global default.
   var bumpDepth = b._bayStdDepth || bayStdDepth || 52;
   var bumpWidth = BAY_WIDTH; // 50 ft
-  var BUMP_COLOR = '#8b5cf6'; // purple to distinguish from other overlays
-  var BUMP_OP = 0.30;
+  var BUMP_COLOR = b.type === 'cross' ? '#f59e0b' : '#10b981'; // same color as building
+  var BUMP_OP = 0.45;
+
+  // Helper: add a dimension label inside a bump out overlay
+  function addBumpOutLabel(p1, p2, dirAlongFt, dirPerpFt, depthFt) {
+    // Calculate center of the bump out rectangle
+    var mid12 = getMidpoint(p1, p2);
+    var halfDepthPt = offsetPt(mid12, dirAlongFt * depthFt / 2, dirPerpFt * depthFt / 2);
+    var labelText = bumpWidth + "' × " + depthFt + "'";
+    var icon = L.divIcon({
+      className: 'bldg-label',
+      html: '<div style="font-family:DM Mono,monospace;font-size:10px;color:#fff;text-shadow:0 0 5px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.7);white-space:nowrap;text-align:center;pointer-events:none;font-weight:600">' + labelText + '</div>',
+      iconSize: [80, 14], iconAnchor: [40, 7]
+    });
+    L.marker(halfDepthPt, { icon: icon, interactive: false, zIndexOffset: 960 }).addTo(b.overlayGroup);
+  }
 
   if (topFt >= rightFt) {
     // Top edge is width direction (v[0]→v[1]), right edge is depth direction
@@ -1692,29 +1706,29 @@ function drawBuildingOverlays(b) {
     if (b.type === 'cross') {
       // Top truck court bump outs (protrude outward from top = perp -1)
       if (b.bumpTopLeft) {
-        // Left end of top edge: from v[0], bumpWidth along top edge
         var bl1 = v[0];
         var bl2 = offsetPt(v[0], bumpWidth, 0);
         addEdgeOverlay(bl1, bl2, bumpDepth, 0, -1, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(bl1, bl2, 0, -1, bumpDepth);
       }
       if (b.bumpTopRight) {
-        // Right end of top edge: from (v[1] - bumpWidth) to v[1]
         var br1 = offsetPt(v[1], -bumpWidth, 0);
         var br2 = v[1];
         addEdgeOverlay(br1, br2, bumpDepth, 0, -1, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(br1, br2, 0, -1, bumpDepth);
       }
       // Bottom truck court bump outs (protrude outward from bottom = perp +1)
       if (b.bumpBotLeft) {
-        // Left end of bottom edge: from v[3], bumpWidth along top edge direction
         var bl1 = v[3];
         var bl2 = offsetPt(v[3], bumpWidth, 0);
         addEdgeOverlay(bl1, bl2, bumpDepth, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(bl1, bl2, 0, 1, bumpDepth);
       }
       if (b.bumpBotRight) {
-        // Right end of bottom edge: from (v[2] - bumpWidth) to v[2]
         var br1 = offsetPt(v[2], -bumpWidth, 0);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepth, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(br1, br2, 0, 1, bumpDepth);
       }
     } else {
       // Rear load: truck court on bottom (south side)
@@ -1722,11 +1736,13 @@ function drawBuildingOverlays(b) {
         var bl1 = v[3];
         var bl2 = offsetPt(v[3], bumpWidth, 0);
         addEdgeOverlay(bl1, bl2, bumpDepth, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(bl1, bl2, 0, 1, bumpDepth);
       }
       if (b.bumpRearRight) {
         var br1 = offsetPt(v[2], -bumpWidth, 0);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepth, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(br1, br2, 0, 1, bumpDepth);
       }
     }
   } else {
@@ -1735,29 +1751,29 @@ function drawBuildingOverlays(b) {
     if (b.type === 'cross') {
       // Top/left truck court bump outs (protrude outward from left = along -1)
       if (b.bumpTopLeft) {
-        // Top end of left edge: from v[0], bumpWidth along right edge direction
         var bl1 = v[0];
         var bl2 = offsetPt(v[0], 0, bumpWidth);
         addEdgeOverlay(bl1, bl2, bumpDepth, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(bl1, bl2, -1, 0, bumpDepth);
       }
       if (b.bumpTopRight) {
-        // Bottom end of left edge: from (v[3] - bumpWidth along right) to v[3]
         var br1 = offsetPt(v[3], 0, -bumpWidth);
         var br2 = v[3];
         addEdgeOverlay(br1, br2, bumpDepth, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(br1, br2, -1, 0, bumpDepth);
       }
       // Bottom/right truck court bump outs (protrude outward from right = along +1)
       if (b.bumpBotLeft) {
-        // Top end of right edge: from v[1], bumpWidth along right edge direction
         var bl1 = v[1];
         var bl2 = offsetPt(v[1], 0, bumpWidth);
         addEdgeOverlay(bl1, bl2, bumpDepth, 1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(bl1, bl2, 1, 0, bumpDepth);
       }
       if (b.bumpBotRight) {
-        // Bottom end of right edge: from (v[2] - bumpWidth along right) to v[2]
         var br1 = offsetPt(v[2], 0, -bumpWidth);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepth, 1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(br1, br2, 1, 0, bumpDepth);
       }
     } else {
       // Rear load: truck court on left (west side)
@@ -1765,11 +1781,13 @@ function drawBuildingOverlays(b) {
         var bl1 = v[0];
         var bl2 = offsetPt(v[0], 0, bumpWidth);
         addEdgeOverlay(bl1, bl2, bumpDepth, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(bl1, bl2, -1, 0, bumpDepth);
       }
       if (b.bumpRearRight) {
         var br1 = offsetPt(v[3], 0, -bumpWidth);
         var br2 = v[3];
         addEdgeOverlay(br1, br2, bumpDepth, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
+        addBumpOutLabel(br1, br2, -1, 0, bumpDepth);
       }
     }
   }
@@ -2494,11 +2512,16 @@ function recalcStats() {
     bldgSF += areaSF(b.layer);
     b.overlayGroup.eachLayer(function(o){
       var sf = areaSF(o);
-      pavedSF += sf;
       var otype = o._overlayType || 'truckcourt';
-      if (otype === 'carparking') carparkingSF += sf;
-      else if (otype === 'trailer') trailerSF += sf;
-      else truckcourtSF += sf;
+      if (otype === 'bumpout') {
+        // Bump outs count as building SF, not paved
+        bldgSF += sf;
+      } else {
+        pavedSF += sf;
+        if (otype === 'carparking') carparkingSF += sf;
+        else if (otype === 'trailer') trailerSF += sf;
+        else truckcourtSF += sf;
+      }
     });
   });
   roads.forEach(function(r) {
@@ -3288,7 +3311,11 @@ function exportPDF() {
       var costGrandTotal = 0;
       buildings.forEach(function(b, i) {
         var ch = b.clearHeight || '40';
-        var bSF = Math.round(areaSF(b.layer));
+        var bSF = areaSF(b.layer);
+        b.overlayGroup.eachLayer(function(o) {
+          if (o._overlayType === 'bumpout') bSF += areaSF(o);
+        });
+        bSF = Math.round(bSF);
         var match = lookupCostPerSF(bSF, ch);
         var total = bSF * match.costPerSF;
         costGrandTotal += total;
@@ -4411,6 +4438,10 @@ function recalcBuildingCosts() {
   buildings.forEach(function(b, i) {
     var ch = b.clearHeight || '40';
     var bldgSF = areaSF(b.layer);
+    // Include bump out SF in building size for cost calculation
+    b.overlayGroup.eachLayer(function(o) {
+      if (o._overlayType === 'bumpout') bldgSF += areaSF(o);
+    });
     var roundedSF = Math.round(bldgSF);
     var match = lookupCostPerSF(roundedSF, ch);
     var costPerSF = match.costPerSF;
@@ -4698,7 +4729,14 @@ function restoreFeeData(data) {
     rawBldgSF = 0; rawPavedSF = 0;
     buildings.forEach(function(b) {
       rawBldgSF += areaSF(b.layer);
-      b.overlayGroup.eachLayer(function(o) { rawPavedSF += areaSF(o); });
+      b.overlayGroup.eachLayer(function(o) {
+        var otype = o._overlayType || 'truckcourt';
+        if (otype === 'bumpout') {
+          rawBldgSF += areaSF(o);
+        } else {
+          rawPavedSF += areaSF(o);
+        }
+      });
     });
     roads.forEach(function(r) {
       if (r.isPolygon && r.layer) { rawPavedSF += areaSF(r.layer); }
