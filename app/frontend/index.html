@@ -77,12 +77,11 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height
 .fee-template-item .tpl-delete:hover{background:rgba(239,68,68,0.15)}
 .fee-no-templates{padding:10px;font-size:10px;color:var(--muted);text-align:center}
 
-header{display:flex;align-items:center;gap:16px;padding:0 20px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative;overflow:visible}
-header::-webkit-scrollbar{height:3px}
-header::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+header{display:flex;align-items:center;gap:10px;padding:0 12px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative;overflow:visible}
+header .btn-ghost,header .btn-primary{flex-shrink:0}
 .logo{font-size:17px;font-weight:800;letter-spacing:-0.5px;color:#fff;white-space:nowrap}
 .logo span{color:var(--accent)}
-.addr-wrap{flex:1;display:flex;gap:8px;max-width:480px}
+.addr-wrap{flex:1;display:flex;gap:8px;max-width:340px;min-width:160px}
 .addr-wrap input{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:7px 12px;border-radius:6px;outline:none;transition:border-color .2s}
 .addr-wrap input:focus{border-color:var(--accent)}
 .addr-wrap input::placeholder{color:var(--muted)}
@@ -209,7 +208,7 @@ select option{background:var(--panel2)}
     <button class="btn-primary" onclick="geocodeAddress()">Go</button>
   </div>
   <div class="toolbar-sep"></div>
-  <button class="btn-ghost" id="btn-sites" onclick="toggleSitesDropdown()">📁 Sites</button>
+  <button class="btn-ghost" id="btn-sites">📁 Sites</button>
   <button class="btn-ghost" id="btn-site" onclick="toggleSiteTool()">Draw Site</button>
   <button class="btn-ghost" id="btn-redraw-site" onclick="redrawSite()" style="display:none">Redraw Site</button>
   <button class="btn-ghost" onclick="clearAll()">Clear All</button>
@@ -3888,26 +3887,62 @@ function restoreFeeData(data) {
 
 /* ===== SITES DROPDOWN ===== */
 
+var _sitesDropdownOpen = false;
+var _sitesDropdownEl = null;
+
+// Create dropdown element dynamically to avoid any HTML placement issues
+(function initSitesDropdown() {
+  var dd = document.createElement('div');
+  dd.id = 'sites-dropdown';
+  dd.className = 'sites-dropdown hidden';
+  dd.style.cssText = 'position:fixed;z-index:99999;';
+  dd.innerHTML = '<div id="sites-list"></div>'
+    + '<div class="sites-dropdown-footer">'
+    + '<button class="btn-ghost" style="width:100%;font-size:11px">+ New Site</button>'
+    + '</div>';
+  dd.addEventListener('click', function(e) { e.stopPropagation(); });
+  dd.querySelector('.sites-dropdown-footer button').addEventListener('click', function() { newSite(); });
+  document.body.appendChild(dd);
+  _sitesDropdownEl = dd;
+})();
+
+// Attach click handler via JS instead of relying on onclick attribute
+(function initSitesButton() {
+  var btn = document.getElementById('btn-sites');
+  if (!btn) return;
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    toggleSitesDropdown();
+  });
+})();
+
 function toggleSitesDropdown() {
-  var dd = document.getElementById('sites-dropdown');
-  if (dd.classList.contains('hidden')) {
+  var dd = _sitesDropdownEl || document.getElementById('sites-dropdown');
+  if (!dd) return;
+  if (_sitesDropdownOpen) {
+    dd.classList.add('hidden');
+    _sitesDropdownOpen = false;
+  } else {
     renderSitesList();
     var btn = document.getElementById('btn-sites');
-    var rect = btn.getBoundingClientRect();
-    dd.style.top = (rect.bottom + 6) + 'px';
-    dd.style.left = rect.left + 'px';
+    if (btn) {
+      var rect = btn.getBoundingClientRect();
+      dd.style.top = (rect.bottom + 6) + 'px';
+      dd.style.left = rect.left + 'px';
+    }
     dd.classList.remove('hidden');
-  } else {
-    dd.classList.add('hidden');
+    _sitesDropdownOpen = true;
   }
 }
 
 // Close dropdown when clicking outside
 document.addEventListener('click', function(e) {
-  var btn = document.getElementById('btn-sites');
-  var dd = document.getElementById('sites-dropdown');
-  if (btn && dd && !btn.contains(e.target) && !dd.contains(e.target)) {
+  if (!_sitesDropdownOpen) return;
+  var dd = _sitesDropdownEl || document.getElementById('sites-dropdown');
+  if (dd) {
     dd.classList.add('hidden');
+    _sitesDropdownOpen = false;
   }
 });
 
@@ -3951,6 +3986,7 @@ function loadSite(name) {
   deserializeSite(sites[name]);
   setSiteName(name);
   document.getElementById('sites-dropdown').classList.add('hidden');
+  _sitesDropdownOpen = false;
   setStatus('Loaded site "' + name + '"');
 }
 
@@ -3969,6 +4005,7 @@ function deleteSavedSite(name) {
 
 function newSite() {
   document.getElementById('sites-dropdown').classList.add('hidden');
+  _sitesDropdownOpen = false;
   if (buildings.length || roads.length || ponds.length || siteBoundary) {
     if (!confirm('Start a new site? Current unsaved changes will be lost.')) return;
   }
@@ -4036,11 +4073,5 @@ function clearAll_noConfirm() {
 })();
 
 </script>
-<div id="sites-dropdown" class="sites-dropdown hidden">
-  <div id="sites-list"></div>
-  <div class="sites-dropdown-footer">
-    <button class="btn-ghost" onclick="newSite()" style="width:100%;font-size:11px">+ New Site</button>
-  </div>
-</div>
 </body>
 </html>
