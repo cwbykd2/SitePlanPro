@@ -11,7 +11,9 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0d0f14;--panel:#131720;--panel2:#1a1f2e;--border:#252d40;--accent:#3b82f6;--accent2:#22d3ee;--warn:#f59e0b;--green:#10b981;--red:#ef4444;--text:#e2e8f0;--muted:#64748b;--road:#6366f1;--pond:#06b6d4}
 body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
-header{display:flex;align-items:center;gap:16px;padding:0 20px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative}
+header{display:flex;align-items:center;gap:16px;padding:0 20px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative;overflow-x:auto;overflow-y:hidden}
+header::-webkit-scrollbar{height:3px}
+header::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .logo{font-size:17px;font-weight:800;letter-spacing:-0.5px;color:#fff;white-space:nowrap}
 .logo span{color:var(--accent)}
 .addr-wrap{flex:1;display:flex;gap:8px;max-width:480px}
