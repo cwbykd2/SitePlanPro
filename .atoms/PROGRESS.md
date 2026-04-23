@@ -36,6 +36,7 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Auto-calculated fee totals based on site statistics
 - [x] Save/Load fee templates per city in localStorage
 - [x] Fee summary in PDF export
+- [x] Truck court inset - per-side inset inputs to shorten truck court from each end of building edge
 
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application
@@ -55,3 +56,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Road labels now show only width (e.g. "40' W") instead of width × length
 - 2026-04-22: Fixed pond serialization in save function to use p.layer.getLatLngs() for new pond object structure
 - 2026-04-22: Added Fee Estimator feature: city auto-detection via Nominatim reverse geocoding, 5 fee categories (Impact, Permits, Roadway, Utility, Fire/Life Safety) with rate mode selectors and auto-calculation from site stats, fee template save/load per city in localStorage, fee summary in PDF export, and full save/load integration
+- 2026-04-22: Added truck court inset feature: per-building inset values (in feet) to shorten truck courts from each end of the building edge. Rear load has Start/End insets; Cross dock has separate Left/Right insets for top and bottom sides. Insets also apply to trailer parking overlays. Full save/load integration.

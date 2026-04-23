@@ -274,6 +274,30 @@ select option{background:var(--panel2)}
                 <label class="checkbox-row"><input type="checkbox" id="chk-left"> Parking on left side</label>
                 <label class="checkbox-row"><input type="checkbox" id="chk-right"> Parking on right side</label>
               </div>
+              <div style="margin-top:8px;">
+                <label style="margin-bottom:4px;font-size:11px;">Truck Court Inset (ft)</label>
+                <div id="rear-inset-opts" class="hidden">
+                  <div class="form-row" style="gap:6px;">
+                    <div style="flex:1"><label style="font-size:10px">Start</label><input type="number" id="tc-inset-left" value="0" min="0" step="5" style="width:100%"></div>
+                    <div style="flex:1"><label style="font-size:10px">End</label><input type="number" id="tc-inset-right" value="0" min="0" step="5" style="width:100%"></div>
+                  </div>
+                </div>
+                <div id="cross-inset-opts" class="hidden">
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">Top Side</div>
+                  <div class="form-row" style="gap:6px;margin-bottom:6px;">
+                    <div style="flex:1"><label style="font-size:10px">Left</label><input type="number" id="tc-inset-top-left" value="0" min="0" step="5" style="width:100%"></div>
+                    <div style="flex:1"><label style="font-size:10px">Right</label><input type="number" id="tc-inset-top-right" value="0" min="0" step="5" style="width:100%"></div>
+                  </div>
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">Bottom Side</div>
+                  <div class="form-row" style="gap:6px;">
+                    <div style="flex:1"><label style="font-size:10px">Left</label><input type="number" id="tc-inset-bot-left" value="0" min="0" step="5" style="width:100%"></div>
+                    <div style="flex:1"><label style="font-size:10px">Right</label><input type="number" id="tc-inset-bot-right" value="0" min="0" step="5" style="width:100%"></div>
+                  </div>
+                </div>
+                <div style="font-size:10px;color:var(--muted);padding-top:2px">
+                  Inset shortens truck court from each end of the building edge
+                </div>
+              </div>
               <div style="font-size:10px;color:var(--muted);padding-top:4px">
                 Default truck court: 130 ft &bull; With trailer parking: 185 ft
               </div>
@@ -1021,6 +1045,12 @@ function registerBuilding(layer, verts) {
     trailerRear: false,
     leftParking: false,
     rightParking: false,
+    tcInsetLeft: 0,
+    tcInsetRight: 0,
+    tcInsetTopLeft: 0,
+    tcInsetTopRight: 0,
+    tcInsetBottomLeft: 0,
+    tcInsetBottomRight: 0,
     rotation: 0,
     scale: 100
   };
@@ -1161,6 +1191,13 @@ function showBuildingOpts() {
   document.getElementById('chk-trailer-rear').checked = b.trailerRear;
   document.getElementById('chk-left').checked = b.leftParking;
   document.getElementById('chk-right').checked = b.rightParking;
+  // Populate inset fields
+  document.getElementById('tc-inset-left').value = b.tcInsetLeft || 0;
+  document.getElementById('tc-inset-right').value = b.tcInsetRight || 0;
+  document.getElementById('tc-inset-top-left').value = b.tcInsetTopLeft || 0;
+  document.getElementById('tc-inset-top-right').value = b.tcInsetTopRight || 0;
+  document.getElementById('tc-inset-bot-left').value = b.tcInsetBottomLeft || 0;
+  document.getElementById('tc-inset-bot-right').value = b.tcInsetBottomRight || 0;
   updateTrailerOpts(b.type);
   onSpacingChange();
   showBuildingHandles(b);
@@ -1169,6 +1206,8 @@ function showBuildingOpts() {
 function updateTrailerOpts(type) {
   document.getElementById('cross-trailer-opts').classList.toggle('hidden', type !== 'cross');
   document.getElementById('rear-trailer-opts').classList.toggle('hidden', type !== 'rear');
+  document.getElementById('rear-inset-opts').classList.toggle('hidden', type !== 'rear');
+  document.getElementById('cross-inset-opts').classList.toggle('hidden', type !== 'cross');
 }
 
 function selectType(type) {
@@ -1194,6 +1233,16 @@ function applyBuildingOptions() {
   b.trailerRear = document.getElementById('chk-trailer-rear').checked;
   b.leftParking = document.getElementById('chk-left').checked;
   b.rightParking = document.getElementById('chk-right').checked;
+  // Read inset values
+  if (b.type === 'rear') {
+    b.tcInsetLeft = parseFloat(document.getElementById('tc-inset-left').value) || 0;
+    b.tcInsetRight = parseFloat(document.getElementById('tc-inset-right').value) || 0;
+  } else {
+    b.tcInsetTopLeft = parseFloat(document.getElementById('tc-inset-top-left').value) || 0;
+    b.tcInsetTopRight = parseFloat(document.getElementById('tc-inset-top-right').value) || 0;
+    b.tcInsetBottomLeft = parseFloat(document.getElementById('tc-inset-bot-left').value) || 0;
+    b.tcInsetBottomRight = parseFloat(document.getElementById('tc-inset-bot-right').value) || 0;
+  }
   var color = b.type === 'cross' ? '#f59e0b' : '#10b981';
   b.layer.setStyle({color:color, fillColor:color, fillOpacity:0.35});
   // Ensure building layer is still on the map
@@ -1271,14 +1320,37 @@ function drawBuildingOverlays(b) {
   //            'outBottom' = outward from bottom edge (same as right direction from bottom)
   //            'outLeft' = outward from left edge
   //            'outRight' = outward from right edge
-  function addEdgeOverlay(p1, p2, depthFt, dirAlongFt, dirPerpFt, color, op, overlayType) {
+  function addEdgeOverlay(p1, p2, depthFt, dirAlongFt, dirPerpFt, color, op, overlayType, insetStartFt, insetEndFt) {
     // p1, p2 define the base edge of the overlay
     // dirAlongFt, dirPerpFt define the extrusion direction in (along, perp) units
-    var p3 = offsetPt(p2, dirAlongFt * depthFt, dirPerpFt * depthFt);
-    var p4 = offsetPt(p1, dirAlongFt * depthFt, dirPerpFt * depthFt);
-    var poly = L.polygon([p1, p2, p3, p4], {color:color, weight:1, fillColor:color, fillOpacity:op, interactive:false});
+    // insetStartFt/insetEndFt: optional inset from p1/p2 ends along the edge
+    var ep1 = p1, ep2 = p2;
+    if (insetStartFt && insetStartFt > 0) {
+      // Compute direction from p1 to p2
+      var dxS = (p2.lng - p1.lng);
+      var dyS = (p2.lat - p1.lat);
+      var lenS = Math.sqrt((dxS * latScale) * (dxS * latScale) + dyS * dyS);
+      var insetCoord = (insetStartFt * ftToCoord);
+      if (lenS > 0) {
+        ep1 = L.latLng(p1.lat + dyS * insetCoord / lenS, p1.lng + dxS * insetCoord / lenS);
+      }
+    }
+    if (insetEndFt && insetEndFt > 0) {
+      // Compute direction from p2 to p1
+      var dxE = (p1.lng - p2.lng);
+      var dyE = (p1.lat - p2.lat);
+      var lenE = Math.sqrt((dxE * latScale) * (dxE * latScale) + dyE * dyE);
+      var insetCoordE = (insetEndFt * ftToCoord);
+      if (lenE > 0) {
+        ep2 = L.latLng(p2.lat + dyE * insetCoordE / lenE, p2.lng + dxE * insetCoordE / lenE);
+      }
+    }
+    var p3 = offsetPt(ep2, dirAlongFt * depthFt, dirPerpFt * depthFt);
+    var p4 = offsetPt(ep1, dirAlongFt * depthFt, dirPerpFt * depthFt);
+    var poly = L.polygon([ep1, ep2, p3, p4], {color:color, weight:1, fillColor:color, fillOpacity:op, interactive:false});
     poly._overlayType = overlayType || 'truckcourt';
     poly.addTo(b.overlayGroup);
+    return { ep1: ep1, ep2: ep2 }; // return inset edge points for trailer chaining
   }
 
   // Identify edges:
@@ -1296,14 +1368,23 @@ function drawBuildingOverlays(b) {
   // "Outward from right" = same as top-edge direction = (uTopX, uTopY)
   //   In (along, perp) space: along=1, perp=0
 
+  // Get inset values (default 0)
+  var tcInsetL = b.tcInsetLeft || 0;
+  var tcInsetR = b.tcInsetRight || 0;
+  // For cross dock, separate top/bottom insets
+  var tcInsetTopL = b.tcInsetTopLeft || tcInsetL;
+  var tcInsetTopR = b.tcInsetTopRight || tcInsetR;
+  var tcInsetBotL = b.tcInsetBottomLeft || tcInsetL;
+  var tcInsetBotR = b.tcInsetBottomRight || tcInsetR;
+
   if (b.type === 'rear') {
     // Rear load: truck court on the LONGER side
     if (topFt >= rightFt) {
       // Top/bottom edges are longer → truck court on bottom (south), car parking on top (north)
-      addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#fbbf24', 0.2, 'truckcourt');
+      var tcEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#fbbf24', 0.2, 'truckcourt', tcInsetL, tcInsetR);
       if (b.trailerRear) {
-        var tc1 = offsetPt(v[3], 0, TRUCK_DEFAULT);
-        var tc2 = offsetPt(v[2], 0, TRUCK_DEFAULT);
+        var tc1 = offsetPt(tcEdge.ep1, 0, TRUCK_DEFAULT);
+        var tc2 = offsetPt(tcEdge.ep2, 0, TRUCK_DEFAULT);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
       }
       // Car parking on top (opposite side)
@@ -1312,10 +1393,10 @@ function drawBuildingOverlays(b) {
       if (b.rightParking) addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#60a5fa', 0.2, 'carparking');
     } else {
       // Left/right edges are longer → truck court on left (west), car parking on right (east)
-      addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#fbbf24', 0.2, 'truckcourt');
+      var tcEdge = addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#fbbf24', 0.2, 'truckcourt', tcInsetL, tcInsetR);
       if (b.trailerRear) {
-        var tc1 = offsetPt(v[0], -TRUCK_DEFAULT, 0);
-        var tc2 = offsetPt(v[3], -TRUCK_DEFAULT, 0);
+        var tc1 = offsetPt(tcEdge.ep1, -TRUCK_DEFAULT, 0);
+        var tc2 = offsetPt(tcEdge.ep2, -TRUCK_DEFAULT, 0);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
       }
       addEdgeOverlay(v[1], v[2], PARK, 1, 0, '#60a5fa', 0.2, 'carparking');
@@ -1324,16 +1405,16 @@ function drawBuildingOverlays(b) {
     }
   } else {
     // Cross dock: truck court on both top and bottom
-    addEdgeOverlay(v[0], v[1], TRUCK_DEFAULT, 0, -1, '#fbbf24', 0.2, 'truckcourt');
+    var tcTopEdge = addEdgeOverlay(v[0], v[1], TRUCK_DEFAULT, 0, -1, '#fbbf24', 0.2, 'truckcourt', tcInsetTopL, tcInsetTopR);
     if (b.trailerTop) {
-      var tc1 = offsetPt(v[0], 0, -TRUCK_DEFAULT);
-      var tc2 = offsetPt(v[1], 0, -TRUCK_DEFAULT);
+      var tc1 = offsetPt(tcTopEdge.ep1, 0, -TRUCK_DEFAULT);
+      var tc2 = offsetPt(tcTopEdge.ep2, 0, -TRUCK_DEFAULT);
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#f97316', 0.18, 'trailer');
     }
-    addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#fbbf24', 0.2, 'truckcourt');
+    var tcBotEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#fbbf24', 0.2, 'truckcourt', tcInsetBotL, tcInsetBotR);
     if (b.trailerBottom) {
-      var tc1 = offsetPt(v[3], 0, TRUCK_DEFAULT);
-      var tc2 = offsetPt(v[2], 0, TRUCK_DEFAULT);
+      var tc1 = offsetPt(tcBotEdge.ep1, 0, TRUCK_DEFAULT);
+      var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
     }
     if (b.leftParking) addEdgeOverlay(v[0], v[3], PARK, -1, 0, '#60a5fa', 0.2, 'carparking');
@@ -2649,6 +2730,12 @@ function serializeSite() {
         trailerRear: b.trailerRear,
         leftParking: b.leftParking,
         rightParking: b.rightParking,
+        tcInsetLeft: b.tcInsetLeft || 0,
+        tcInsetRight: b.tcInsetRight || 0,
+        tcInsetTopLeft: b.tcInsetTopLeft || 0,
+        tcInsetTopRight: b.tcInsetTopRight || 0,
+        tcInsetBottomLeft: b.tcInsetBottomLeft || 0,
+        tcInsetBottomRight: b.tcInsetBottomRight || 0,
         rotation: b.rotation,
         scale: b.scale
       };
@@ -2798,6 +2885,12 @@ function deserializeSite(data) {
         trailerRear: bd.trailerRear || false,
         leftParking: bd.leftParking || false,
         rightParking: bd.rightParking || false,
+        tcInsetLeft: bd.tcInsetLeft || 0,
+        tcInsetRight: bd.tcInsetRight || 0,
+        tcInsetTopLeft: bd.tcInsetTopLeft || 0,
+        tcInsetTopRight: bd.tcInsetTopRight || 0,
+        tcInsetBottomLeft: bd.tcInsetBottomLeft || 0,
+        tcInsetBottomRight: bd.tcInsetBottomRight || 0,
         rotation: bd.rotation || 0,
         scale: bd.scale || 100,
         labelGroup: null
