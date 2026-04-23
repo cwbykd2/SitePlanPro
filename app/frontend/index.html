@@ -295,7 +295,7 @@ select option{background:var(--panel2)}
                 <span class="bay-config-title">🏗 Bay Configuration</span>
                 <div class="bay-tooltip">
                   <span class="bay-tip-icon">?</span>
-                  <span class="bay-tip-text">Bays are structural units of the building. The <b>Speed Bay</b> is the first bay from the truck court — typically deeper (60–70 ft) for faster loading. Standard bays are 52–56 ft deep × 50 ft wide.</span>
+                  <span class="bay-tip-text">Bays are structural units of the building. The <b>Speed Bay</b> is the first bay from the truck court — typically deeper (60–70 ft) for faster loading. Standard bays are 50 ft wide × 52–56 ft deep.</span>
                 </div>
               </div>
               <button class="bay-snap-btn" onclick="autoSnapToOptimalBays()">⚡ Auto-Snap to Optimal Bays</button>
@@ -380,7 +380,7 @@ select option{background:var(--panel2)}
                 <label class="checkbox-row"><input type="checkbox" id="chk-bump-rear-right"> Bump out — right end</label>
               </div>
               <div style="font-size:10px;color:var(--muted);padding-top:2px">
-                Each bump out: std bay depth × 50' wide, at building ends facing truck court
+                Each bump out: 50' wide × std bay depth, at building ends facing truck court
               </div>
             </div>
               <div style="margin-top:8px;">
@@ -1657,7 +1657,7 @@ function drawBuildingOverlays(b) {
 
   // ===== BUMP OUTS =====
   // Bump outs are rectangular protrusions at the ends of the building, facing the truck court.
-  // Each bump out is bayStdDepth deep outward × BAY_WIDTH (50 ft) along the building edge.
+  // Each bump out is BAY_WIDTH (50 ft) along the building edge × bayStdDepth deep outward.
   // Use the stored standard bay depth for this building, or the global default.
   var bumpDepth = b._bayStdDepth || bayStdDepth || 52;
   var bumpWidth = BAY_WIDTH; // 50 ft
@@ -3724,7 +3724,7 @@ function flashSaveIndicator() {
 
 /* ===== BAY SPACING SYSTEM ===== */
 
-var BAY_WIDTH = 50; // All bays are 50 ft wide (second dimension in depth × width format)
+var BAY_WIDTH = 50; // All bays are 50 ft wide (first dimension in width × depth format)
 var bayStdDepth = 52; // Standard bay depth (52, 54, or 56)
 var baySpeedDepth = 60; // Speed bay depth (60 or 70)
 var showBayGrid = true;
@@ -3891,7 +3891,7 @@ function autoSnapToOptimalBays() {
   updateBayStats();
   drawAllBayGrids();
   
-  setStatus('Snapped to ' + config.widthBays + '×' + config.depthBays + ' bays (' + config.totalDepth + '×' + config.totalWidth + ' ft = ' + fmt(config.totalSF) + ' SF)');
+  setStatus('Snapped to ' + config.widthBays + '×' + config.depthBays + ' bays (' + config.totalWidth + '×' + config.totalDepth + ' ft = ' + fmt(config.totalSF) + ' SF)');
 }
 
 function resizeBuildingToBays(b, config) {
@@ -3987,7 +3987,7 @@ function updateBayStats() {
   var depthLabel = isCross ? '2 Speed + ' + stdBays + ' Std = ' + totalDepth + ' ft' : '1 Speed + ' + stdBays + ' Std = ' + totalDepth + ' ft';
   document.getElementById('bay-stat-depth').textContent = depthLabel;
   document.getElementById('bay-stat-sf').textContent = fmt(totalSF) + ' SF';
-  var speedInfo = isCross ? 'Speed Bays (both ends): ' + baySpeedDepth + '\' × 50\' · Std Bays: ' + bayStdDepth + '\' × 50\'' : 'Speed Bay: ' + baySpeedDepth + '\' × 50\' · Std Bays: ' + bayStdDepth + '\' × 50\'';
+  var speedInfo = isCross ? 'Speed Bays (both ends): 50\' × ' + baySpeedDepth + '\' · Std Bays: 50\' × ' + bayStdDepth + '\'' : 'Speed Bay: 50\' × ' + baySpeedDepth + '\' · Std Bays: 50\' × ' + bayStdDepth + '\'';
   document.getElementById('bay-speed-info').textContent = speedInfo;
 }
 
@@ -4108,30 +4108,30 @@ function drawBayGrid(b) {
       // Cross dock: speed bay (top) + N standard bays + speed bay (bottom)
       var topSpeedFrac = bSpeedDepth / d12;
       depthRowFracs.push(Math.min(topSpeedFrac, 1));
-      depthRowLabels.push({ text: bSpeedDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       // Standard bays in the middle
       for (var j = 1; j <= stdBays; j++) {
         var dFrac = (bSpeedDepth + j * bStdDepth) / d12;
-        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: bStdDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' }); break; }
+        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
         depthRowFracs.push(dFrac);
-        depthRowLabels.push({ text: bStdDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
       }
       // Bottom speed bay - from last standard bay to end
       var lastFrac = depthRowFracs[depthRowFracs.length - 1];
       if (lastFrac < 1) {
         depthRowFracs.push(1);
-        depthRowLabels.push({ text: bSpeedDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       }
     } else {
       // Rear load: speed bay at top only
       var speedFrac = bSpeedDepth / d12;
       depthRowFracs.push(Math.min(speedFrac, 1));
-      depthRowLabels.push({ text: bSpeedDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
         var dFrac = (bSpeedDepth + j * bStdDepth) / d12;
-        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: bStdDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' }); break; }
+        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
         depthRowFracs.push(dFrac);
-        depthRowLabels.push({ text: bStdDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
       }
     }
 
@@ -4195,27 +4195,27 @@ function drawBayGrid(b) {
       // Cross dock: speed bay at start + standard bays + speed bay at end
       var topSpeedFrac = bSpeedDepth / d01;
       depthColFracs.push(Math.min(topSpeedFrac, 1));
-      depthColLabels.push({ text: bSpeedDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
         var dFrac = (bSpeedDepth + j * bStdDepth) / d01;
-        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: bStdDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' }); break; }
+        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
         depthColFracs.push(dFrac);
-        depthColLabels.push({ text: bStdDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
       }
       var lastFrac = depthColFracs[depthColFracs.length - 1];
       if (lastFrac < 1) {
         depthColFracs.push(1);
-        depthColLabels.push({ text: bSpeedDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       }
     } else {
       var speedFrac = bSpeedDepth / d01;
       depthColFracs.push(Math.min(speedFrac, 1));
-      depthColLabels.push({ text: bSpeedDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
         var dFrac = (bSpeedDepth + j * bStdDepth) / d01;
-        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: bStdDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' }); break; }
+        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
         depthColFracs.push(dFrac);
-        depthColLabels.push({ text: bStdDepth + "'" + ' × ' + BAY_WIDTH + "'", color: '#000' });
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
       }
     }
 
