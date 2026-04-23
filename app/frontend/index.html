@@ -278,24 +278,17 @@ select option{background:var(--panel2)}
                 <label style="margin-bottom:4px;font-size:11px;">Truck Court Inset (ft)</label>
                 <div id="rear-inset-opts" class="hidden">
                   <div class="form-row" style="gap:6px;">
-                    <div style="flex:1"><label style="font-size:10px">Start</label><input type="number" id="tc-inset-left" value="0" min="0" step="5" style="width:100%"></div>
-                    <div style="flex:1"><label style="font-size:10px">End</label><input type="number" id="tc-inset-right" value="0" min="0" step="5" style="width:100%"></div>
+                    <div style="flex:1"><label style="font-size:10px">Inset</label><input type="number" id="tc-inset-rear" value="0" min="0" step="5" style="width:100%"></div>
                   </div>
                 </div>
                 <div id="cross-inset-opts" class="hidden">
-                  <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">Top Side</div>
-                  <div class="form-row" style="gap:6px;margin-bottom:6px;">
-                    <div style="flex:1"><label style="font-size:10px">Left</label><input type="number" id="tc-inset-top-left" value="0" min="0" step="5" style="width:100%"></div>
-                    <div style="flex:1"><label style="font-size:10px">Right</label><input type="number" id="tc-inset-top-right" value="0" min="0" step="5" style="width:100%"></div>
-                  </div>
-                  <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">Bottom Side</div>
                   <div class="form-row" style="gap:6px;">
-                    <div style="flex:1"><label style="font-size:10px">Left</label><input type="number" id="tc-inset-bot-left" value="0" min="0" step="5" style="width:100%"></div>
-                    <div style="flex:1"><label style="font-size:10px">Right</label><input type="number" id="tc-inset-bot-right" value="0" min="0" step="5" style="width:100%"></div>
+                    <div style="flex:1"><label style="font-size:10px">Top Side</label><input type="number" id="tc-inset-top" value="0" min="0" step="5" style="width:100%"></div>
+                    <div style="flex:1"><label style="font-size:10px">Bottom Side</label><input type="number" id="tc-inset-bot" value="0" min="0" step="5" style="width:100%"></div>
                   </div>
                 </div>
                 <div style="font-size:10px;color:var(--muted);padding-top:2px">
-                  Inset shortens truck court from each end of the building edge
+                  Shortens truck court equally from each end
                 </div>
               </div>
               <div style="font-size:10px;color:var(--muted);padding-top:4px">
@@ -1191,13 +1184,10 @@ function showBuildingOpts() {
   document.getElementById('chk-trailer-rear').checked = b.trailerRear;
   document.getElementById('chk-left').checked = b.leftParking;
   document.getElementById('chk-right').checked = b.rightParking;
-  // Populate inset fields
-  document.getElementById('tc-inset-left').value = b.tcInsetLeft || 0;
-  document.getElementById('tc-inset-right').value = b.tcInsetRight || 0;
-  document.getElementById('tc-inset-top-left').value = b.tcInsetTopLeft || 0;
-  document.getElementById('tc-inset-top-right').value = b.tcInsetTopRight || 0;
-  document.getElementById('tc-inset-bot-left').value = b.tcInsetBottomLeft || 0;
-  document.getElementById('tc-inset-bot-right').value = b.tcInsetBottomRight || 0;
+  // Populate inset fields (single value per side, applied equally to both ends)
+  document.getElementById('tc-inset-rear').value = b.tcInsetLeft || 0;
+  document.getElementById('tc-inset-top').value = b.tcInsetTopLeft || 0;
+  document.getElementById('tc-inset-bot').value = b.tcInsetBottomLeft || 0;
   updateTrailerOpts(b.type);
   onSpacingChange();
   showBuildingHandles(b);
@@ -1233,15 +1223,18 @@ function applyBuildingOptions() {
   b.trailerRear = document.getElementById('chk-trailer-rear').checked;
   b.leftParking = document.getElementById('chk-left').checked;
   b.rightParking = document.getElementById('chk-right').checked;
-  // Read inset values
+  // Read inset values (single value per side, applied equally to both ends)
   if (b.type === 'rear') {
-    b.tcInsetLeft = parseFloat(document.getElementById('tc-inset-left').value) || 0;
-    b.tcInsetRight = parseFloat(document.getElementById('tc-inset-right').value) || 0;
+    var rearInset = parseFloat(document.getElementById('tc-inset-rear').value) || 0;
+    b.tcInsetLeft = rearInset;
+    b.tcInsetRight = rearInset;
   } else {
-    b.tcInsetTopLeft = parseFloat(document.getElementById('tc-inset-top-left').value) || 0;
-    b.tcInsetTopRight = parseFloat(document.getElementById('tc-inset-top-right').value) || 0;
-    b.tcInsetBottomLeft = parseFloat(document.getElementById('tc-inset-bot-left').value) || 0;
-    b.tcInsetBottomRight = parseFloat(document.getElementById('tc-inset-bot-right').value) || 0;
+    var topInset = parseFloat(document.getElementById('tc-inset-top').value) || 0;
+    var botInset = parseFloat(document.getElementById('tc-inset-bot').value) || 0;
+    b.tcInsetTopLeft = topInset;
+    b.tcInsetTopRight = topInset;
+    b.tcInsetBottomLeft = botInset;
+    b.tcInsetBottomRight = botInset;
   }
   var color = b.type === 'cross' ? '#f59e0b' : '#10b981';
   b.layer.setStyle({color:color, fillColor:color, fillOpacity:0.35});
