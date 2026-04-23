@@ -31,6 +31,11 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Curved roads - Catmull-Rom spline toggle for smooth curved road segments
 - [x] Road editing - click road to edit vertices, drag to reshape, delete button
 - [x] Road intersections - auto-detect and visually merge crossing roads via Turf.js union
+- [x] City/municipality auto-detection via reverse geocoding (Nominatim API)
+- [x] Fee Estimator tab in sidebar with 5 fee categories and rate inputs
+- [x] Auto-calculated fee totals based on site statistics
+- [x] Save/Load fee templates per city in localStorage
+- [x] Fee summary in PDF export
 
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application
@@ -49,3 +54,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Fixed pond drawing bug - mode 'pond' was not matched in draw:created handler, causing completed ponds to disappear
 - 2026-04-22: Road labels now show only width (e.g. "40' W") instead of width × length
 - 2026-04-22: Fixed pond serialization in save function to use p.layer.getLatLngs() for new pond object structure
+- 2026-04-22: Added Fee Estimator feature: city auto-detection via Nominatim reverse geocoding, 5 fee categories (Impact, Permits, Roadway, Utility, Fire/Life Safety) with rate mode selectors and auto-calculation from site stats, fee template save/load per city in localStorage, fee summary in PDF export, and full save/load integration
