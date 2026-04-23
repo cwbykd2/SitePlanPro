@@ -1198,6 +1198,7 @@ function registerBuilding(layer, verts) {
   showBuildingOpts();
   updateBuildingList();
   recalcStats();
+  drawAllBayGrids();
   checkOutOfBounds();
   setStatus('Building placed! Drag to move. Use blue ⤡ handle to resize, yellow ↻ handle to rotate.');
 }
@@ -3527,8 +3528,8 @@ function deserializeSite(data) {
   if (data.fees) {
     restoreFeeData(data.fees);
   }
-  // Check out-of-bounds after full restore
-  setTimeout(function() { checkOutOfBounds(); }, 100);
+  // Draw bay grids for all buildings and check out-of-bounds after full restore
+  setTimeout(function() { drawAllBayGrids(); checkOutOfBounds(); }, 100);
 }
 
 /* ===== AUTO-SAVE ===== */
@@ -3564,7 +3565,8 @@ function setBayStdDepth(val) {
   btns.forEach(function(b) { b.classList.toggle('active', parseInt(b.textContent) === val); });
   updateBayStats();
   var ab = getActiveBuilding();
-  if (ab) { resizeBuildingFromBayUI(ab); drawBayGrid(ab); }
+  if (ab) { resizeBuildingFromBayUI(ab); }
+  drawAllBayGrids();
 }
 
 function setBaySpeedDepth(val) {
@@ -3573,19 +3575,20 @@ function setBaySpeedDepth(val) {
   btns.forEach(function(b) { b.classList.toggle('active', parseInt(b.textContent) === val); });
   updateBayStats();
   var ab = getActiveBuilding();
-  if (ab) { resizeBuildingFromBayUI(ab); drawBayGrid(ab); }
+  if (ab) { resizeBuildingFromBayUI(ab); }
+  drawAllBayGrids();
 }
 
 function toggleBayGrid() {
   showBayGrid = document.getElementById('chk-show-bay-grid').checked;
-  var ab = getActiveBuilding();
-  if (ab) drawBayGrid(ab);
+  drawAllBayGrids();
 }
 
 function onBayCountChange() {
   updateBayStats();
   var ab = getActiveBuilding();
-  if (ab) { resizeBuildingFromBayUI(ab); drawBayGrid(ab); }
+  if (ab) { resizeBuildingFromBayUI(ab); }
+  drawAllBayGrids();
 }
 
 function resizeBuildingFromBayUI(b) {
@@ -3714,7 +3717,7 @@ function autoSnapToOptimalBays() {
   resizeBuildingToBays(b, config);
   
   updateBayStats();
-  drawBayGrid(b);
+  drawAllBayGrids();
   
   setStatus('Snapped to ' + config.widthBays + '×' + config.depthBays + ' bays (' + config.totalWidth + '×' + config.totalDepth + ' ft = ' + fmt(config.totalSF) + ' SF)');
 }
@@ -3851,8 +3854,39 @@ function drawBayGrid(b) {
   var d01 = topLen / ftToCoord;
   var d12 = rightLen / ftToCoord;
   
-  var widthBays = parseInt(document.getElementById('bay-count-width').value) || 1;
-  var depthBays = parseInt(document.getElementById('bay-count-depth').value) || 1;
+  // Use stored bay config for this building, or calculate from dimensions
+  var widthBays, depthBays, bStdDepth, bSpeedDepth;
+  if (b.id === activeBuilding) {
+    // Active building: read from UI
+    widthBays = parseInt(document.getElementById('bay-count-width').value) || 1;
+    depthBays = parseInt(document.getElementById('bay-count-depth').value) || 1;
+    bStdDepth = bayStdDepth;
+    bSpeedDepth = baySpeedDepth;
+    // Store on building for when it's not active
+    b._bayWidthCount = widthBays;
+    b._bayDepthCount = depthBays;
+    b._bayStdDepth = bStdDepth;
+    b._baySpeedDepth = bSpeedDepth;
+  } else if (b._bayWidthCount) {
+    // Use previously stored config
+    widthBays = b._bayWidthCount;
+    depthBays = b._bayDepthCount;
+    bStdDepth = b._bayStdDepth || 52;
+    bSpeedDepth = b._baySpeedDepth || 60;
+  } else {
+    // Calculate best fit from dimensions
+    var dims = getBuildingDimensions(b.vertices);
+    var config = calculateBestBayFit(dims.width, dims.depth, b.type);
+    if (!config) return;
+    widthBays = config.widthBays;
+    depthBays = config.depthBays;
+    bStdDepth = config.stdDepth;
+    bSpeedDepth = config.speedDepth;
+    b._bayWidthCount = widthBays;
+    b._bayDepthCount = depthBays;
+    b._bayStdDepth = bStdDepth;
+    b._baySpeedDepth = bSpeedDepth;
+  }
   var isCrossDockBays = b.type === 'cross';
   var speedBayCount = isCrossDockBays ? 2 : 1;
   var stdBays = Math.max(0, depthBays - speedBayCount);
@@ -3867,9 +3901,9 @@ function drawBayGrid(b) {
     );
   }
   
-  var bayGridColor = 'rgba(255,255,255,0.35)';
-  var speedBayColor = 'rgba(34,211,238,0.4)';
-  var bayGridWeight = 1;
+  var bayGridColor = 'rgba(0,0,0,0.6)';
+  var speedBayColor = 'rgba(0,0,0,0.8)';
+  var bayGridWeight = 1.5;
   var bayGridDash = '6,4';
 
   // Helper: interpolate between two latlngs by fraction
@@ -3881,7 +3915,7 @@ function drawBayGrid(b) {
   function addBayDimLabel(pos, text, color) {
     var icon = L.divIcon({
       className: 'bldg-label',
-      html: '<div style="font-family:DM Mono,monospace;font-size:9px;color:' + color + ';text-shadow:0 0 5px rgba(0,0,0,.95),0 0 10px rgba(0,0,0,.7);white-space:nowrap;text-align:center;pointer-events:none">' + text + '</div>',
+      html: '<div style="font-family:DM Mono,monospace;font-size:9px;color:#000;text-shadow:0 0 4px rgba(255,255,255,.9),0 0 8px rgba(255,255,255,.6);white-space:nowrap;text-align:center;pointer-events:none;font-weight:600">' + text + '</div>',
       iconSize: [90, 14], iconAnchor: [45, 7]
     });
     L.marker(pos, { icon: icon, interactive: false, zIndexOffset: 950 }).addTo(b._bayGridGroup);
@@ -3900,32 +3934,32 @@ function drawBayGrid(b) {
 
     if (isCrossDock) {
       // Cross dock: speed bay (top) + N standard bays + speed bay (bottom)
-      var topSpeedFrac = baySpeedDepth / d12;
+      var topSpeedFrac = bSpeedDepth / d12;
       depthRowFracs.push(Math.min(topSpeedFrac, 1));
-      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       // Standard bays in the middle
       for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (baySpeedDepth + j * bayStdDepth) / d12;
-        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+        var dFrac = (bSpeedDepth + j * bStdDepth) / d12;
+        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
         depthRowFracs.push(dFrac);
-        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
       }
       // Bottom speed bay - from last standard bay to end
       var lastFrac = depthRowFracs[depthRowFracs.length - 1];
       if (lastFrac < 1) {
         depthRowFracs.push(1);
-        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       }
     } else {
       // Rear load: speed bay at top only
-      var speedFrac = baySpeedDepth / d12;
+      var speedFrac = bSpeedDepth / d12;
       depthRowFracs.push(Math.min(speedFrac, 1));
-      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (baySpeedDepth + j * bayStdDepth) / d12;
-        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+        var dFrac = (bSpeedDepth + j * bStdDepth) / d12;
+        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
         depthRowFracs.push(dFrac);
-        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
       }
     }
 
@@ -3987,29 +4021,29 @@ function drawBayGrid(b) {
 
     if (isCrossDock) {
       // Cross dock: speed bay at start + standard bays + speed bay at end
-      var topSpeedFrac = baySpeedDepth / d01;
+      var topSpeedFrac = bSpeedDepth / d01;
       depthColFracs.push(Math.min(topSpeedFrac, 1));
-      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (baySpeedDepth + j * bayStdDepth) / d01;
-        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+        var dFrac = (bSpeedDepth + j * bStdDepth) / d01;
+        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
         depthColFracs.push(dFrac);
-        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
       }
       var lastFrac = depthColFracs[depthColFracs.length - 1];
       if (lastFrac < 1) {
         depthColFracs.push(1);
-        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       }
     } else {
-      var speedFrac = baySpeedDepth / d01;
+      var speedFrac = bSpeedDepth / d01;
       depthColFracs.push(Math.min(speedFrac, 1));
-      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + baySpeedDepth + "'", color: '#22d3ee' });
+      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (baySpeedDepth + j * bayStdDepth) / d01;
-        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' }); break; }
+        var dFrac = (bSpeedDepth + j * bStdDepth) / d01;
+        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
         depthColFracs.push(dFrac);
-        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bayStdDepth + "'", color: 'rgba(255,255,255,0.7)' });
+        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
       }
     }
 
@@ -4066,6 +4100,13 @@ function drawBayGrid(b) {
   }
 }
 
+// Draw bay grids for ALL buildings (always visible)
+function drawAllBayGrids() {
+  buildings.forEach(function(b) {
+    drawBayGrid(b);
+  });
+}
+
 // Update bay UI when a building is selected
 function updateBayUIForBuilding(b) {
   if (!b) return;
@@ -4083,7 +4124,7 @@ function updateBayUIForBuilding(b) {
     spdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.speedDepth); });
   }
   updateBayStats();
-  drawBayGrid(b);
+  drawAllBayGrids();
 }
 
 /* ===== BUILDING COST ESTIMATOR ===== */
