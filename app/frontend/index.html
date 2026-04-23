@@ -962,9 +962,6 @@ function applyBuildingOptions() {
 function drawBuildingOverlays(b) {
   b.overlayGroup.clearLayers();
   if (!b.vertices || b.vertices.length < 4 || !b.baseVertices || b.baseVertices.length < 4) return;
-  // For rotated buildings, we compute overlays relative to the building's oriented bounding box
-  var center = getPolygonCenter(b.vertices);
-  var verts = b.vertices;
 
   // Get axis-aligned bounding box of the base (unrotated) vertices
   var baseCenter = getPolygonCenter(b.baseVertices);
@@ -992,6 +989,7 @@ function drawBuildingOverlays(b) {
   var E = baseCenter.lng + (maxLng - baseCenter.lng) * scaleFactor;
   var W = baseCenter.lng + (minLng - baseCenter.lng) * scaleFactor;
 
+  // Use baseCenter as rotation pivot so overlays align exactly with building edges
   function addRotatedRect(latN, latS, lngW, lngE, color, op) {
     var corners = [
       L.latLng(latN, lngW),
@@ -1000,7 +998,8 @@ function drawBuildingOverlays(b) {
       L.latLng(latS, lngW)
     ];
     var rotated = corners.map(function(c) {
-      return rotatePoint(center, c, b.rotation);
+      var scaled = c; // already in scaled base coords
+      return rotatePoint(baseCenter, scaled, b.rotation);
     });
     L.polygon(rotated, {color:color, weight:1, fillColor:color, fillOpacity:op, interactive:false}).addTo(b.overlayGroup);
   }

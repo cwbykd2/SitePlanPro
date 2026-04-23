@@ -29,3 +29,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Added PDF export feature with html2canvas + jsPDF
 - 2026-04-22: Added default car parking on opposite side of truck court for rear load buildings
 - 2026-04-22: Updated rear load truck court to always be placed on the longer side of the building
+- 2026-04-22: Fixed truck court/parking rotation pivot to use baseCenter instead of rotated center, ensuring overlays align perfectly with building edges at any angle
