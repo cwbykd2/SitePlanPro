@@ -39,6 +39,7 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - [x] Truck court inset - per-side inset inputs to shorten truck court from each end of building edge
 - [x] Building Cost Estimator tab - per-building cost calculation using pricing chart with 32'/36'/40' clear heights, closest SF matching, site total, PDF export integration, and save/load support
 - [x] Per-building clear height dropdown - each building has its own independent clear height selector instead of a global one
+- [x] Paving type selector - choose Car Parking, Trailer Parking, or Other when drawing pavings; colors match overlay types; stats breakdown and PDF updated
 
 ## Progress Log
 - 2026-04-22: Started deployment of SitePlan Pro HTML application
@@ -59,3 +60,4 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Fixed pond serialization in save function to use p.layer.getLatLngs() for new pond object structure
 - 2026-04-22: Added Fee Estimator feature: city auto-detection via Nominatim reverse geocoding, 5 fee categories (Impact, Permits, Roadway, Utility, Fire/Life Safety) with rate mode selectors and auto-calculation from site stats, fee template save/load per city in localStorage, fee summary in PDF export, and full save/load integration
 - 2026-04-22: Added truck court inset feature: per-building inset values (in feet) to shorten truck courts from each end of the building edge. Rear load has Start/End insets; Cross dock has separate Left/Right insets for top and bottom sides. Insets also apply to trailer parking overlays. Full save/load integration.
+- 2026-04-22: Added paving type selector (Car Parking / Trailer Parking / Other) with matching colors, type labels on map, stats breakdown integration, PDF export, and save/load support

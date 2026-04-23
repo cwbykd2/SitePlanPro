@@ -330,6 +330,23 @@ select option{background:var(--panel2)}
         <div class="card">
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
+              <label>Paving Type</label>
+              <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">
+                <label class="checkbox-row" style="border-bottom:1px solid var(--border);padding:6px 0;cursor:pointer" onclick="setPavingType('carparking')">
+                  <input type="radio" name="paving-type" value="carparking" checked style="accent-color:#60a5fa">
+                  <span style="color:#60a5fa;font-weight:600">Car Parking</span>
+                </label>
+                <label class="checkbox-row" style="border-bottom:1px solid var(--border);padding:6px 0;cursor:pointer" onclick="setPavingType('trailer')">
+                  <input type="radio" name="paving-type" value="trailer" style="accent-color:#f97316">
+                  <span style="color:#f97316;font-weight:600">Trailer Parking</span>
+                </label>
+                <label class="checkbox-row" style="padding:6px 0;cursor:pointer" onclick="setPavingType('other')">
+                  <input type="radio" name="paving-type" value="other" style="accent-color:#10b981">
+                  <span style="color:#10b981;font-weight:600">Other</span>
+                </label>
+              </div>
+            </div>
+            <div>
               <label>Draw Mode</label>
               <div class="type-grid">
                 <div class="type-card selected" id="pave-mode-rect" onclick="setPavingMode('rect')"><div class="type-icon">▭</div><div class="type-name">Rectangle</div></div>
@@ -546,6 +563,7 @@ var editingRoad = null; // currently editing road object
 var ponds = [];
 var pavings = [];
 var pavingMode = 'rect'; // 'rect' or 'free'
+var currentPavingType = 'carparking'; // 'carparking', 'trailer', 'other'
 var siteBoundary = null;
 var activeBuilding = null;
 var activeDraw = null;
@@ -1497,6 +1515,18 @@ function drawBuildingOverlays(b) {
 
 /* ===== PAVING MANAGEMENT ===== */
 
+function getPavingColor(pavingType) {
+  if (pavingType === 'carparking') return '#60a5fa';
+  if (pavingType === 'trailer') return '#f97316';
+  return '#10b981';
+}
+
+function setPavingType(type) {
+  currentPavingType = type;
+  var radios = document.querySelectorAll('input[name="paving-type"]');
+  radios.forEach(function(r) { r.checked = (r.value === type); });
+}
+
 function setPavingMode(mode) {
   pavingMode = mode;
   document.getElementById('pave-mode-rect').classList.toggle('selected', mode === 'rect');
@@ -1508,14 +1538,15 @@ function setPavingMode(mode) {
 }
 
 function beginPavingDraw() {
+  var c = getPavingColor(currentPavingType);
   if (pavingMode === 'rect') {
     drawingMode = 'paving-rect';
-    activeDraw = new L.Draw.Rectangle(map, {shapeOptions:{color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:0.25},showArea:false});
+    activeDraw = new L.Draw.Rectangle(map, {shapeOptions:{color:c,weight:2,fillColor:c,fillOpacity:0.25},showArea:false});
     activeDraw.enable();
     setStatus('Drag to draw a paving rectangle - shows dimensions as you draw');
   } else {
     drawingMode = 'paving-free';
-    activeDraw = new L.Draw.Polygon(map, {shapeOptions:{color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:0.25},allowIntersection:false,showArea:false});
+    activeDraw = new L.Draw.Polygon(map, {shapeOptions:{color:c,weight:2,fillColor:c,fillOpacity:0.25},allowIntersection:false,showArea:false});
     activeDraw.enable();
     setStatus('Click points to draw paving area - double-click to finish');
   }
@@ -1523,16 +1554,18 @@ function beginPavingDraw() {
 
 function registerPaving(layer, isRect) {
   var id = Date.now();
+  var pType = currentPavingType;
+  var c = getPavingColor(pType);
   var verts;
   if (isRect) {
     var bounds = layer.getBounds();
     verts = rectToVerts(bounds);
-    // Replace rectangle with polygon for consistency
-    var polygon = L.polygon(verts, {color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:0.25});
+    var polygon = L.polygon(verts, {color:c,weight:2,fillColor:c,fillOpacity:0.25});
     drawnItems.removeLayer(layer);
     drawnItems.addLayer(polygon);
     layer = polygon;
   } else {
+    layer.setStyle({color:c,weight:2,fillColor:c,fillOpacity:0.25});
     verts = layer.getLatLngs()[0] || layer.getLatLngs();
     verts = verts.map(function(v) { return L.latLng(v.lat, v.lng); });
   }
@@ -1542,6 +1575,7 @@ function registerPaving(layer, isRect) {
     layer: layer,
     vertices: verts,
     isRect: isRect,
+    pavingType: pType,
     labelGroup: L.featureGroup().addTo(map)
   };
   pavings.push(paving);
@@ -1556,25 +1590,28 @@ function registerPaving(layer, isRect) {
   updatePavingLabels(paving);
   recalcStats();
   checkOutOfBounds();
-  setStatus('Paving added! ' + (pavingMode === 'rect' ? 'Drag another rectangle' : 'Click to draw another') + ' or switch tools');
+  var typeLabel = pType === 'carparking' ? 'Car Parking' : pType === 'trailer' ? 'Trailer Parking' : 'Paving';
+  setStatus(typeLabel + ' added! ' + (pavingMode === 'rect' ? 'Drag another rectangle' : 'Click to draw another') + ' or switch tools');
 }
 
 function updatePavingLabels(p) {
   p.labelGroup.clearLayers();
   var verts = p.vertices;
   var center = getPolygonCenter(verts);
+  var c = getPavingColor(p.pavingType || 'other');
+  var typeLabel = p.pavingType === 'carparking' ? 'Car Pkg' : p.pavingType === 'trailer' ? 'Trailer' : '';
 
   if (p.isRect && verts.length >= 4) {
-    // Show width, depth, SF like buildings
     var dims = getBuildingDimensions(verts);
     var sfText = dims.sf >= 1e6 ? (dims.sf / 1e6).toFixed(2) + 'M SF' :
                  dims.sf >= 1e3 ? (dims.sf / 1e3).toFixed(1) + 'K SF' :
                  Math.round(dims.sf).toLocaleString() + ' SF';
+    var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="color:' + c + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="color:' + c + '">' + sfText + '</div>';
 
     var sfIcon = L.divIcon({
       className: 'bldg-label',
-      html: '<div class="bldg-label-sf" style="color:#10b981">' + sfText + '</div>',
-      iconSize: [120, 20], iconAnchor: [60, 10]
+      html: labelHtml,
+      iconSize: [120, 30], iconAnchor: [60, 15]
     });
     L.marker(center, {icon: sfIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
 
@@ -1590,27 +1627,27 @@ function updatePavingLabels(p) {
 
     var wIcon = L.divIcon({
       className: 'bldg-label',
-      html: '<div class="bldg-label-dim" style="color:#34d399">' + dims.width + ' ft</div>',
+      html: '<div class="bldg-label-dim" style="color:' + c + '">' + dims.width + ' ft</div>',
       iconSize: [80, 16], iconAnchor: [40, 8]
     });
     L.marker(widthMid, {icon: wIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
 
     var dIcon = L.divIcon({
       className: 'bldg-label',
-      html: '<div class="bldg-label-dim" style="color:#34d399">' + dims.depth + ' ft</div>',
+      html: '<div class="bldg-label-dim" style="color:' + c + '">' + dims.depth + ' ft</div>',
       iconSize: [80, 16], iconAnchor: [40, 8]
     });
     L.marker(depthMid, {icon: dIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
   } else {
-    // Free-draw: just show SF in center
     var sf = areaSF(p.layer);
     var sfText = sf >= 1e6 ? (sf / 1e6).toFixed(2) + 'M SF' :
                  sf >= 1e3 ? (sf / 1e3).toFixed(1) + 'K SF' :
                  Math.round(sf).toLocaleString() + ' SF';
+    var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="color:' + c + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="color:' + c + '">' + sfText + '</div>';
     var sfIcon = L.divIcon({
       className: 'bldg-label',
-      html: '<div class="bldg-label-sf" style="color:#10b981">' + sfText + '</div>',
-      iconSize: [120, 20], iconAnchor: [60, 10]
+      html: labelHtml,
+      iconSize: [120, 30], iconAnchor: [60, 15]
     });
     L.marker(center, {icon: sfIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
   }
@@ -1894,7 +1931,10 @@ function recalcStats() {
   pavings.forEach(function(p){
     var sf = areaSF(p.layer);
     pavedSF += sf;
-    pavingAreaSF += sf;
+    var pt = p.pavingType || 'other';
+    if (pt === 'carparking') carparkingSF += sf;
+    else if (pt === 'trailer') trailerSF += sf;
+    else pavingAreaSF += sf;
   });
   ponds.forEach(function(p){ pondSF += areaSF(p.layer); });
   if (siteBoundary) siteSF = areaSF(siteBoundary);
@@ -2918,7 +2958,8 @@ function serializeSite() {
       return {
         id: p.id,
         vertices: serializeLatlngs(p.vertices),
-        isRect: p.isRect
+        isRect: p.isRect,
+        pavingType: p.pavingType || 'other'
       };
     }),
     siteBoundary: siteBoundary ? serializeLatlngs(siteBoundary.getLatLngs()[0] || siteBoundary.getLatLngs()) : null,
@@ -3010,13 +3051,16 @@ function deserializeSite(data) {
   if (data.pavings) {
     data.pavings.forEach(function(pd) {
       var lls = pd.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
-      var poly = L.polygon(lls, { color: '#10b981', weight: 2, fillColor: '#10b981', fillOpacity: 0.25 });
+      var pType = pd.pavingType || 'other';
+      var c = getPavingColor(pType);
+      var poly = L.polygon(lls, { color: c, weight: 2, fillColor: c, fillOpacity: 0.25 });
       drawnItems.addLayer(poly);
       var paving = {
         id: pd.id || Date.now() + Math.random(),
         layer: poly,
         vertices: lls,
         isRect: pd.isRect,
+        pavingType: pType,
         labelGroup: L.featureGroup().addTo(map)
       };
       pavings.push(paving);
