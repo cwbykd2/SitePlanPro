@@ -1353,10 +1353,23 @@ function setupBuildingDrag(bldg) {
         };
         bldg.overlayGroup.eachLayer(function(ol) {
           if (ol.getLatLngs) {
-            var latlngs = ol.getLatLngs()[0] || ol.getLatLngs();
+            var raw = ol.getLatLngs();
+            // Normalize: polygons return [[LatLng,...]], polylines return [LatLng,...]
+            var isNested = Array.isArray(raw) && raw.length > 0 && Array.isArray(raw[0]);
+            var latlngs = isNested ? raw[0] : raw;
+            if (Array.isArray(latlngs)) {
+              dragState.origOverlayPositions.push({
+                layer: ol,
+                isNested: isNested,
+                verts: latlngs.map(function(v) { return L.latLng(v.lat, v.lng); })
+              });
+            }
+          } else if (ol.getLatLng) {
+            // Markers / circle markers
             dragState.origOverlayPositions.push({
               layer: ol,
-              verts: latlngs.map(function(v) { return L.latLng(v.lat, v.lng); })
+              isMarker: true,
+              verts: [ol.getLatLng()]
             });
           }
         });
@@ -1410,10 +1423,15 @@ function onBuildingDrag(e) {
 
   // Move overlays
   dragState.origOverlayPositions.forEach(function(op) {
-    var movedVerts = op.verts.map(function(v) {
-      return L.latLng(v.lat + dLat, v.lng + dLng);
-    });
-    op.layer.setLatLngs([movedVerts]);
+    if (op.isMarker) {
+      var v = op.verts[0];
+      op.layer.setLatLng(L.latLng(v.lat + dLat, v.lng + dLng));
+    } else {
+      var movedVerts = op.verts.map(function(v) {
+        return L.latLng(v.lat + dLat, v.lng + dLng);
+      });
+      op.layer.setLatLngs(op.isNested ? [movedVerts] : movedVerts);
+    }
   });
 }
 
