@@ -368,6 +368,13 @@ select option{background:var(--panel2)}
                 </div>
                 <label class="checkbox-row"><input type="checkbox" id="chk-left"> Parking on left side</label>
                 <label class="checkbox-row"><input type="checkbox" id="chk-right"> Parking on right side</label>
+                <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+                  <label style="font-size:11px;margin-bottom:4px;display:block">Car Parking Depth</label>
+                  <div style="display:flex;gap:4px">
+                    <div class="bay-seg-btn selected" id="park-double" onclick="setParkingRows('double')" style="flex:1;text-align:center">Double Row (76')</div>
+                    <div class="bay-seg-btn" id="park-single" onclick="setParkingRows('single')" style="flex:1;text-align:center">Single Row (56')</div>
+                  </div>
+                </div>
               </div>
 
             <!-- Bump Out Configuration -->
@@ -1214,6 +1221,7 @@ function registerBuilding(layer, verts) {
     trailerRear: false,
     leftParking: false,
     rightParking: false,
+    parkingRows: 'double',
     tcInsetLeft: 0,
     tcInsetRight: 0,
     tcInsetTopLeft: 0,
@@ -1431,6 +1439,12 @@ function showBuildingOpts() {
   if (elTR) elTR.checked = b.trailerRear;
   if (elLP) elLP.checked = b.leftParking;
   if (elRP) elRP.checked = b.rightParking;
+  // Populate parking row toggle
+  var parkMode = b.parkingRows || 'double';
+  var elPD = document.getElementById('park-double');
+  var elPS = document.getElementById('park-single');
+  if (elPD) elPD.classList.toggle('selected', parkMode === 'double');
+  if (elPS) elPS.classList.toggle('selected', parkMode === 'single');
   // Populate inset fields with manual-only values (subtract auto bump-out inset)
   var elIR = document.getElementById('tc-inset-rear');
   var elIT = document.getElementById('tc-inset-top');
@@ -1485,6 +1499,13 @@ function selectType(type) {
   updateTrailerOpts(type);
 }
 
+function setParkingRows(mode) {
+  var dbl = document.getElementById('park-double');
+  var sgl = document.getElementById('park-single');
+  if (dbl) dbl.classList.toggle('selected', mode === 'double');
+  if (sgl) sgl.classList.toggle('selected', mode === 'single');
+}
+
 function applyBuildingOptions() {
   var b = buildings.find(function(x){return x.id===activeBuilding});
   if (!b) return;
@@ -1494,6 +1515,7 @@ function applyBuildingOptions() {
   b.trailerRear = document.getElementById('chk-trailer-rear').checked;
   b.leftParking = document.getElementById('chk-left').checked;
   b.rightParking = document.getElementById('chk-right').checked;
+  b.parkingRows = document.getElementById('park-single').classList.contains('selected') ? 'single' : 'double';
   // Read bump out flags
   if (b.type === 'cross') {
     b.bumpTopLeft = document.getElementById('chk-bump-top-left').checked;
@@ -1589,7 +1611,7 @@ function drawBuildingOverlays(b) {
 
   var TRUCK_DEFAULT = 130;
   var TRUCK_EXTENDED = 185;
-  var PARK = 62;
+  var PARK = (b.parkingRows === 'single') ? 56 : 76;
 
   // Edge lengths in feet
   var topFt = topLen / ftToCoord;    // length of top/bottom edge in feet
@@ -3615,6 +3637,7 @@ function serializeSite() {
         trailerRear: b.trailerRear,
         leftParking: b.leftParking,
         rightParking: b.rightParking,
+        parkingRows: b.parkingRows || 'double',
         tcInsetLeft: b.tcInsetLeft || 0,
         tcInsetRight: b.tcInsetRight || 0,
         tcInsetTopLeft: b.tcInsetTopLeft || 0,
@@ -3782,6 +3805,7 @@ function deserializeSite(data) {
         trailerRear: bd.trailerRear || false,
         leftParking: bd.leftParking || false,
         rightParking: bd.rightParking || false,
+        parkingRows: bd.parkingRows || 'double',
         tcInsetLeft: bd.tcInsetLeft || 0,
         tcInsetRight: bd.tcInsetRight || 0,
         tcInsetTopLeft: bd.tcInsetTopLeft || 0,
