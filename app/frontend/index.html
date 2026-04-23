@@ -743,6 +743,17 @@ function getMidpoint(a, b) {
   return L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
 }
 
+function getTotalBuildingSF(b) {
+  // Returns the total building SF including bump outs
+  var sf = areaSF(b.layer);
+  b.overlayGroup.eachLayer(function(o) {
+    if (o._overlayType === 'bumpout') {
+      sf += areaSF(o);
+    }
+  });
+  return sf;
+}
+
 function updateBuildingLabels(b) {
   if (!b.labelGroup) {
     b.labelGroup = L.featureGroup().addTo(map);
@@ -755,10 +766,11 @@ function updateBuildingLabels(b) {
   var dims = getBuildingDimensions(verts);
   var center = getPolygonCenter(verts);
 
-  // SF label in center
-  var sfText = dims.sf >= 1e6 ? (dims.sf / 1e6).toFixed(2) + 'M SF' :
-               dims.sf >= 1e3 ? (dims.sf / 1e3).toFixed(1) + 'K SF' :
-               Math.round(dims.sf).toLocaleString() + ' SF';
+  // SF label in center — include bump out SF
+  var totalSF = getTotalBuildingSF(b);
+  var sfText = totalSF >= 1e6 ? (totalSF / 1e6).toFixed(2) + 'M SF' :
+               totalSF >= 1e3 ? (totalSF / 1e3).toFixed(1) + 'K SF' :
+               Math.round(totalSF).toLocaleString() + ' SF';
   var sfIcon = L.divIcon({
     className: 'bldg-label',
     html: '<div class="bldg-label-sf">' + sfText + '</div>',
@@ -2981,10 +2993,11 @@ function updateBuildingList() {
     var color = b.type==='cross'?'#f59e0b':'#10b981';
     var label = b.type==='cross'?'Cross Dock':'Rear Load';
     var sel = b.id === activeBuilding ? ' selected-bldg' : '';
+    var totalSF = getTotalBuildingSF(b);
     return '<div class="bldg-item' + sel + '" onclick="selectBuilding('+b.id+')">'
       +'<div class="bldg-dot" style="background:'+color+'"></div>'
       +'<div class="bldg-info"><div class="bldg-name">Building '+(i+1)+'</div>'
-      +'<div class="bldg-meta">'+label+' &middot; '+fmt(areaSF(b.layer))+' SF</div></div>'
+      +'<div class="bldg-meta">'+label+' &middot; '+fmt(totalSF)+' SF</div></div>'
       +'<span class="bldg-del" onclick="event.stopPropagation();deleteBuilding('+b.id+')">&#x2715;</span>'
       +'</div>';
   }).join('');
