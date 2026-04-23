@@ -295,25 +295,31 @@ select option{background:var(--panel2)}
                 <span class="bay-config-title">🏗 Bay Configuration</span>
                 <div class="bay-tooltip">
                   <span class="bay-tip-icon">?</span>
-                  <span class="bay-tip-text">Bays are structural units of the building. The <b>Speed Bay</b> is the first bay from the truck court — typically deeper (60–70 ft) for faster loading. Standard bays are 50 ft wide × 52–56 ft deep.</span>
+                  <span class="bay-tip-text">Bays are structural units of the building. All bays are 52–56 ft wide. <b>Speed Bays</b> (along truck courts) are 60–70 ft deep. <b>Standard Bays</b> are 50 ft deep.</span>
                 </div>
               </div>
               <button class="bay-snap-btn" onclick="autoSnapToOptimalBays()">⚡ Auto-Snap to Optimal Bays</button>
               <div class="bay-controls">
                 <div class="bay-control-row">
-                  <label>Std Bay Depth</label>
-                  <div class="bay-segmented" id="bay-std-depth-seg">
-                    <div class="bay-seg-btn active" onclick="setBayStdDepth(52)">52'</div>
-                    <div class="bay-seg-btn" onclick="setBayStdDepth(54)">54'</div>
-                    <div class="bay-seg-btn" onclick="setBayStdDepth(56)">56'</div>
+                  <label>
+                    <span class="bay-tooltip" style="display:inline">
+                      Bay Width
+                      <span class="bay-tip-icon" style="margin-left:2px">?</span>
+                      <span class="bay-tip-text">Column spacing for all bays, measured parallel to the truck court. Standard bays: width × 50' deep. Speed bays: width × 60' or 70' deep.</span>
+                    </span>
+                  </label>
+                  <div class="bay-segmented" id="bay-width-seg">
+                    <div class="bay-seg-btn active" onclick="setBayWidth(52)">52'</div>
+                    <div class="bay-seg-btn" onclick="setBayWidth(54)">54'</div>
+                    <div class="bay-seg-btn" onclick="setBayWidth(56)">56'</div>
                   </div>
                 </div>
                 <div class="bay-control-row">
                   <label>
                     <span class="bay-tooltip" style="display:inline">
-                      Speed Bay
+                      Speed Bay Depth
                       <span class="bay-tip-icon" style="margin-left:2px">?</span>
-                      <span class="bay-tip-text">The first bay from the truck court side. Deeper than standard bays for faster truck loading/unloading operations.</span>
+                      <span class="bay-tip-text">The depth of speed bays (rows along the truck court). Standard bays are always 50' deep.</span>
                     </span>
                   </label>
                   <div class="bay-segmented" id="bay-speed-depth-seg">
@@ -380,7 +386,7 @@ select option{background:var(--panel2)}
                 <label class="checkbox-row"><input type="checkbox" id="chk-bump-rear-right"> Bump out — right end</label>
               </div>
               <div style="font-size:10px;color:var(--muted);padding-top:2px">
-                Each bump out: 50' wide × std bay depth, at building ends facing truck court
+                Each bump out: bay width × 50' deep, at building ends facing truck court
               </div>
             </div>
               <div style="margin-top:8px;">
@@ -1411,7 +1417,7 @@ function showBuildingOpts() {
   var elIR = document.getElementById('tc-inset-rear');
   var elIT = document.getElementById('tc-inset-top');
   var elIB = document.getElementById('tc-inset-bot');
-  var bumpW = BAY_WIDTH; // 50 ft auto-inset per bump out
+  var bumpW = bayWidth; // auto-inset per bump out (52/54/56)
   if (elIR) {
     var autoRL = b.bumpRearLeft ? bumpW : 0;
     elIR.value = Math.max(0, (b.tcInsetLeft || 0) - autoRL);
@@ -1487,9 +1493,9 @@ function applyBuildingOptions() {
     b.bumpBotRight = false;
   }
   // Auto-calculate truck court insets based on bump outs
-  // Each bump out is BAY_WIDTH (50 ft) wide at the building end, so the truck court
+  // Each bump out is bayWidth (52/54/56 ft) wide at the building end, so the truck court
   // should be inset by that amount on the corresponding end to sit inside the bump outs.
-  var bumpInset = BAY_WIDTH; // 50 ft — same width as bump out
+  var bumpInset = bayWidth; // same width as bump out (52/54/56)
   if (b.type === 'rear') {
     var rearInsetBase = parseFloat(document.getElementById('tc-inset-rear').value) || 0;
     // Auto-add bump out inset on top of any manual inset
@@ -1691,10 +1697,9 @@ function drawBuildingOverlays(b) {
 
   // ===== BUMP OUTS =====
   // Bump outs are rectangular protrusions at the ends of the building, facing the truck court.
-  // Each bump out is BAY_WIDTH (50 ft) along the building edge × bayStdDepth deep outward.
-  // Use the stored standard bay depth for this building, or the global default.
-  var bumpDepth = b._bayStdDepth || bayStdDepth || 52;
-  var bumpWidth = BAY_WIDTH; // 50 ft
+  // Each bump out is bayWidth (52/54/56 ft) along the building edge × BAY_STD_DEPTH (50 ft) deep outward.
+  var bumpDepth = BAY_STD_DEPTH; // bump outs are always 50 ft deep (standard bay depth)
+  var bumpWidth = b._bayWidth || bayWidth; // bay width (52/54/56)
   var BUMP_COLOR = b.type === 'cross' ? '#f59e0b' : '#10b981'; // same color as building
   var BUMP_OP = 0.45;
 
@@ -3798,14 +3803,14 @@ function flashSaveIndicator() {
 
 /* ===== BAY SPACING SYSTEM ===== */
 
-var BAY_WIDTH = 50; // All bays are 50 ft wide (first dimension in width × depth format)
-var bayStdDepth = 52; // Standard bay depth (52, 54, or 56)
+var bayWidth = 52; // Bay width (52, 54, or 56) — applies to ALL bays (column spacing)
+var BAY_STD_DEPTH = 50; // Standard bay depth is fixed at 50 ft
 var baySpeedDepth = 60; // Speed bay depth (60 or 70)
 var showBayGrid = true;
 
-function setBayStdDepth(val) {
-  bayStdDepth = val;
-  var btns = document.querySelectorAll('#bay-std-depth-seg .bay-seg-btn');
+function setBayWidth(val) {
+  bayWidth = val;
+  var btns = document.querySelectorAll('#bay-width-seg .bay-seg-btn');
   btns.forEach(function(b) { b.classList.toggle('active', parseInt(b.textContent) === val); });
   updateBayStats();
   var ab = getActiveBuilding();
@@ -3842,13 +3847,14 @@ function resizeBuildingFromBayUI(b) {
   var isCross = b.type === 'cross';
   var speedCount = isCross ? 2 : 1;
   var stdBays = Math.max(0, depthBays - speedCount);
-  var totalWidth = widthBays * BAY_WIDTH;
-  var totalDepth = speedCount * baySpeedDepth + stdBays * bayStdDepth;
+  var totalWidth = widthBays * bayWidth;
+  var totalDepth = speedCount * baySpeedDepth + stdBays * BAY_STD_DEPTH;
   var config = {
     widthBays: widthBays,
     depthBays: depthBays,
     stdBays: stdBays,
-    stdDepth: bayStdDepth,
+    bayWidth: bayWidth,
+    stdDepth: BAY_STD_DEPTH,
     speedDepth: baySpeedDepth,
     totalWidth: totalWidth,
     totalDepth: totalDepth,
@@ -3859,43 +3865,47 @@ function resizeBuildingFromBayUI(b) {
 
 function calculateBestBayFit(drawnWidthFt, drawnDepthFt, bldgType) {
   // Find the optimal bay configuration that gets closest to the drawn dimensions
-  // Width direction: N bays × 50 ft each
-  // Depth direction: for cross dock = speed bay + M standard bays + speed bay (both ends)
-  //                  for rear load = 1 speed bay + M standard bays
+  // Width direction: N bays × bayWidth (52/54/56) each
+  // Depth direction: for cross dock = speed bay + M standard bays (50' each) + speed bay
+  //                  for rear load = 1 speed bay + M standard bays (50' each)
+  // Speed bays: bayWidth wide × speedDepth (60/70) deep
+  // Standard bays: bayWidth wide × 50' deep
   var isCross = (bldgType === 'cross');
-  var speedCount = isCross ? 2 : 1; // number of speed bays
+  var speedCount = isCross ? 2 : 1; // number of speed bay rows
   
   var bestConfig = null;
   var bestDiff = Infinity;
   
-  var stdDepths = [52, 54, 56];
+  var bayWidths = [52, 54, 56];
   var speedDepths = [60, 70];
+  var stdDepth = 50; // standard bay depth is always 50 ft
   
-  for (var si = 0; si < stdDepths.length; si++) {
+  for (var wi = 0; wi < bayWidths.length; wi++) {
     for (var spi = 0; spi < speedDepths.length; spi++) {
-      var sd = stdDepths[si];
+      var bw = bayWidths[wi];
       var spd = speedDepths[spi];
       
       // Calculate optimal number of width bays
-      var nWidth = Math.max(1, Math.round(drawnWidthFt / BAY_WIDTH));
-      var actualWidth = nWidth * BAY_WIDTH;
+      var nWidth = Math.max(1, Math.round(drawnWidthFt / bw));
+      var actualWidth = nWidth * bw;
       
-      // Total depth = speedCount * speedDepth + nStd * stdDepth
-      var nStd = Math.max(0, Math.round((drawnDepthFt - speedCount * spd) / sd));
+      // Total depth = speedCount * speedDepth + nStd * stdDepth(50)
+      var nStd = Math.max(0, Math.round((drawnDepthFt - speedCount * spd) / stdDepth));
       
       // Try nStd-1, nStd, nStd+1 to find true best
       for (var adj = -1; adj <= 1; adj++) {
         var tryStd = Math.max(0, nStd + adj);
-        var tryDepth = speedCount * spd + tryStd * sd;
+        var tryDepth = speedCount * spd + tryStd * stdDepth;
         var tryDiff = Math.abs(actualWidth - drawnWidthFt) + Math.abs(tryDepth - drawnDepthFt);
         
         if (tryDiff < bestDiff) {
           bestDiff = tryDiff;
           bestConfig = {
             widthBays: nWidth,
-            depthBays: tryStd + speedCount, // speed bays + standard bays
+            depthBays: tryStd + speedCount,
             stdBays: tryStd,
-            stdDepth: sd,
+            bayWidth: bw,
+            stdDepth: stdDepth,
             speedDepth: spd,
             totalWidth: actualWidth,
             totalDepth: tryDepth,
@@ -3907,10 +3917,10 @@ function calculateBestBayFit(drawnWidthFt, drawnDepthFt, bldgType) {
       // Also try nWidth+1 and nWidth-1
       for (var wadj = -1; wadj <= 1; wadj += 2) {
         var tryWidth = Math.max(1, nWidth + wadj);
-        var tryActualWidth = tryWidth * BAY_WIDTH;
+        var tryActualWidth = tryWidth * bw;
         for (var dadj = -1; dadj <= 1; dadj++) {
           var tryStd2 = Math.max(0, nStd + dadj);
-          var tryDepth2 = speedCount * spd + tryStd2 * sd;
+          var tryDepth2 = speedCount * spd + tryStd2 * stdDepth;
           var tryDiff2 = Math.abs(tryActualWidth - drawnWidthFt) + Math.abs(tryDepth2 - drawnDepthFt);
           
           if (tryDiff2 < bestDiff) {
@@ -3919,7 +3929,8 @@ function calculateBestBayFit(drawnWidthFt, drawnDepthFt, bldgType) {
               widthBays: tryWidth,
               depthBays: tryStd2 + speedCount,
               stdBays: tryStd2,
-              stdDepth: sd,
+              bayWidth: bw,
+              stdDepth: stdDepth,
               speedDepth: spd,
               totalWidth: tryActualWidth,
               totalDepth: tryDepth2,
@@ -3945,12 +3956,12 @@ function autoSnapToOptimalBays() {
   if (!config) { setStatus('Could not calculate bay fit'); return; }
   
   // Update UI controls
-  bayStdDepth = config.stdDepth;
+  bayWidth = config.bayWidth;
   baySpeedDepth = config.speedDepth;
   
   // Update segmented buttons
-  var stdBtns = document.querySelectorAll('#bay-std-depth-seg .bay-seg-btn');
-  stdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.stdDepth); });
+  var widthBtns = document.querySelectorAll('#bay-width-seg .bay-seg-btn');
+  widthBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.bayWidth); });
   var spdBtns = document.querySelectorAll('#bay-speed-depth-seg .bay-seg-btn');
   spdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.speedDepth); });
   
@@ -4053,15 +4064,15 @@ function updateBayStats() {
   var speedCount = isCross ? 2 : 1;
   var stdBays = Math.max(0, depthBays - speedCount);
   
-  var totalWidth = widthBays * BAY_WIDTH;
-  var totalDepth = speedCount * baySpeedDepth + stdBays * bayStdDepth;
+  var totalWidth = widthBays * bayWidth;
+  var totalDepth = speedCount * baySpeedDepth + stdBays * BAY_STD_DEPTH;
   var totalSF = totalWidth * totalDepth;
   
-  document.getElementById('bay-stat-width').textContent = widthBays + ' × 50\' = ' + totalWidth + ' ft';
+  document.getElementById('bay-stat-width').textContent = widthBays + ' × ' + bayWidth + '\' = ' + totalWidth + ' ft';
   var depthLabel = isCross ? '2 Speed + ' + stdBays + ' Std = ' + totalDepth + ' ft' : '1 Speed + ' + stdBays + ' Std = ' + totalDepth + ' ft';
   document.getElementById('bay-stat-depth').textContent = depthLabel;
   document.getElementById('bay-stat-sf').textContent = fmt(totalSF) + ' SF';
-  var speedInfo = isCross ? 'Speed Bays (both ends): 50\' × ' + baySpeedDepth + '\' · Std Bays: 50\' × ' + bayStdDepth + '\'' : 'Speed Bay: 50\' × ' + baySpeedDepth + '\' · Std Bays: 50\' × ' + bayStdDepth + '\'';
+  var speedInfo = isCross ? 'Speed Bays: ' + bayWidth + '\' × ' + baySpeedDepth + '\' · Std Bays: ' + bayWidth + '\' × 50\'' : 'Speed Bay: ' + bayWidth + '\' × ' + baySpeedDepth + '\' · Std Bays: ' + bayWidth + '\' × 50\'';
   document.getElementById('bay-speed-info').textContent = speedInfo;
 }
 
@@ -4101,23 +4112,23 @@ function drawBayGrid(b) {
   var d12 = rightLen / ftToCoord;
   
   // Use stored bay config for this building, or calculate from dimensions
-  var widthBays, depthBays, bStdDepth, bSpeedDepth;
+  var widthBays, depthBays, bBayWidth, bSpeedDepth;
   if (b.id === activeBuilding) {
     // Active building: read from UI
     widthBays = parseInt(document.getElementById('bay-count-width').value) || 1;
     depthBays = parseInt(document.getElementById('bay-count-depth').value) || 1;
-    bStdDepth = bayStdDepth;
+    bBayWidth = bayWidth;
     bSpeedDepth = baySpeedDepth;
     // Store on building for when it's not active
     b._bayWidthCount = widthBays;
     b._bayDepthCount = depthBays;
-    b._bayStdDepth = bStdDepth;
+    b._bayWidth = bBayWidth;
     b._baySpeedDepth = bSpeedDepth;
   } else if (b._bayWidthCount) {
     // Use previously stored config
     widthBays = b._bayWidthCount;
     depthBays = b._bayDepthCount;
-    bStdDepth = b._bayStdDepth || 52;
+    bBayWidth = b._bayWidth || 52;
     bSpeedDepth = b._baySpeedDepth || 60;
   } else {
     // Calculate best fit from dimensions
@@ -4126,11 +4137,11 @@ function drawBayGrid(b) {
     if (!config) return;
     widthBays = config.widthBays;
     depthBays = config.depthBays;
-    bStdDepth = config.stdDepth;
+    bBayWidth = config.bayWidth;
     bSpeedDepth = config.speedDepth;
     b._bayWidthCount = widthBays;
     b._bayDepthCount = depthBays;
-    b._bayStdDepth = bStdDepth;
+    b._bayWidth = bBayWidth;
     b._baySpeedDepth = bSpeedDepth;
   }
   var isCrossDockBays = b.type === 'cross';
@@ -4182,36 +4193,36 @@ function drawBayGrid(b) {
       // Cross dock: speed bay (top) + N standard bays + speed bay (bottom)
       var topSpeedFrac = bSpeedDepth / d12;
       depthRowFracs.push(Math.min(topSpeedFrac, 1));
-      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
+      depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       // Standard bays in the middle
       for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (bSpeedDepth + j * bStdDepth) / d12;
-        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
+        var dFrac = (bSpeedDepth + j * BAY_STD_DEPTH) / d12;
+        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
         depthRowFracs.push(dFrac);
-        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
+        depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
       }
       // Bottom speed bay - from last standard bay to end
       var lastFrac = depthRowFracs[depthRowFracs.length - 1];
       if (lastFrac < 1) {
         depthRowFracs.push(1);
-        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
+        depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       }
     } else {
       // Rear load: speed bay at top only
       var speedFrac = bSpeedDepth / d12;
       depthRowFracs.push(Math.min(speedFrac, 1));
-      depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
+      depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (bSpeedDepth + j * bStdDepth) / d12;
-        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
+        var dFrac = (bSpeedDepth + j * BAY_STD_DEPTH) / d12;
+        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
         depthRowFracs.push(dFrac);
-        depthRowLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
+        depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
       }
     }
 
-    // Vertical lines (width bays) every 50 ft along top edge
+    // Vertical lines (width bays) every bayWidth ft along top edge
     for (var i = 1; i < widthBays; i++) {
-      var ft = i * BAY_WIDTH;
+      var ft = i * bBayWidth;
       var frac = ft / d01;
       if (frac > 1) break;
       var lineStart = lerpLL(verts[0], verts[1], frac);
@@ -4243,8 +4254,8 @@ function drawBayGrid(b) {
       for (var col = 0; col < widthBays; col++) {
         // Only label top row (row===0) or left column (col===0)
         if (row !== 0 && col !== 0) continue;
-        var leftFracW = (col * BAY_WIDTH) / d01;
-        var rightFracW = ((col + 1) * BAY_WIDTH) / d01;
+        var leftFracW = (col * bBayWidth) / d01;
+        var rightFracW = ((col + 1) * bBayWidth) / d01;
         if (leftFracW >= 1) break;
         if (rightFracW > 1) rightFracW = 1;
         var cellTopLeft = lerpLL(verts[0], verts[1], leftFracW);
@@ -4269,33 +4280,33 @@ function drawBayGrid(b) {
       // Cross dock: speed bay at start + standard bays + speed bay at end
       var topSpeedFrac = bSpeedDepth / d01;
       depthColFracs.push(Math.min(topSpeedFrac, 1));
-      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
+      depthColLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (bSpeedDepth + j * bStdDepth) / d01;
-        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
+        var dFrac = (bSpeedDepth + j * BAY_STD_DEPTH) / d01;
+        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
         depthColFracs.push(dFrac);
-        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
+        depthColLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
       }
       var lastFrac = depthColFracs[depthColFracs.length - 1];
       if (lastFrac < 1) {
         depthColFracs.push(1);
-        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
+        depthColLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       }
     } else {
       var speedFrac = bSpeedDepth / d01;
       depthColFracs.push(Math.min(speedFrac, 1));
-      depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
+      depthColLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
       for (var j = 1; j <= stdBays; j++) {
-        var dFrac = (bSpeedDepth + j * bStdDepth) / d01;
-        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' }); break; }
+        var dFrac = (bSpeedDepth + j * BAY_STD_DEPTH) / d01;
+        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
         depthColFracs.push(dFrac);
-        depthColLabels.push({ text: BAY_WIDTH + "'" + ' × ' + bStdDepth + "'", color: '#000' });
+        depthColLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
       }
     }
 
-    // Horizontal lines (width bays) every 50 ft along right edge
+    // Horizontal lines (width bays) every bayWidth ft along right edge
     for (var i = 1; i < widthBays; i++) {
-      var ft = i * BAY_WIDTH;
+      var ft = i * bBayWidth;
       var frac = ft / d12;
       if (frac > 1) break;
       var lineStart = lerpLL(verts[1], verts[2], frac);
@@ -4327,8 +4338,8 @@ function drawBayGrid(b) {
       for (var row = 0; row < widthBays; row++) {
         // Only label top row (row===0) or left column (col===0)
         if (row !== 0 && col !== 0) continue;
-        var topFracW = (row * BAY_WIDTH) / d12;
-        var botFracW = ((row + 1) * BAY_WIDTH) / d12;
+        var topFracW = (row * bBayWidth) / d12;
+        var botFracW = ((row + 1) * bBayWidth) / d12;
         if (topFracW >= 1) break;
         if (botFracW > 1) botFracW = 1;
         var edgeTopL = lerpLL(verts[0], verts[1], leftFracD);
@@ -4363,11 +4374,11 @@ function updateBayUIForBuilding(b) {
     var elBCD2 = document.getElementById('bay-count-depth');
     if (elBCW2) elBCW2.value = config.widthBays;
     if (elBCD2) elBCD2.value = config.depthBays;
-    bayStdDepth = config.stdDepth;
+    bayWidth = config.bayWidth;
     baySpeedDepth = config.speedDepth;
     
-    var stdBtns = document.querySelectorAll('#bay-std-depth-seg .bay-seg-btn');
-    stdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.stdDepth); });
+    var widthBtns = document.querySelectorAll('#bay-width-seg .bay-seg-btn');
+    widthBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.bayWidth); });
     var spdBtns = document.querySelectorAll('#bay-speed-depth-seg .bay-seg-btn');
     spdBtns.forEach(function(btn) { btn.classList.toggle('active', parseInt(btn.textContent) === config.speedDepth); });
   }
