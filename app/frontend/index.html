@@ -1898,8 +1898,8 @@ function drawBuildingOverlays(b) {
     addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
     curEdge = stallEdge1;
 
-    // 3. Fire lane (26') - yellow with red hash lines
-    var flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#e8d44d', 0.5, null, 'firelane', "26' Fire");
+    // 3. Fire lane (26') - grey with red hash lines
+    var flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
     addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
     curEdge = flEdge;
 
