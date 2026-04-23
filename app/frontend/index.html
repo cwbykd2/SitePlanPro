@@ -11,6 +11,23 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0d0f14;--panel:#131720;--panel2:#1a1f2e;--border:#252d40;--accent:#3b82f6;--accent2:#22d3ee;--warn:#f59e0b;--green:#10b981;--red:#ef4444;--text:#e2e8f0;--muted:#64748b;--road:#6366f1;--pond:#06b6d4}
 body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.road-width-modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center}
+.road-width-modal-overlay.active{display:flex}
+.road-width-modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:280px;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.road-width-modal h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:16px;color:var(--text)}
+.road-width-modal .width-options{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.road-width-modal .width-opt{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.15s;font-family:'DM Mono',monospace;font-size:13px;color:var(--text)}
+.road-width-modal .width-opt:hover,.road-width-modal .width-opt.selected{border-color:var(--muted);background:var(--border)}
+.road-width-modal .width-opt input[type="radio"]{accent-color:var(--muted)}
+.road-width-modal .custom-input{display:none;margin-top:8px;padding:8px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;width:100%;outline:none}
+.road-width-modal .custom-input:focus{border-color:var(--muted)}
+.road-width-modal .custom-input.visible{display:block}
+.road-width-modal .modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.road-width-modal .modal-actions button{padding:8px 18px;border-radius:6px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-size:13px;font-weight:600;transition:all 0.15s}
+.road-width-modal .btn-cancel{background:var(--panel2);color:var(--muted);border:1px solid var(--border) !important}
+.road-width-modal .btn-cancel:hover{background:var(--border)}
+.road-width-modal .btn-apply{background:#6b7280;color:#fff}
+.road-width-modal .btn-apply:hover{background:#9ca3af}
 header{display:flex;align-items:center;gap:16px;padding:0 20px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative;overflow-x:auto;overflow-y:hidden}
 header::-webkit-scrollbar{height:3px}
 header::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
@@ -252,6 +269,22 @@ select option{background:var(--panel2)}
     </div>
   </div>
   <div style="flex:1;position:relative;overflow:hidden">
+    <div id="road-width-modal" class="road-width-modal-overlay">
+      <div class="road-width-modal">
+        <h3>Road Width</h3>
+        <div class="width-options">
+          <label class="width-opt" onclick="selectRoadWidth(30)"><input type="radio" name="rw" value="30"> 30&apos;</label>
+          <label class="width-opt" onclick="selectRoadWidth(36)"><input type="radio" name="rw" value="36"> 36&apos;</label>
+          <label class="width-opt selected" onclick="selectRoadWidth(40)"><input type="radio" name="rw" value="40" checked> 40&apos;</label>
+          <label class="width-opt" onclick="selectRoadWidth(-1)"><input type="radio" name="rw" value="custom"> Custom</label>
+          <input type="number" id="road-custom-width" class="custom-input" placeholder="Enter width in feet..." min="10" max="200">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" onclick="cancelRoadWidth()">Cancel</button>
+          <button class="btn-apply" onclick="applyRoadWidth()">Apply</button>
+        </div>
+      </div>
+    </div>
     <div id="map"></div>
     <div id="status-bar">Pan and zoom freely - pick a draw tool to place elements</div>
     <div id="dim-tip"></div>
@@ -266,7 +299,9 @@ select option{background:var(--panel2)}
 var FEET_PER_METER = 3.28084;
 var currentTool = 'select';
 var buildings = [];
-var roads = [];
+var roads = []; // Each road: { centerline: L.Polyline (temp), width: number (feet), layer: L.Polygon, labelGroup: L.LayerGroup }
+var pendingRoadPolyline = null;
+var selectedRoadWidth = 40;
 var ponds = [];
 var pavings = [];
 var pavingMode = 'rect'; // 'rect' or 'free'
@@ -729,17 +764,9 @@ map.on(L.Draw.Event.CREATED, function(e) {
     setTool('select');
 
   } else if (mode === 'polyline') {
-    layer.setStyle({color:'#6366f1',weight:5,opacity:0.85});
-    drawnItems.addLayer(layer);
-    roads.push(layer);
-    layer.on('click', function() {
-      if (confirm('Delete this road?')) { drawnItems.removeLayer(layer); roads = roads.filter(function(r){return r!==layer}); recalcStats(); }
-    });
-    recalcStats();
-    checkOutOfBounds();
-    setStatus('Road added - draw another or switch tools');
-    currentTool = 'road';
-    beginDraw('polyline');
+    // Store the drawn polyline temporarily and show width modal
+    pendingRoadPolyline = layer;
+    showRoadWidthModal();
 
   } else if (mode === 'polygon') {
     layer.setStyle({color:'#06b6d4',weight:2,fillColor:'#06b6d4',fillOpacity:0.35});
@@ -1446,6 +1473,22 @@ function checkOutOfBounds() {
     } catch(e) {}
   });
 
+  // Check roads
+  roads.forEach(function(r) {
+    try {
+      if (r.isPolygon && r.layer) {
+        var rGeo = r.layer.toGeoJSON();
+        var diff = turf.difference(turf.featureCollection([rGeo, boundaryGeo]));
+        if (diff) {
+          var redLayer = L.geoJSON(diff, {
+            style: { color: '#ef4444', weight: 2, fillColor: '#ef4444', fillOpacity: 0.45, interactive: false }
+          }).addTo(map);
+          outOfBoundsLayers.push(redLayer);
+        }
+      }
+    } catch(e) {}
+  });
+
   // Check ponds
   ponds.forEach(function(p) {
     try {
@@ -1474,9 +1517,14 @@ function recalcStats() {
     b.overlayGroup.eachLayer(function(o){ pavedSF += areaSF(o); });
   });
   roads.forEach(function(r) {
-    var pts = r.getLatLngs(), len=0;
-    for (var i=0;i<pts.length-1;i++) len+=pts[i].distanceTo(pts[i+1]);
-    pavedSF += len*FEET_PER_METER*30;
+    if (r.isPolygon && r.layer) {
+      pavedSF += areaSF(r.layer);
+    } else {
+      var pts = r.centerline || (r.layer ? r.layer.getLatLngs() : []);
+      var len = 0;
+      for (var i = 0; i < pts.length - 1; i++) len += pts[i].distanceTo(pts[i + 1]);
+      pavedSF += len * FEET_PER_METER * (r.width || 30);
+    }
   });
   pavings.forEach(function(p){ pavedSF += areaSF(p.layer); });
   ponds.forEach(function(p){ pondSF += areaSF(p); });
@@ -1492,6 +1540,175 @@ function fmt(n) {
   if (n>=1e6) return (n/1e6).toFixed(2)+'M';
   if (n>=1e3) return (n/1e3).toFixed(1)+'K';
   return Math.round(n).toLocaleString();
+}
+
+/* ===== ROAD WIDTH MODAL ===== */
+
+function showRoadWidthModal() {
+  var modal = document.getElementById('road-width-modal');
+  modal.classList.add('active');
+  // Reset to default selection (40')
+  var opts = modal.querySelectorAll('.width-opt');
+  opts.forEach(function(o) { o.classList.remove('selected'); });
+  opts[2].classList.add('selected'); // 40' default
+  opts[2].querySelector('input').checked = true;
+  selectedRoadWidth = 40;
+  document.getElementById('road-custom-width').classList.remove('visible');
+  document.getElementById('road-custom-width').value = '';
+}
+
+function selectRoadWidth(val) {
+  var modal = document.getElementById('road-width-modal');
+  var opts = modal.querySelectorAll('.width-opt');
+  opts.forEach(function(o) { o.classList.remove('selected'); });
+  var customInput = document.getElementById('road-custom-width');
+  if (val === -1) {
+    opts[3].classList.add('selected');
+    customInput.classList.add('visible');
+    customInput.focus();
+    selectedRoadWidth = -1;
+  } else {
+    selectedRoadWidth = val;
+    customInput.classList.remove('visible');
+    // Find and highlight the correct option
+    for (var i = 0; i < opts.length; i++) {
+      var radio = opts[i].querySelector('input');
+      if (radio && parseInt(radio.value) === val) {
+        opts[i].classList.add('selected');
+        break;
+      }
+    }
+  }
+}
+
+function cancelRoadWidth() {
+  var modal = document.getElementById('road-width-modal');
+  modal.classList.remove('active');
+  pendingRoadPolyline = null;
+  setStatus('Road cancelled - draw another or switch tools');
+  currentTool = 'road';
+  beginDraw('polyline');
+}
+
+function applyRoadWidth() {
+  var modal = document.getElementById('road-width-modal');
+  modal.classList.remove('active');
+
+  var widthFt = selectedRoadWidth;
+  if (widthFt === -1) {
+    widthFt = parseFloat(document.getElementById('road-custom-width').value);
+    if (!widthFt || widthFt < 1) {
+      alert('Please enter a valid width');
+      modal.classList.add('active');
+      return;
+    }
+  }
+
+  if (!pendingRoadPolyline) return;
+
+  var centerlineLatLngs = pendingRoadPolyline.getLatLngs();
+  createRoadFromCenterline(centerlineLatLngs, widthFt);
+  pendingRoadPolyline = null;
+
+  recalcStats();
+  checkOutOfBounds();
+  autoSave();
+  setStatus('Road added (' + widthFt + '\' wide) - draw another or switch tools');
+  currentTool = 'road';
+  beginDraw('polyline');
+}
+
+function createRoadFromCenterline(centerlineLatLngs, widthFt) {
+  // Convert width from feet to meters, then halve for buffer radius
+  var widthMeters = widthFt / FEET_PER_METER;
+  var bufferRadius = widthMeters / 2;
+
+  // Create GeoJSON line from centerline
+  var coords = centerlineLatLngs.map(function(ll) { return [ll.lng, ll.lat]; });
+  var line = turf.lineString(coords);
+
+  // Buffer the line to create a polygon
+  var buffered = turf.buffer(line, bufferRadius / 1000, { units: 'kilometers' });
+
+  if (!buffered || !buffered.geometry) {
+    // Fallback: just add as a thin polyline
+    var fallbackLayer = L.polyline(centerlineLatLngs, { color: '#9ca3af', weight: 6, opacity: 0.85 });
+    drawnItems.addLayer(fallbackLayer);
+    var road = { centerline: centerlineLatLngs, width: widthFt, layer: fallbackLayer, labelGroup: L.layerGroup().addTo(map), isPolygon: false };
+    roads.push(road);
+    attachRoadClickHandler(road);
+    return road;
+  }
+
+  // Create Leaflet polygon from buffered GeoJSON
+  var polyCoords = buffered.geometry.coordinates[0].map(function(c) { return L.latLng(c[1], c[0]); });
+  var roadPolygon = L.polygon(polyCoords, {
+    color: '#6b7280',
+    weight: 1,
+    fillColor: '#9ca3af',
+    fillOpacity: 0.7,
+    opacity: 0.9
+  });
+  drawnItems.addLayer(roadPolygon);
+
+  // Create label group for width annotation
+  var labelGroup = L.layerGroup().addTo(map);
+  updateRoadLabels(centerlineLatLngs, widthFt, labelGroup);
+
+  var road = { centerline: centerlineLatLngs, width: widthFt, layer: roadPolygon, labelGroup: labelGroup, isPolygon: true };
+  roads.push(road);
+  attachRoadClickHandler(road);
+  return road;
+}
+
+function attachRoadClickHandler(road) {
+  road.layer.on('click', function() {
+    if (currentTool === 'select' && confirm('Delete this road?')) {
+      drawnItems.removeLayer(road.layer);
+      if (road.labelGroup) map.removeLayer(road.labelGroup);
+      roads = roads.filter(function(r) { return r !== road; });
+      recalcStats();
+      checkOutOfBounds();
+      autoSave();
+    }
+  });
+}
+
+function updateRoadLabels(centerlineLatLngs, widthFt, labelGroup) {
+  labelGroup.clearLayers();
+  if (centerlineLatLngs.length < 2) return;
+
+  // Place a width label at the midpoint of the centerline
+  var totalLen = 0;
+  var segLens = [];
+  for (var i = 0; i < centerlineLatLngs.length - 1; i++) {
+    var segLen = centerlineLatLngs[i].distanceTo(centerlineLatLngs[i + 1]);
+    segLens.push(segLen);
+    totalLen += segLen;
+  }
+
+  var halfLen = totalLen / 2;
+  var cumLen = 0;
+  for (var j = 0; j < segLens.length; j++) {
+    if (cumLen + segLens[j] >= halfLen) {
+      var ratio = (halfLen - cumLen) / segLens[j];
+      var midLat = centerlineLatLngs[j].lat + ratio * (centerlineLatLngs[j + 1].lat - centerlineLatLngs[j].lat);
+      var midLng = centerlineLatLngs[j].lng + ratio * (centerlineLatLngs[j + 1].lng - centerlineLatLngs[j].lng);
+      var lengthFt = Math.round(totalLen * FEET_PER_METER);
+      var label = L.marker([midLat, midLng], {
+        icon: L.divIcon({
+          className: 'road-dim-label',
+          html: '<span style="background:rgba(107,114,128,0.85);color:#fff;padding:2px 6px;border-radius:4px;font-family:DM Mono,monospace;font-size:11px;white-space:nowrap;">' + widthFt + '\' W × ' + lengthFt + '\' L</span>',
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
+        }),
+        interactive: false
+      });
+      labelGroup.addLayer(label);
+      break;
+    }
+    cumLen += segLens[j];
+  }
 }
 
 /* ===== BUILDING LIST ===== */
@@ -1745,7 +1962,7 @@ function clearAll() {
   clearOutOfBoundsLayers();
   siteBoundaryLocked = false;
   buildings.forEach(function(b){ drawnItems.removeLayer(b.layer); map.removeLayer(b.overlayGroup); if (b.labelGroup) map.removeLayer(b.labelGroup); });
-  roads.forEach(function(r){ drawnItems.removeLayer(r); });
+  roads.forEach(function(r){ drawnItems.removeLayer(r.layer); if (r.labelGroup) map.removeLayer(r.labelGroup); });
   ponds.forEach(function(p){ drawnItems.removeLayer(p); });
   pavings.forEach(function(p){ drawnItems.removeLayer(p.layer); if (p.labelGroup) map.removeLayer(p.labelGroup); });
   if (siteBoundary) drawnItems.removeLayer(siteBoundary);
@@ -1871,7 +2088,7 @@ function serializeSite() {
       };
     }),
     roads: roads.map(function(r) {
-      return serializeLatlngs(r.getLatLngs());
+      return { centerline: serializeLatlngs(r.centerline), width: r.width };
     }),
     ponds: ponds.map(function(p) {
       var ll = p.getLatLngs();
@@ -1898,7 +2115,7 @@ function deserializeSite(data) {
     map.removeLayer(b.overlayGroup);
     if (b.labelGroup) map.removeLayer(b.labelGroup);
   });
-  roads.forEach(function(r) { drawnItems.removeLayer(r); });
+  roads.forEach(function(r) { drawnItems.removeLayer(r.layer); if (r.labelGroup) map.removeLayer(r.labelGroup); });
   ponds.forEach(function(p) { drawnItems.removeLayer(p); });
   pavings.forEach(function(p) {
     drawnItems.removeLayer(p.layer);
@@ -1925,19 +2142,17 @@ function deserializeSite(data) {
   // Restore roads
   if (data.roads) {
     data.roads.forEach(function(rd) {
-      var lls = rd.map(function(v) { return L.latLng(v.lat, v.lng); });
-      var polyline = L.polyline(lls, { color: 'var(--road)', weight: 6, opacity: 0.85 });
-      polyline.setStyle({ color: '#6366f1', weight: 6, opacity: 0.85 });
-      drawnItems.addLayer(polyline);
-      roads.push(polyline);
-      polyline.on('click', function() {
-        if (currentTool === 'select' && confirm('Delete this road?')) {
-          drawnItems.removeLayer(polyline);
-          roads = roads.filter(function(r) { return r !== polyline; });
-          recalcStats();
-          autoSave();
-        }
-      });
+      // Support both old format (array of latlngs) and new format (object with centerline + width)
+      var lls, widthFt;
+      if (Array.isArray(rd)) {
+        // Old format: array of {lat, lng}
+        lls = rd.map(function(v) { return L.latLng(v.lat, v.lng); });
+        widthFt = 30; // legacy default
+      } else {
+        lls = rd.centerline.map(function(v) { return L.latLng(v.lat, v.lng); });
+        widthFt = rd.width || 40;
+      }
+      createRoadFromCenterline(lls, widthFt);
     });
   }
 
@@ -2175,7 +2390,7 @@ function clearAll_noConfirm() {
     map.removeLayer(b.overlayGroup);
     if (b.labelGroup) map.removeLayer(b.labelGroup);
   });
-  roads.forEach(function(r) { drawnItems.removeLayer(r); });
+  roads.forEach(function(r) { drawnItems.removeLayer(r.layer); if (r.labelGroup) map.removeLayer(r.labelGroup); });
   ponds.forEach(function(p) { drawnItems.removeLayer(p); });
   pavings.forEach(function(p) {
     drawnItems.removeLayer(p.layer);

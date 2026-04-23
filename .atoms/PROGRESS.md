@@ -38,3 +38,5 @@ Deploy the uploaded SitePlan Pro HTML application - a site planning tool with Le
 - 2026-04-22: Replaced single resize handle with independent width (blue ↔) and depth (green ↕) edge-midpoint handles for axis-specific resizing
 - 2026-04-22: Added hashed black boundary line (locked after naming), Adjust Site button, and out-of-bounds red highlighting for items outside boundary
 - 2026-04-22: Removed Transform section (rotate/scale sliders and buttons) from sidebar; kept mouse handle hint text
+- 2026-04-22: Added road width selection modal (24', 30', 40' presets + custom), road polygon rendering via Turf.js buffer, road labels, and road out-of-bounds checking
+- 2026-04-22: Fixed road cleanup in clearAll_noConfirm and all load/reset functions to use new road object structure (r.layer, r.labelGroup)
