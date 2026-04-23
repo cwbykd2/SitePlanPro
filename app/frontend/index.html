@@ -368,13 +368,6 @@ select option{background:var(--panel2)}
                 </div>
                 <!-- Cross-dock parking options: top, left, right -->
                 <div id="cross-parking-opts">
-                  <label class="checkbox-row"><input type="checkbox" id="chk-top-park-cross"> Parking on top side</label>
-                  <div id="top-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
-                    <div style="display:flex;gap:4px">
-                      <div class="bay-seg-btn active" id="park-top-double" onclick="setParkingSide('top','double')" style="flex:1;text-align:center;font-size:9px">Double (76')</div>
-                      <div class="bay-seg-btn" id="park-top-single" onclick="setParkingSide('top','single')" style="flex:1;text-align:center;font-size:9px">Single (56')</div>
-                    </div>
-                  </div>
                   <label class="checkbox-row"><input type="checkbox" id="chk-left-cross"> Parking on left side</label>
                   <div id="left-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;gap:4px">
@@ -1479,14 +1472,11 @@ function showBuildingOpts() {
   if (elTB) elTB.checked = b.trailerBottom;
   if (elTR) elTR.checked = b.trailerRear;
   // Populate per-side parking checkboxes and depth toggles
-  // Cross-dock: top, left, right
-  var elTopCross = document.getElementById('chk-top-park-cross');
+  // Cross-dock: left, right (no top parking — truck courts on top and bottom)
   var elLeftCross = document.getElementById('chk-left-cross');
   var elRightCross = document.getElementById('chk-right-cross');
-  if (elTopCross) { elTopCross.checked = b.topParking || false; document.getElementById('top-park-depth-cross').classList.toggle('hidden', !elTopCross.checked); }
   if (elLeftCross) { elLeftCross.checked = b.leftParking || false; document.getElementById('left-park-depth-cross').classList.toggle('hidden', !elLeftCross.checked); }
   if (elRightCross) { elRightCross.checked = b.rightParking || false; document.getElementById('right-park-depth-cross').classList.toggle('hidden', !elRightCross.checked); }
-  setParkingSide('top', b.parkingRowsTop || 'double');
   setParkingSide('left', b.parkingRowsLeft || 'double');
   setParkingSide('right', b.parkingRowsRight || 'double');
   // Rear-load: main, left, right
@@ -1566,7 +1556,6 @@ function setParkingSide(side, mode) {
 // Toggle depth selector visibility when parking checkbox changes
 function initParkingCheckboxes() {
   var pairs = [
-    ['chk-top-park-cross', 'top-park-depth-cross'],
     ['chk-left-cross', 'left-park-depth-cross'],
     ['chk-right-cross', 'right-park-depth-cross'],
     ['chk-left-rear', 'left-park-depth-rear'],
@@ -1592,10 +1581,9 @@ function applyBuildingOptions() {
   b.trailerRear = document.getElementById('chk-trailer-rear').checked;
   // Per-side parking: read from cross or rear UI depending on type
   if (b.type === 'cross') {
-    b.topParking = document.getElementById('chk-top-park-cross').checked;
+    b.topParking = false; // No top parking for cross-dock (truck court on top)
     b.leftParking = document.getElementById('chk-left-cross').checked;
     b.rightParking = document.getElementById('chk-right-cross').checked;
-    b.parkingRowsTop = document.getElementById('park-top-single').classList.contains('active') ? 'single' : 'double';
     b.parkingRowsLeft = document.getElementById('park-left-single').classList.contains('active') ? 'single' : 'double';
     b.parkingRowsRight = document.getElementById('park-right-single').classList.contains('active') ? 'single' : 'double';
   } else {
