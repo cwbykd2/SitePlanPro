@@ -180,9 +180,10 @@ select option{background:var(--panel2)}
 .cost-toggle-arrow.open{transform:rotate(180deg)}
 .cost-panel{display:none;flex-direction:column;gap:8px;padding-top:6px}
 .cost-panel.open{display:flex}
-.cost-clear-height-bar{display:flex;align-items:center;gap:6px;padding:4px 0}
-.cost-clear-height-bar label{margin:0;font-size:11px;color:var(--muted);white-space:nowrap}
-.cost-clear-height-bar select{flex:1}
+.cost-bldg-height-row{display:flex;align-items:center;gap:6px;margin-top:4px}
+.cost-bldg-height-row label{margin:0;font-size:10px;color:var(--muted);white-space:nowrap}
+.cost-bldg-height-row select{background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:10px;padding:3px 4px;border-radius:4px;outline:none;flex:1}
+.cost-bldg-height-row select:focus{border-color:var(--accent)}
 .cost-building-item{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
 .cost-building-item .cost-bldg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .cost-building-item .cost-bldg-name{font-size:11px;font-weight:600;color:var(--text)}
@@ -370,14 +371,6 @@ select option{background:var(--panel2)}
           <span class="cost-toggle-arrow" id="cost-arrow">▼</span>
         </div>
         <div class="cost-panel" id="cost-panel">
-          <div class="cost-clear-height-bar">
-            <label>Clear Height:</label>
-            <select id="cost-clear-height" onchange="recalcBuildingCosts()">
-              <option value="32">32' Clear Height</option>
-              <option value="36">36' Clear Height</option>
-              <option value="40" selected>40' Clear Height</option>
-            </select>
-          </div>
           <div id="cost-building-list">
             <div class="cost-no-buildings">No buildings placed yet</div>
           </div>
@@ -1091,6 +1084,7 @@ function registerBuilding(layer, verts) {
     tcInsetTopRight: 0,
     tcInsetBottomLeft: 0,
     tcInsetBottomRight: 0,
+    clearHeight: '40',
     rotation: 0,
     scale: 100
   };
@@ -2653,19 +2647,20 @@ function exportPDF() {
 
     // --- Building Cost Estimator Summary ---
     if (buildings.length > 0) {
-      var clearHeight = document.getElementById('cost-clear-height').value;
       var costItems = [];
       var costGrandTotal = 0;
       buildings.forEach(function(b, i) {
-        var bldgSF = Math.round(areaSF(b.layer));
-        var match = lookupCostPerSF(bldgSF, clearHeight);
-        var total = bldgSF * match.costPerSF;
+        var ch = b.clearHeight || '40';
+        var bSF = Math.round(areaSF(b.layer));
+        var match = lookupCostPerSF(bSF, ch);
+        var total = bSF * match.costPerSF;
         costGrandTotal += total;
         costItems.push({
           name: 'Building ' + (i + 1) + ' (' + (b.type === 'cross' ? 'Cross Dock' : 'Rear Load') + ')',
-          sf: bldgSF,
+          sf: bSF,
           rate: match.costPerSF,
           matchedSF: match.sf,
+          clearHeight: ch,
           total: total
         });
       });
@@ -2691,10 +2686,6 @@ function exportPDF() {
       pdf.setFontSize(10);
       pdf.setTextColor(245, 158, 11);
       pdf.text('Building Cost Estimator', 15, costY + 7);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8);
-      pdf.setTextColor(160, 160, 180);
-      pdf.text(clearHeight + "' Clear Height", 70, costY + 7);
 
       // Grand total on right
       pdf.setFont('helvetica', 'bold');
@@ -2707,15 +2698,16 @@ function exportPDF() {
       pdf.line(15, costY + 10, pageW - 15, costY + 10);
 
       // Column headers
-      var colX = [15, 90, 140, 185, pageW - 15];
+      var colX = [15, 80, 120, 155, 190, pageW - 15];
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7);
       pdf.setTextColor(120, 120, 140);
       pdf.text('Building', colX[0], costY + 16);
-      pdf.text('Size (SF)', colX[1], costY + 16);
-      pdf.text('Matched SF', colX[2], costY + 16);
-      pdf.text('Rate', colX[3], costY + 16);
-      pdf.text('Cost', colX[4], costY + 16, { align: 'right' });
+      pdf.text('Clear Ht', colX[1], costY + 16);
+      pdf.text('Size (SF)', colX[2], costY + 16);
+      pdf.text('Matched SF', colX[3], costY + 16);
+      pdf.text('Rate', colX[4], costY + 16);
+      pdf.text('Cost', colX[5], costY + 16, { align: 'right' });
 
       // Rows
       costItems.forEach(function(item, idx) {
@@ -2725,12 +2717,13 @@ function exportPDF() {
         pdf.setTextColor(220, 220, 230);
         pdf.text(item.name, colX[0], rowY);
         pdf.setTextColor(180, 180, 200);
-        pdf.text(fmt(item.sf), colX[1], rowY);
-        pdf.text(fmt(item.matchedSF), colX[2], rowY);
-        pdf.text('$' + item.rate.toFixed(2) + '/SF', colX[3], rowY);
+        pdf.text(item.clearHeight + "'", colX[1], rowY);
+        pdf.text(fmt(item.sf), colX[2], rowY);
+        pdf.text(fmt(item.matchedSF), colX[3], rowY);
+        pdf.text('$' + item.rate.toFixed(2) + '/SF', colX[4], rowY);
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(255, 255, 255);
-        pdf.text('$' + formatCurrency(item.total), colX[4], rowY, { align: 'right' });
+        pdf.text('$' + formatCurrency(item.total), colX[5], rowY, { align: 'right' });
       });
 
       // Total bar
@@ -2909,6 +2902,7 @@ function serializeSite() {
         tcInsetTopRight: b.tcInsetTopRight || 0,
         tcInsetBottomLeft: b.tcInsetBottomLeft || 0,
         tcInsetBottomRight: b.tcInsetBottomRight || 0,
+        clearHeight: b.clearHeight || '40',
         rotation: b.rotation,
         scale: b.scale
       };
@@ -2928,8 +2922,7 @@ function serializeSite() {
       };
     }),
     siteBoundary: siteBoundary ? serializeLatlngs(siteBoundary.getLatLngs()[0] || siteBoundary.getLatLngs()) : null,
-    fees: getFeeData(),
-    clearHeight: document.getElementById('cost-clear-height').value
+    fees: getFeeData()
   };
   return data;
 }
@@ -3065,6 +3058,7 @@ function deserializeSite(data) {
         tcInsetTopRight: bd.tcInsetTopRight || 0,
         tcInsetBottomLeft: bd.tcInsetBottomLeft || 0,
         tcInsetBottomRight: bd.tcInsetBottomRight || 0,
+        clearHeight: bd.clearHeight || '40',
         rotation: bd.rotation || 0,
         scale: bd.scale || 100,
         labelGroup: null
@@ -3080,10 +3074,6 @@ function deserializeSite(data) {
   updateBuildingList();
   recalcStats();
   updateSiteButtons();
-  // Restore clear height
-  if (data.clearHeight) {
-    document.getElementById('cost-clear-height').value = data.clearHeight;
-  }
   // Restore fee data
   if (data.fees) {
     restoreFeeData(data.fees);
@@ -3163,8 +3153,16 @@ function toggleCostPanel() {
   arrow.classList.toggle('open');
 }
 
+function onBuildingClearHeightChange(bldgId, selectEl) {
+  var b = buildings.find(function(x) { return x.id == bldgId; });
+  if (b) {
+    b.clearHeight = selectEl.value;
+    recalcBuildingCosts();
+    autoSave();
+  }
+}
+
 function recalcBuildingCosts() {
-  var clearHeight = document.getElementById('cost-clear-height').value;
   var listEl = document.getElementById('cost-building-list');
   var grandTotalEl = document.getElementById('cost-grand-total');
 
@@ -3178,9 +3176,10 @@ function recalcBuildingCosts() {
   var html = '';
 
   buildings.forEach(function(b, i) {
+    var ch = b.clearHeight || '40';
     var bldgSF = areaSF(b.layer);
     var roundedSF = Math.round(bldgSF);
-    var match = lookupCostPerSF(roundedSF, clearHeight);
+    var match = lookupCostPerSF(roundedSF, ch);
     var costPerSF = match.costPerSF;
     var matchedSF = match.sf;
     var totalCost = roundedSF * costPerSF;
@@ -3193,6 +3192,14 @@ function recalcBuildingCosts() {
       + '<div class="cost-bldg-header">'
       + '<span class="cost-bldg-name" style="color:' + color + '">Building ' + (i + 1) + ' — ' + label + '</span>'
       + '<span class="cost-bldg-total">$' + formatCurrency(totalCost) + '</span>'
+      + '</div>'
+      + '<div class="cost-bldg-height-row">'
+      + '<label>Clear Height:</label>'
+      + '<select onchange="onBuildingClearHeightChange(' + b.id + ', this)">'
+      + '<option value="32"' + (ch === '32' ? ' selected' : '') + ">32'</option>"
+      + '<option value="36"' + (ch === '36' ? ' selected' : '') + ">36'</option>"
+      + '<option value="40"' + (ch === '40' ? ' selected' : '') + ">40'</option>"
+      + '</select>'
       + '</div>'
       + '<div class="cost-bldg-details">'
       + 'Size: <span>' + fmt(roundedSF) + ' SF</span> · '
