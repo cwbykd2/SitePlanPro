@@ -2433,8 +2433,8 @@ function registerPaving(layer, isRect) {
   // Setup drag & select interaction
   setupPavingDrag(paving);
 
-  updatePavingLabels(paving);
   updatePavingCarParkOverlays(paving);
+  updatePavingLabels(paving);
   recalcStats();
   checkOutOfBounds();
   var typeLabel = pType === 'carparking' ? 'Car Parking' : pType === 'trailer' ? 'Trailer Parking' : 'Paving';
@@ -2445,8 +2445,23 @@ function updatePavingLabels(p) {
   p.labelGroup.clearLayers();
   var verts = p.vertices;
   var center = getPolygonCenter(verts);
-  var typeLabel = p.pavingType === 'carparking' ? 'Car Pkg' : p.pavingType === 'trailer' ? 'Trailer' : '';
   var pavLabelStyle = 'color:#000;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 -1px 0 #fff,0 1px 0 #fff,-1px 0 0 #fff,1px 0 0 #fff';
+
+  // Car parking: show only the stall count number, no other labels
+  if (p.pavingType === 'carparking') {
+    var stallCount = p.stallCount || 0;
+    if (stallCount > 0) {
+      var stallIcon = L.divIcon({
+        className: 'bldg-label',
+        html: '<div class="bldg-label-sf" style="' + pavLabelStyle + ';font-size:14px;font-weight:700;">' + stallCount + '</div>',
+        iconSize: [80, 24], iconAnchor: [40, 12]
+      });
+      L.marker(center, {icon: stallIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
+    }
+    return;
+  }
+
+  var typeLabel = p.pavingType === 'trailer' ? 'Trailer' : '';
 
   if (p.isRect && verts.length >= 4) {
     var dims = getBuildingDimensions(verts);
@@ -2517,8 +2532,8 @@ function deletePaving(id) {
 function updatePavingPolygon(p, newVerts) {
   p.vertices = newVerts.map(function(v) { return L.latLng(v.lat, v.lng); });
   p.layer.setLatLngs([p.vertices]);
-  updatePavingLabels(p);
   updatePavingCarParkOverlays(p);
+  updatePavingLabels(p);
 }
 
 function selectPaving(id) {
@@ -4059,8 +4074,8 @@ function deserializeSite(data) {
       };
       pavings.push(paving);
       setupPavingDrag(paving);
-      updatePavingLabels(paving);
       updatePavingCarParkOverlays(paving);
+      updatePavingLabels(paving);
     });
   }
 
