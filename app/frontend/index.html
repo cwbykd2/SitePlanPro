@@ -1906,8 +1906,9 @@ function drawBuildingOverlays(b) {
     function drawStrip(startP1, startP2, depth, color, opacity, strokeDash, overlayType, labelText) {
       var farP1 = offsetPt(startP1, dirAlongFt * depth, dirPerpFt * depth);
       var farP2 = offsetPt(startP2, dirAlongFt * depth, dirPerpFt * depth);
+      var stripBorderColor = (overlayType === 'firelane') ? '#cc0000' : '#000000';
       var poly = L.polygon([startP1, startP2, farP2, farP1], {
-        color: '#000000', weight: 1, fillColor: color, fillOpacity: opacity, interactive: false,
+        color: stripBorderColor, weight: 1, fillColor: color, fillOpacity: opacity, interactive: false,
         dashArray: strokeDash || null
       });
       poly._overlayType = overlayType;
@@ -1952,34 +1953,7 @@ function drawBuildingOverlays(b) {
 
     // Helper to add diagonal hash lines inside a fire lane strip
     function addFireLaneHash(startP1, startP2, depth, dirAF, dirPF) {
-      var dxEdge = (startP2.lng - startP1.lng);
-      var dyEdge = (startP2.lat - startP1.lat);
-      var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
-      var spacingFt = 12;
-      var spacingCoord = spacingFt * ftToCoord;
-      var numLines = Math.floor(edgeLenCoord / spacingCoord);
-      if (numLines < 1) return;
-
-      for (var i = 0; i <= numLines; i++) {
-        var frac = i / Math.max(numLines, 1);
-        var basePt = L.latLng(
-          startP1.lat + dyEdge * frac,
-          startP1.lng + dxEdge * frac
-        );
-        var farPt = offsetPt(basePt, dirAF * depth, dirPF * depth);
-        // Shift the far point along the edge to create diagonal
-        var shiftFrac = Math.min(frac + 0.5 / Math.max(numLines, 1), 1.0);
-        // Use a fixed diagonal offset
-        var diagOffsetCoord = depth * 0.4 * ftToCoord;
-        var farPtShifted = L.latLng(
-          farPt.lat + dyEdge * (diagOffsetCoord / Math.max(edgeLenCoord, 0.0001)),
-          farPt.lng + dxEdge * (diagOffsetCoord / Math.max(edgeLenCoord, 0.0001))
-        );
-        var line = L.polyline([basePt, farPtShifted], {
-          color: '#cc0000', weight: 1.2, opacity: 0.5, interactive: false
-        });
-        line.addTo(b.overlayGroup);
-      }
+      // Hash marks removed - fire lane uses solid red border instead
     }
 
     var curEdge;
@@ -2329,8 +2303,9 @@ function updatePavingCarParkOverlays(p) {
   function drawStrip(startP1, startP2, depth, color, opacity, strokeDash, overlayType) {
     var farP1 = offsetPt(startP1, 0, depth);
     var farP2 = offsetPt(startP2, 0, depth);
+    var stripBorderColor = (overlayType === 'firelane') ? '#cc0000' : '#000000';
     var poly = L.polygon([startP1, startP2, farP2, farP1], {
-      color: '#000000', weight: 1, fillColor: color, fillOpacity: opacity, interactive: false,
+      color: stripBorderColor, weight: 1, fillColor: color, fillOpacity: opacity, interactive: false,
       dashArray: strokeDash || null
     });
     poly._overlayType = overlayType;
@@ -2363,30 +2338,7 @@ function updatePavingCarParkOverlays(p) {
 
   // Diagonal hash lines inside a fire lane strip
   function addFireLaneHash(startP1, startP2, depth) {
-    var dxEdge = (startP2.lng - startP1.lng);
-    var dyEdge = (startP2.lat - startP1.lat);
-    var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
-    var spacingFt = 12;
-    var spacingCoord = spacingFt * ftToCoord;
-    var numLines = Math.floor(edgeLenCoord / spacingCoord);
-    if (numLines < 1) return;
-    for (var i = 0; i <= numLines; i++) {
-      var frac = i / Math.max(numLines, 1);
-      var basePt = L.latLng(
-        startP1.lat + dyEdge * frac,
-        startP1.lng + dxEdge * frac
-      );
-      var farPt = offsetPt(basePt, 0, depth);
-      var diagOffsetCoord = depth * 0.4 * ftToCoord;
-      var farPtShifted = L.latLng(
-        farPt.lat + dyEdge * (diagOffsetCoord / Math.max(edgeLenCoord, 0.0001)),
-        farPt.lng + dxEdge * (diagOffsetCoord / Math.max(edgeLenCoord, 0.0001))
-      );
-      var line = L.polyline([basePt, farPtShifted], {
-        color: '#cc0000', weight: 1.2, opacity: 0.5, interactive: false
-      });
-      line.addTo(p.overlayGroup);
-    }
+    // Hash marks removed - fire lane uses solid red border instead
   }
 
   // Fill the paving depth with repeating pattern:
