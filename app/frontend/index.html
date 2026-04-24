@@ -2453,7 +2453,7 @@ function updatePavingLabels(p) {
     if (stallCount > 0) {
       var stallIcon = L.divIcon({
         className: 'bldg-label',
-        html: '<div class="bldg-label-sf" style="' + pavLabelStyle + ';font-size:14px;font-weight:700;">' + stallCount + '</div>',
+        html: '<div class="bldg-label-sf" style="' + pavLabelStyle + ';font-size:7px;font-weight:700;">' + stallCount + '</div>',
         iconSize: [80, 24], iconAnchor: [40, 12]
       });
       L.marker(center, {icon: stallIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
