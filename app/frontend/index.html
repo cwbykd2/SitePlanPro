@@ -2260,6 +2260,174 @@ function beginPavingDraw() {
   }
 }
 
+/* ===== PAVING CAR PARK OVERLAY PATTERN ===== */
+function updatePavingCarParkOverlays(p) {
+  // Clear existing overlays
+  if (p.overlayGroup) p.overlayGroup.clearLayers();
+  else { p.overlayGroup = L.featureGroup().addTo(map); }
+
+  // Only draw pattern for rectangular car parking pavings
+  if (p.pavingType !== 'carparking' || !p.isRect || !p.vertices || p.vertices.length < 4) return;
+
+  var v = p.vertices;
+  var center = getPolygonCenter(v);
+  var latScale = Math.cos(center.lat * Math.PI / 180);
+  var ftToCoord = 1 / (111320 * FEET_PER_METER);
+
+  // Edge vectors
+  var topDx = (v[1].lng - v[0].lng) * latScale;
+  var topDy = v[1].lat - v[0].lat;
+  var topLen = Math.sqrt(topDx * topDx + topDy * topDy);
+
+  var rightDx = (v[2].lng - v[1].lng) * latScale;
+  var rightDy = v[2].lat - v[1].lat;
+  var rightLen = Math.sqrt(rightDx * rightDx + rightDy * rightDy);
+
+  if (topLen === 0 || rightLen === 0) return;
+
+  // Unit vectors
+  var uTopX = topDx / topLen;
+  var uTopY = topDy / topLen;
+  var uRightX = rightDx / rightLen;
+  var uRightY = rightDy / rightLen;
+
+  // Edge lengths in feet
+  var topFt = topLen / ftToCoord;
+  var rightFt = rightLen / ftToCoord;
+
+  // Determine which edge is "width" (longer) and which is "depth" (shorter)
+  // We'll stack strips along the shorter dimension (depth direction)
+  var depthFt, widthEdge;
+  var baseP1, baseP2, dirAlongFt, dirPerpFt;
+
+  if (topFt >= rightFt) {
+    // Top/bottom edges are wider; stack strips along right edge direction
+    depthFt = rightFt;
+    baseP1 = v[0]; baseP2 = v[1];
+    dirAlongFt = 0; dirPerpFt = 1; // along right edge direction
+  } else {
+    // Left/right edges are wider; stack strips along top edge direction
+    depthFt = topFt;
+    baseP1 = v[0]; baseP2 = v[3];
+    dirAlongFt = 1; dirPerpFt = 0; // along top edge direction (but we need to redefine for this case)
+    // Swap unit vectors for this orientation
+    var tmpUX = uTopX, tmpUY = uTopY;
+    uTopX = uRightX; uTopY = uRightY;
+    uRightX = tmpUX; uRightY = tmpUY;
+  }
+
+  function offsetPt(pt, alongFt, perpFt) {
+    var along = alongFt * ftToCoord;
+    var perp = perpFt * ftToCoord;
+    return L.latLng(
+      pt.lat + uTopY * along + uRightY * perp,
+      pt.lng + (uTopX * along + uRightX * perp) / latScale
+    );
+  }
+
+  // Draw a strip and return far edge points
+  function drawStrip(startP1, startP2, depth, color, opacity, strokeDash, overlayType) {
+    var farP1 = offsetPt(startP1, 0, depth);
+    var farP2 = offsetPt(startP2, 0, depth);
+    var poly = L.polygon([startP1, startP2, farP2, farP1], {
+      color: '#000000', weight: 1, fillColor: color, fillOpacity: opacity, interactive: false,
+      dashArray: strokeDash || null
+    });
+    poly._overlayType = overlayType;
+    poly.addTo(p.overlayGroup);
+    return { p1: farP1, p2: farP2 };
+  }
+
+  // Stall lines inside a car stall strip
+  function addStallLines(startP1, startP2, depth) {
+    var dxEdge = (startP2.lng - startP1.lng);
+    var dyEdge = (startP2.lat - startP1.lat);
+    var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
+    var stallWidthFt = 9;
+    var stallWidthCoord = stallWidthFt * ftToCoord;
+    var numStalls = Math.floor(edgeLenCoord / stallWidthCoord);
+    if (numStalls < 1) return;
+    for (var i = 1; i < numStalls; i++) {
+      var frac = i / numStalls;
+      var linePt = L.latLng(
+        startP1.lat + dyEdge * frac,
+        startP1.lng + dxEdge * frac
+      );
+      var linePtFar = offsetPt(linePt, 0, depth);
+      var line = L.polyline([linePt, linePtFar], {
+        color: '#ffffff', weight: 0.8, opacity: 0.6, interactive: false, dashArray: '2,2'
+      });
+      line.addTo(p.overlayGroup);
+    }
+  }
+
+  // Diagonal hash lines inside a fire lane strip
+  function addFireLaneHash(startP1, startP2, depth) {
+    var dxEdge = (startP2.lng - startP1.lng);
+    var dyEdge = (startP2.lat - startP1.lat);
+    var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
+    var spacingFt = 12;
+    var spacingCoord = spacingFt * ftToCoord;
+    var numLines = Math.floor(edgeLenCoord / spacingCoord);
+    if (numLines < 1) return;
+    for (var i = 0; i <= numLines; i++) {
+      var frac = i / Math.max(numLines, 1);
+      var basePt = L.latLng(
+        startP1.lat + dyEdge * frac,
+        startP1.lng + dxEdge * frac
+      );
+      var farPt = offsetPt(basePt, 0, depth);
+      var diagOffsetCoord = depth * 0.4 * ftToCoord;
+      var farPtShifted = L.latLng(
+        farPt.lat + dyEdge * (diagOffsetCoord / Math.max(edgeLenCoord, 0.0001)),
+        farPt.lng + dxEdge * (diagOffsetCoord / Math.max(edgeLenCoord, 0.0001))
+      );
+      var line = L.polyline([basePt, farPtShifted], {
+        color: '#cc0000', weight: 1.2, opacity: 0.5, interactive: false
+      });
+      line.addTo(p.overlayGroup);
+    }
+  }
+
+  // Fill the paving depth with repeating pattern:
+  // 20' stalls → 26' fire lane → 20' stalls → 0.5' curb → (repeat)
+  var STALL = 20, FIRELANE = 26, CURB = 0.5;
+  var curP1 = baseP1, curP2 = baseP2;
+  var usedDepth = 0;
+  var stripIndex = 0; // 0=stall, 1=firelane, 2=stall, 3=curb, then repeat
+
+  while (usedDepth < depthFt - 1) {
+    var stripType, stripDepth, stripColor, stripOpacity, stripDash;
+    var phase = stripIndex % 4;
+    if (phase === 0 || phase === 2) {
+      stripType = 'carstall'; stripDepth = STALL; stripColor = '#a0a0a0'; stripOpacity = 0.5; stripDash = '5,3';
+    } else if (phase === 1) {
+      stripType = 'firelane'; stripDepth = FIRELANE; stripColor = '#a0a0a0'; stripOpacity = 0.5; stripDash = null;
+    } else {
+      stripType = 'curb'; stripDepth = CURB; stripColor = '#555555'; stripOpacity = 0.8; stripDash = null;
+    }
+
+    // Clamp to remaining depth
+    var remaining = depthFt - usedDepth;
+    if (stripDepth > remaining) stripDepth = remaining;
+    if (stripDepth < 0.5 && stripType !== 'curb') break;
+
+    var edge = drawStrip(curP1, curP2, stripDepth, stripColor, stripOpacity, stripDash, stripType);
+
+    // Add detail lines
+    if (stripType === 'carstall' && stripDepth >= STALL * 0.8) {
+      addStallLines(curP1, curP2, stripDepth);
+    } else if (stripType === 'firelane' && stripDepth >= FIRELANE * 0.8) {
+      addFireLaneHash(curP1, curP2, stripDepth);
+    }
+
+    curP1 = edge.p1;
+    curP2 = edge.p2;
+    usedDepth += stripDepth;
+    stripIndex++;
+  }
+}
+
 function registerPaving(layer, isRect) {
   var id = Date.now();
   var pType = currentPavingType;
@@ -2286,7 +2454,8 @@ function registerPaving(layer, isRect) {
     rotation: 0,
     isRect: isRect,
     pavingType: pType,
-    labelGroup: L.featureGroup().addTo(map)
+    labelGroup: L.featureGroup().addTo(map),
+    overlayGroup: L.featureGroup().addTo(map)
   };
   pavings.push(paving);
 
@@ -2294,6 +2463,7 @@ function registerPaving(layer, isRect) {
   setupPavingDrag(paving);
 
   updatePavingLabels(paving);
+  updatePavingCarParkOverlays(paving);
   recalcStats();
   checkOutOfBounds();
   var typeLabel = pType === 'carparking' ? 'Car Parking' : pType === 'trailer' ? 'Trailer Parking' : 'Paving';
@@ -2364,6 +2534,7 @@ function deletePaving(id) {
   if (!p) return;
   drawnItems.removeLayer(p.layer);
   if (p.labelGroup) map.removeLayer(p.labelGroup);
+  if (p.overlayGroup) map.removeLayer(p.overlayGroup);
   pavings = pavings.filter(function(x) { return x.id !== id; });
   if (selectedPaving === id) { selectedPaving = null; hidePavingHandles(); }
   recalcStats();
@@ -2376,6 +2547,7 @@ function updatePavingPolygon(p, newVerts) {
   p.vertices = newVerts.map(function(v) { return L.latLng(v.lat, v.lng); });
   p.layer.setLatLngs([p.vertices]);
   updatePavingLabels(p);
+  updatePavingCarParkOverlays(p);
 }
 
 function selectPaving(id) {
@@ -3866,11 +4038,13 @@ function deserializeSite(data) {
         rotation: pd.rotation || 0,
         isRect: pd.isRect,
         pavingType: pType,
-        labelGroup: L.featureGroup().addTo(map)
+        labelGroup: L.featureGroup().addTo(map),
+        overlayGroup: L.featureGroup().addTo(map)
       };
       pavings.push(paving);
       setupPavingDrag(paving);
       updatePavingLabels(paving);
+      updatePavingCarParkOverlays(paving);
     });
   }
 
