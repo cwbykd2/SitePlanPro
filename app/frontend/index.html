@@ -2329,6 +2329,7 @@ function updatePavingCarParkOverlays(p) {
   }
 
   // Stall lines inside a car stall strip
+  // Returns the number of stalls in this row
   function addStallLines(startP1, startP2, depth) {
     var dxEdge = (startP2.lng - startP1.lng);
     var dyEdge = (startP2.lat - startP1.lat);
@@ -2336,7 +2337,7 @@ function updatePavingCarParkOverlays(p) {
     var stallWidthFt = 9;
     var stallWidthCoord = stallWidthFt * ftToCoord;
     var numStalls = Math.floor(edgeLenCoord / stallWidthCoord);
-    if (numStalls < 1) return;
+    if (numStalls < 1) return 0;
     for (var i = 1; i < numStalls; i++) {
       var frac = i / numStalls;
       var linePt = L.latLng(
@@ -2349,6 +2350,7 @@ function updatePavingCarParkOverlays(p) {
       });
       line.addTo(p.overlayGroup);
     }
+    return numStalls;
   }
 
   // Diagonal hash lines inside a fire lane strip
@@ -2362,6 +2364,7 @@ function updatePavingCarParkOverlays(p) {
   var curP1 = baseP1, curP2 = baseP2;
   var usedDepth = 0;
   var stripIndex = 0; // 0=stall, 1=firelane, 2=stall, 3=curb, then repeat
+  var pavingStallCount = 0;
 
   while (usedDepth < depthFt - 1) {
     var stripType, stripDepth, stripColor, stripOpacity, stripDash;
@@ -2383,7 +2386,7 @@ function updatePavingCarParkOverlays(p) {
 
     // Add detail lines
     if (stripType === 'carstall' && stripDepth >= STALL * 0.8) {
-      addStallLines(curP1, curP2, stripDepth);
+      pavingStallCount += addStallLines(curP1, curP2, stripDepth);
     } else if (stripType === 'firelane' && stripDepth >= FIRELANE * 0.8) {
       addFireLaneHash(curP1, curP2, stripDepth);
     }
@@ -2393,6 +2396,7 @@ function updatePavingCarParkOverlays(p) {
     usedDepth += stripDepth;
     stripIndex++;
   }
+  p.stallCount = pavingStallCount;
 }
 
 function registerPaving(layer, isRect) {
@@ -3145,6 +3149,32 @@ function recalcStats() {
         + '</div>';
     }
   });
+  // Additional Parking from paving tab car parking areas
+  var additionalStalls = 0;
+  var additionalCount = 0;
+  pavings.forEach(function(pv) {
+    if (pv.pavingType === 'carparking' && pv.isRect && (pv.stallCount || 0) > 0) {
+      additionalStalls += pv.stallCount;
+      additionalCount++;
+    }
+  });
+  if (additionalCount > 0) {
+    if (carparksHtml.length > 0) {
+      carparksHtml += '<div style="border-top:1px solid var(--border);margin:4px 0;"></div>';
+    }
+    carparksHtml += '<div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;margin-top:2px;">Additional Parking</div>';
+    var apIdx = 0;
+    pavings.forEach(function(pv) {
+      if (pv.pavingType === 'carparking' && pv.isRect && (pv.stallCount || 0) > 0) {
+        apIdx++;
+        carparksHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;">'
+          + '<span style="color:#b0b0b0;">Lot ' + apIdx + '</span>'
+          + '<span style="color:#fff;font-family:\'DM Mono\',monospace;">' + pv.stallCount.toLocaleString() + ' stalls</span>'
+          + '</div>';
+      }
+    });
+    totalStalls += additionalStalls;
+  }
   carparksListEl.innerHTML = carparksHtml;
   document.getElementById('stat-totalstalls').textContent = totalStalls.toLocaleString() + ' stalls';
   carparksEl.style.display = totalStalls > 0 ? 'block' : 'none';
