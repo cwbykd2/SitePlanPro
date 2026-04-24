@@ -2304,15 +2304,15 @@ function updatePavingLabels(p) {
   p.labelGroup.clearLayers();
   var verts = p.vertices;
   var center = getPolygonCenter(verts);
-  var c = getPavingColor(p.pavingType || 'other');
   var typeLabel = p.pavingType === 'carparking' ? 'Car Pkg' : p.pavingType === 'trailer' ? 'Trailer' : '';
+  var pavLabelStyle = 'color:#000;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 -1px 0 #fff,0 1px 0 #fff,-1px 0 0 #fff,1px 0 0 #fff';
 
   if (p.isRect && verts.length >= 4) {
     var dims = getBuildingDimensions(verts);
     var sfText = dims.sf >= 1e6 ? (dims.sf / 1e6).toFixed(2) + 'M SF' :
                  dims.sf >= 1e3 ? (dims.sf / 1e3).toFixed(1) + 'K SF' :
                  Math.round(dims.sf).toLocaleString() + ' SF';
-    var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="color:' + c + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="color:' + c + '">' + sfText + '</div>';
+    var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + sfText + '</div>';
 
     var sfIcon = L.divIcon({
       className: 'bldg-label',
@@ -2333,14 +2333,14 @@ function updatePavingLabels(p) {
 
     var wIcon = L.divIcon({
       className: 'bldg-label',
-      html: '<div class="bldg-label-dim" style="color:' + c + '">' + dims.width + ' ft</div>',
+      html: '<div class="bldg-label-dim" style="' + pavLabelStyle + '">' + dims.width + ' ft</div>',
       iconSize: [80, 16], iconAnchor: [40, 8]
     });
     L.marker(widthMid, {icon: wIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
 
     var dIcon = L.divIcon({
       className: 'bldg-label',
-      html: '<div class="bldg-label-dim" style="color:' + c + '">' + dims.depth + ' ft</div>',
+      html: '<div class="bldg-label-dim" style="' + pavLabelStyle + '">' + dims.depth + ' ft</div>',
       iconSize: [80, 16], iconAnchor: [40, 8]
     });
     L.marker(depthMid, {icon: dIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
@@ -2349,7 +2349,7 @@ function updatePavingLabels(p) {
     var sfText = sf >= 1e6 ? (sf / 1e6).toFixed(2) + 'M SF' :
                  sf >= 1e3 ? (sf / 1e3).toFixed(1) + 'K SF' :
                  Math.round(sf).toLocaleString() + ' SF';
-    var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="color:' + c + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="color:' + c + '">' + sfText + '</div>';
+    var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + sfText + '</div>';
     var sfIcon = L.divIcon({
       className: 'bldg-label',
       html: labelHtml,
