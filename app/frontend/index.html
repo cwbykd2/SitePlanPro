@@ -516,6 +516,14 @@ select option{background:var(--panel2)}
           <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;"><span style="color:#a78bfa;">Road</span><span style="color:#fff;font-family:'DM Mono',monospace;" id="stat-road">0 SF</span></div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;"><span style="color:#10b981;">Paving</span><span style="color:#fff;font-family:'DM Mono',monospace;" id="stat-pavingarea">0 SF</span></div>
         </div>
+        <div class="stats-breakdown" id="stats-carparks" style="display:none;margin-top:6px;padding:6px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:11px;">
+          <div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Car Parks</div>
+          <div id="carparks-list"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 2px 0;border-top:1px solid var(--border);margin-top:4px;">
+            <span style="color:#60a5fa;font-weight:600;">Total</span>
+            <span style="color:#60a5fa;font-family:'DM Mono',monospace;font-weight:600;" id="stat-totalstalls">0</span>
+          </div>
+        </div>
       </div>
 
       <!-- Building Cost Estimator -->
@@ -1750,6 +1758,7 @@ function applyBuildingOptions() {
 
 function drawBuildingOverlays(b) {
   b.overlayGroup.clearLayers();
+  b.stallCount = 0;
   if (!b.vertices || b.vertices.length < 4) return;
 
   // Work directly with the ACTUAL building vertices (already transformed)
@@ -1927,6 +1936,7 @@ function drawBuildingOverlays(b) {
     }
 
     // Helper to add stall line markers inside a car stall strip
+    // Returns the number of stalls in this row
     function addStallLines(startP1, startP2, depth, dirAF, dirPF) {
       // Draw perpendicular lines at regular intervals along the edge
       var dxEdge = (startP2.lng - startP1.lng);
@@ -1935,7 +1945,7 @@ function drawBuildingOverlays(b) {
       var stallWidthFt = 9; // standard stall width
       var stallWidthCoord = stallWidthFt * ftToCoord;
       var numStalls = Math.floor(edgeLenCoord / stallWidthCoord);
-      if (numStalls < 1) return;
+      if (numStalls < 1) return 0;
 
       for (var i = 1; i < numStalls; i++) {
         var frac = i / numStalls;
@@ -1949,6 +1959,7 @@ function drawBuildingOverlays(b) {
         });
         line.addTo(b.overlayGroup);
       }
+      return numStalls;
     }
 
     // Helper to add diagonal hash lines inside a fire lane strip
@@ -1961,9 +1972,11 @@ function drawBuildingOverlays(b) {
     // 1. Sidewalk (10') - light tan, dotted border
     curEdge = drawStrip(ep1, ep2, SIDEWALK, '#d4c9a8', 0.6, '3,3', 'sidewalk', "10' SW");
 
+    var zoneStallCount = 0;
+
     // 2. First row of car stalls (20')
     var stallEdge1 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-    addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+    zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
     curEdge = stallEdge1;
 
     // 3. First fire lane (26')
@@ -1974,7 +1987,7 @@ function drawBuildingOverlays(b) {
     // 4. Second row of car stalls (20') - rows >= 2
     if (numRows >= 2) {
       var stallEdge2 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-      addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
       curEdge = stallEdge2;
     }
 
@@ -1986,7 +1999,7 @@ function drawBuildingOverlays(b) {
 
       // Third row of car stalls (20')
       var stallEdge3 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-      addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
       curEdge = stallEdge3;
 
       // Second fire lane (26')
@@ -1998,12 +2011,12 @@ function drawBuildingOverlays(b) {
     // 6. For rows >= 4: fourth row of car stalls (20')
     if (numRows >= 4) {
       var stallEdge4 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-      addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
       curEdge = stallEdge4;
     }
 
-    // Return overall overlay bounds for compatibility
-    return { ep1: ep1, ep2: ep2, p3: curEdge.p2, p4: curEdge.p1, depthFt: totalDepth };
+    // Return overall overlay bounds for compatibility, plus stall count
+    return { ep1: ep1, ep2: ep2, p3: curEdge.p2, p4: curEdge.p1, depthFt: totalDepth, stallCount: zoneStallCount };
   }
 
   // Identify edges:
@@ -2042,9 +2055,10 @@ function drawBuildingOverlays(b) {
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
       }
       // Car parking on top (opposite side) — sub-zoned
-      addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsMain));
-      if (b.leftParking) { addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); }
-      if (b.rightParking) { addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); }
+      var _pz1 = addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsMain));
+      b.stallCount += (_pz1 && _pz1.stallCount) || 0;
+      if (b.leftParking) { var _pzL1 = addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL1 && _pzL1.stallCount) || 0; }
+      if (b.rightParking) { var _pzR1 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR1 && _pzR1.stallCount) || 0; }
     } else {
       // Left/right edges are longer → truck court on left (west), car parking on right (east)
       var tcEdge = addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#808080', 0.5, 'truckcourt', tcInsetL, tcInsetR);
@@ -2055,9 +2069,10 @@ function drawBuildingOverlays(b) {
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
       }
       // Car parking on right (east) — sub-zoned
-      addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsMain));
-      if (b.leftParking) { addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsLeft)); }
-      if (b.rightParking) { addParkingSubZones(v[3], v[2], 0, 1, toNumRows(b.parkingRowsRight)); }
+      var _pz2 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsMain));
+      b.stallCount += (_pz2 && _pz2.stallCount) || 0;
+      if (b.leftParking) { var _pzL2 = addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL2 && _pzL2.stallCount) || 0; }
+      if (b.rightParking) { var _pzR2 = addParkingSubZones(v[3], v[2], 0, 1, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR2 && _pzR2.stallCount) || 0; }
     }
   } else {
     // Cross dock: truck court on both top and bottom
@@ -2076,8 +2091,8 @@ function drawBuildingOverlays(b) {
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
     }
     // Cross dock side parking — sub-zoned
-    if (b.leftParking) { addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); }
-    if (b.rightParking) { addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); }
+    if (b.leftParking) { var _pzL3 = addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
+    if (b.rightParking) { var _pzR3 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
   }
 
   // ===== BUMP OUTS =====
@@ -3114,6 +3129,25 @@ function recalcStats() {
   document.getElementById('stat-trailer').textContent = fmt(trailerSF) + ' SF';
   document.getElementById('stat-road').textContent = fmt(roadSF) + ' SF';
   document.getElementById('stat-pavingarea').textContent = fmt(pavingAreaSF) + ' SF';
+
+  // Update Car Parks panel
+  var carparksEl = document.getElementById('stats-carparks');
+  var carparksListEl = document.getElementById('carparks-list');
+  var totalStalls = 0;
+  var carparksHtml = '';
+  buildings.forEach(function(b, i) {
+    var count = b.stallCount || 0;
+    totalStalls += count;
+    if (count > 0) {
+      carparksHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;">'
+        + '<span style="color:#b0b0b0;">Building ' + (i + 1) + '</span>'
+        + '<span style="color:#fff;font-family:\'DM Mono\',monospace;">' + count.toLocaleString() + ' stalls</span>'
+        + '</div>';
+    }
+  });
+  carparksListEl.innerHTML = carparksHtml;
+  document.getElementById('stat-totalstalls').textContent = totalStalls.toLocaleString() + ' stalls';
+  carparksEl.style.display = totalStalls > 0 ? 'block' : 'none';
 }
 
 function fmt(n) {
