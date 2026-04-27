@@ -3902,14 +3902,13 @@ function createCustomizeHandles(b) {
         updateBuildingLabels(bl);
         // Update adjacent edge midpoint handles
         updateEdgeHandlePositions(bl);
-        // Recalculate bay overlays in real-time during drag
-        drawBuildingOverlays(bl);
       });
       marker.on('dragend', function() {
         map.dragging.enable();
         var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
         if (bl) {
           bl.baseVertices = bl.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+          drawBuildingOverlays(bl);
           recalcStats();
         }
       });
@@ -3970,16 +3969,12 @@ function createCustomizeHandles(b) {
           // Convert this handle to a vertex handle and rebuild all handles
           handle.type = 'promoted';
           handle._promotedIdx = insertAt;
-          // Recalculate bay overlays in real-time
-          drawBuildingOverlays(bl);
         } else if (handle && handle.type === 'promoted') {
           var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
           if (!bl) return;
           bl.vertices[handle._promotedIdx] = e.target.getLatLng();
           bl.layer.setLatLngs([bl.vertices]);
           updateBuildingLabels(bl);
-          // Recalculate bay overlays in real-time
-          drawBuildingOverlays(bl);
         }
       });
       marker.on('dragend', function() {
@@ -3987,6 +3982,7 @@ function createCustomizeHandles(b) {
         var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
         if (bl) {
           bl.baseVertices = bl.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+          drawBuildingOverlays(bl);
           recalcStats();
           createCustomizeHandles(bl); // Rebuild all handles with new vertex
         }
