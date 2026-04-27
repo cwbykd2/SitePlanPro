@@ -1003,7 +1003,11 @@ function createHandleIcon(cls, symbol) {
 }
 
 function showBuildingHandles(b) {
-  hideAllHandles();
+  if (widthHandle) { map.removeLayer(widthHandle); widthHandle = null; }
+  if (depthHandle) { map.removeLayer(depthHandle); depthHandle = null; }
+  if (rotateHandle) { map.removeLayer(rotateHandle); rotateHandle = null; }
+  handleState = null;
+  hidePavingHandles();
   if (!b || b.vertices.length < 4) return;
   if (b.vertices.length > 4) return; // Custom polygon - no standard resize handles
 
@@ -1873,6 +1877,7 @@ function applyBuildingOptions() {
 /* ===== BUILDING OVERLAYS ===== */
 
 function drawBuildingOverlays(b) {
+  hideBumpHandles();
   b.overlayGroup.clearLayers();
   b.stallCount = 0;
   if (!b.vertices || b.vertices.length < 4) return;
