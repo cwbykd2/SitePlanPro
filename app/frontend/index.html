@@ -222,6 +222,46 @@ select option{background:var(--panel2)}
 .bay-tooltip .bay-tip-icon{width:14px;height:14px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);color:var(--muted);font-size:9px;display:flex;align-items:center;justify-content:center;cursor:help;flex-shrink:0}
 .bay-tooltip .bay-tip-text{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:10px;color:var(--text);width:200px;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.4);line-height:1.4}
 .bay-tooltip:hover .bay-tip-text{display:block}
+
+/* ===== CUSTOMIZE BUILDING MODE ===== */
+.customize-vertex-handle {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #3b82f6; border: 2px solid #fff;
+  box-shadow: 0 0 6px rgba(59,130,246,0.6);
+  cursor: grab; transition: transform 0.15s;
+}
+.customize-vertex-handle:hover { transform: scale(1.3); background: #2563eb; }
+.customize-edge-handle {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #f59e0b; border: 2px solid #fff;
+  box-shadow: 0 0 6px rgba(245,158,11,0.5);
+  cursor: grab; opacity: 0.8; transition: transform 0.15s, opacity 0.15s;
+}
+.customize-edge-handle:hover { transform: scale(1.3); opacity: 1; background: #d97706; }
+.customize-active-outline { outline: 2px dashed #3b82f6; outline-offset: 2px; }
+#btn-customize-building {
+  width: 100%; margin-top: 6px; padding: 8px 0;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff; border: none; border-radius: 6px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: opacity 0.2s;
+}
+#btn-customize-building:hover { opacity: 0.85; }
+#btn-done-customize {
+  width: 100%; margin-top: 6px; padding: 8px 0;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff; border: none; border-radius: 6px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: opacity 0.2s;
+}
+#btn-done-customize:hover { opacity: 0.85; }
+#btn-add-vertex-hint {
+  font-size: 10px; color: var(--muted); text-align: center;
+  margin-top: 4px; padding: 4px;
+}
+
 </style>
 </head>
 <body>
@@ -457,9 +497,12 @@ select option{background:var(--panel2)}
               </div>
             </div>
             <button class="btn-primary" onclick="applyBuildingOptions()" style="width:100%">Apply Options</button>
+            <button id="btn-customize-building" onclick="enterCustomizeMode()">✏️ Customize Shape</button>
+            <button id="btn-done-customize" class="hidden" onclick="exitCustomizeMode()">✅ Done Customizing</button>
+            <div id="btn-add-vertex-hint" class="hidden">Drag blue corners to reshape. Drag yellow midpoints to add new corners. Right-click a corner to remove it.</div>
           </div>
         </div>
-        <div style="margin-top:10px;font-size:10px;color:var(--muted);text-align:center;padding:6px 0">
+        <div id="customize-hint-normal" style="margin-top:10px;font-size:10px;color:var(--muted);text-align:center;padding:6px 0">
           Drag building to move &bull; Blue ↔ = width &bull; Green ↕ = depth &bull; Yellow ↻ = rotate
         </div>
       </div>
@@ -810,16 +853,32 @@ function updateBuildingPolygon(b, newVerts) {
 /* ===== BUILDING DIMENSION LABELS ===== */
 
 function getBuildingDimensions(verts) {
-  // verts is an array of 4 LatLng points forming the building polygon
-  // Calculate width (distance between first two vertices) and depth (distance between second and third)
-  if (verts.length < 4) return { width: 0, depth: 0, sf: 0 };
-  var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
-  var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
-  // Width is the longer side, depth is the shorter
-  var w = Math.round(Math.max(d01, d12));
-  var d = Math.round(Math.min(d01, d12));
-  var sf = w * d;
-  return { width: w, depth: d, sf: sf, edgeW: d01 > d12 ? 0 : 1 };
+  // For customized polygons with >4 vertices, compute bounding box dimensions
+  if (verts.length < 3) return { width: 0, depth: 0, sf: 0 };
+  if (verts.length === 4) {
+    var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
+    var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
+    var w = Math.round(Math.max(d01, d12));
+    var d = Math.round(Math.min(d01, d12));
+    var sf = w * d;
+    return { width: w, depth: d, sf: sf, edgeW: d01 > d12 ? 0 : 1 };
+  }
+  // For non-rectangular: use bounding box approximation
+  var minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  verts.forEach(function(v) {
+    if (v.lat < minLat) minLat = v.lat;
+    if (v.lat > maxLat) maxLat = v.lat;
+    if (v.lng < minLng) minLng = v.lng;
+    if (v.lng > maxLng) maxLng = v.lng;
+  });
+  var nw = L.latLng(maxLat, minLng);
+  var ne = L.latLng(maxLat, maxLng);
+  var sw = L.latLng(minLat, minLng);
+  var bbW = Math.round(nw.distanceTo(ne) * FEET_PER_METER);
+  var bbD = Math.round(nw.distanceTo(sw) * FEET_PER_METER);
+  var w2 = Math.max(bbW, bbD);
+  var d2 = Math.min(bbW, bbD);
+  return { width: w2, depth: d2, sf: w2 * d2, edgeW: bbW > bbD ? 0 : 1 };
 }
 
 function getMidpoint(a, b) {
@@ -844,13 +903,22 @@ function updateBuildingLabels(b) {
   b.labelGroup.clearLayers();
 
   var verts = b.vertices;
-  if (verts.length < 4) return;
+  if (verts.length < 3) return;
 
   var dims = getBuildingDimensions(verts);
   var center = getPolygonCenter(verts);
 
-  // SF label in center — include bump out SF
-  var totalSF = getTotalBuildingSF(b);
+  // SF label in center — include bump out SF (use actual polygon area for custom shapes)
+  var totalSF;
+  if (verts.length > 4) {
+    totalSF = areaSF(b.layer);
+    // Still add bump outs if any
+    b.overlayGroup.eachLayer(function(o) {
+      if (o._overlayType === 'bumpout') totalSF += areaSF(o);
+    });
+  } else {
+    totalSF = getTotalBuildingSF(b);
+  }
   var sfText = totalSF >= 1e6 ? (totalSF / 1e6).toFixed(2) + 'M SF' :
                totalSF >= 1e3 ? (totalSF / 1e3).toFixed(1) + 'K SF' :
                Math.round(totalSF).toLocaleString() + ' SF';
@@ -862,35 +930,47 @@ function updateBuildingLabels(b) {
   });
   L.marker(center, {icon: sfIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
 
-  // Width label along the wider edge (top edge: verts[0] to verts[1])
-  var widthEdgeIdx = dims.edgeW === 0 ? 0 : 1;
-  var widthMid, depthMid;
-
-  if (widthEdgeIdx === 0) {
-    // Width along edge 0-1 (top), depth along edge 1-2 (right side)
-    widthMid = getMidpoint(verts[0], verts[1]);
-    depthMid = getMidpoint(verts[1], verts[2]);
+  if (verts.length === 4) {
+    // Standard rectangular labels
+    var widthEdgeIdx = dims.edgeW === 0 ? 0 : 1;
+    var widthMid, depthMid;
+    if (widthEdgeIdx === 0) {
+      widthMid = getMidpoint(verts[0], verts[1]);
+      depthMid = getMidpoint(verts[1], verts[2]);
+    } else {
+      widthMid = getMidpoint(verts[1], verts[2]);
+      depthMid = getMidpoint(verts[0], verts[1]);
+    }
+    var widthIcon = L.divIcon({
+      className: 'bldg-label',
+      html: '<div class="bldg-label-dim">' + dims.width + ' ft</div>',
+      iconSize: [80, 16],
+      iconAnchor: [40, 8]
+    });
+    L.marker(widthMid, {icon: widthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
+    var depthIcon = L.divIcon({
+      className: 'bldg-label',
+      html: '<div class="bldg-label-dim">' + dims.depth + ' ft</div>',
+      iconSize: [80, 16],
+      iconAnchor: [40, 8]
+    });
+    L.marker(depthMid, {icon: depthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
   } else {
-    // Width along edge 1-2 (right side), depth along edge 0-1 (top)
-    widthMid = getMidpoint(verts[1], verts[2]);
-    depthMid = getMidpoint(verts[0], verts[1]);
+    // Custom polygon: show edge lengths for each side
+    for (var ei = 0; ei < verts.length; ei++) {
+      var nextEi = (ei + 1) % verts.length;
+      var edgeLen = Math.round(verts[ei].distanceTo(verts[nextEi]) * FEET_PER_METER);
+      if (edgeLen < 5) continue; // Skip tiny edges
+      var edgeMid = getMidpoint(verts[ei], verts[nextEi]);
+      var edgeIcon = L.divIcon({
+        className: 'bldg-label',
+        html: '<div class="bldg-label-dim">' + edgeLen + ' ft</div>',
+        iconSize: [80, 16],
+        iconAnchor: [40, 8]
+      });
+      L.marker(edgeMid, {icon: edgeIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
+    }
   }
-
-  var widthIcon = L.divIcon({
-    className: 'bldg-label',
-    html: '<div class="bldg-label-dim">' + dims.width + ' ft</div>',
-    iconSize: [80, 16],
-    iconAnchor: [40, 8]
-  });
-  L.marker(widthMid, {icon: widthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
-
-  var depthIcon = L.divIcon({
-    className: 'bldg-label',
-    html: '<div class="bldg-label-dim">' + dims.depth + ' ft</div>',
-    iconSize: [80, 16],
-    iconAnchor: [40, 8]
-  });
-  L.marker(depthMid, {icon: depthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
 }
 
 /* ===== AXIS PROJECTION HELPERS ===== */
@@ -929,6 +1009,8 @@ function createHandleIcon(cls, symbol) {
 function showBuildingHandles(b) {
   hideAllHandles();
   if (!b || b.vertices.length < 4) return;
+  if (customizeMode && b.id === customizeBldgId) return; // Don't show resize handles in customize mode
+  if (b.vertices.length > 4) return; // Custom polygon - no standard resize handles
 
   // Width handle at midpoint of edge v1-v2 (right edge)
   var widthMid = getMidpoint(b.vertices[1], b.vertices[2]);
@@ -1352,6 +1434,7 @@ function setupBuildingDrag(bldg) {
   var el = bldg.layer;
   el.on('mousedown', function(e) {
     if (currentTool !== 'select') return;
+    if (customizeMode && bldg.id === customizeBldgId) return; // Skip drag in customize mode
     // Select this building
     activeBuilding = bldg.id;
     showBuildingOpts();
@@ -1575,6 +1658,28 @@ function showBuildingOpts() {
   if (elBRR) elBRR.checked = b.bumpRearRight || false;
   updateTrailerOpts(b.type);
   showBuildingHandles(b);
+  // Update customize button state
+  var btnCustomize = document.getElementById('btn-customize-building');
+  var btnDone = document.getElementById('btn-done-customize');
+  var hintCustomize = document.getElementById('btn-add-vertex-hint');
+  var hintNormal = document.getElementById('customize-hint-normal');
+  if (customizeMode && customizeBldgId === b.id) {
+    if (btnCustomize) btnCustomize.classList.add('hidden');
+    if (btnDone) btnDone.classList.remove('hidden');
+    if (hintCustomize) hintCustomize.classList.remove('hidden');
+    if (hintNormal) hintNormal.classList.add('hidden');
+  } else {
+    if (btnCustomize) btnCustomize.classList.remove('hidden');
+    if (btnDone) btnDone.classList.add('hidden');
+    if (hintCustomize) hintCustomize.classList.add('hidden');
+    if (hintNormal) hintNormal.classList.remove('hidden');
+  }
+  // If building has >4 vertices (customized), show different hint
+  if (b.vertices.length > 4 && !customizeMode) {
+    if (hintNormal) hintNormal.innerHTML = 'Custom shape (' + b.vertices.length + ' corners) &bull; Click <b>Customize Shape</b> to edit';
+  } else if (!customizeMode) {
+    if (hintNormal) hintNormal.innerHTML = 'Drag building to move &bull; Blue ↔ = width &bull; Green ↕ = depth &bull; Yellow ↻ = rotate';
+  }
   // Update bay configuration UI
   updateBayUIForBuilding(b);
 }
@@ -3673,6 +3778,7 @@ function updateBuildingList() {
 }
 
 function selectBuilding(id) {
+  if (customizeMode && customizeBldgId !== id) exitCustomizeMode();
   activeBuilding = id;
   showBuildingOpts();
   updateBuildingList();
@@ -3684,6 +3790,7 @@ function selectBuilding(id) {
 }
 
 function deleteBuilding(id) {
+  if (customizeMode && customizeBldgId === id) exitCustomizeMode();
   var b = buildings.find(function(x){return x.id===id});
   if (!b) return;
   drawnItems.removeLayer(b.layer);
@@ -3696,6 +3803,204 @@ function deleteBuilding(id) {
   recalcStats();
   checkOutOfBounds();
 }
+
+
+/* ===== CUSTOMIZE BUILDING MODE ===== */
+
+var customizeMode = false;
+var customizeHandles = []; // {marker, type:'vertex'|'edge', idx}
+var customizeBldgId = null;
+
+function enterCustomizeMode() {
+  var b = buildings.find(function(x) { return x.id === activeBuilding; });
+  if (!b || b.vertices.length < 3) return;
+  customizeMode = true;
+  customizeBldgId = b.id;
+
+  // Hide normal resize/rotate handles
+  hideAllHandles();
+
+  // Change building outline to dashed to indicate edit mode
+  b.layer.setStyle({ dashArray: '8,6', color: '#3b82f6', weight: 3 });
+
+  // Show/hide buttons
+  document.getElementById('btn-customize-building').classList.add('hidden');
+  document.getElementById('btn-done-customize').classList.remove('hidden');
+  document.getElementById('btn-add-vertex-hint').classList.remove('hidden');
+
+  // Disable building drag in customize mode
+  b._customizeOldTool = currentTool;
+
+  createCustomizeHandles(b);
+  setStatus('Customize mode: drag corners to reshape, drag yellow midpoints to add corners, right-click to remove.');
+}
+
+function exitCustomizeMode() {
+  var b = buildings.find(function(x) { return x.id === customizeBldgId; });
+  customizeMode = false;
+  customizeBldgId = null;
+
+  // Remove all customize handles
+  clearCustomizeHandles();
+
+  if (b) {
+    // Reset building style
+    b.layer.setStyle({ dashArray: null, color: '#000000', weight: 2 });
+    // Update base vertices to current
+    b.baseVertices = b.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+    b.rotation = 0;
+    b.scale = 100;
+    // Recalculate everything
+    updateBuildingLabels(b);
+    drawBuildingOverlays(b);
+    recalcStats();
+    drawAllBayGrids();
+    checkOutOfBounds();
+    showBuildingHandles(b);
+  }
+
+  // Show/hide buttons
+  document.getElementById('btn-customize-building').classList.remove('hidden');
+  document.getElementById('btn-done-customize').classList.add('hidden');
+  document.getElementById('btn-add-vertex-hint').classList.add('hidden');
+
+  setStatus('Customization complete. Building updated.');
+}
+
+function clearCustomizeHandles() {
+  customizeHandles.forEach(function(h) {
+    if (h.marker) map.removeLayer(h.marker);
+  });
+  customizeHandles = [];
+}
+
+function createCustomizeHandles(b) {
+  clearCustomizeHandles();
+  var verts = b.vertices;
+
+  // Create vertex handles (blue circles at each corner)
+  for (var i = 0; i < verts.length; i++) {
+    (function(idx) {
+      var icon = L.divIcon({
+        className: '',
+        html: '<div class="customize-vertex-handle"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      var marker = L.marker(verts[idx], {
+        icon: icon,
+        draggable: true,
+        zIndexOffset: 3000
+      }).addTo(map);
+
+      marker.on('dragstart', function() { map.dragging.disable(); });
+      marker.on('drag', function(e) {
+        var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
+        if (!bl) return;
+        bl.vertices[idx] = e.target.getLatLng();
+        bl.layer.setLatLngs([bl.vertices]);
+        updateBuildingLabels(bl);
+        // Update adjacent edge midpoint handles
+        updateEdgeHandlePositions(bl);
+      });
+      marker.on('dragend', function() {
+        map.dragging.enable();
+        var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
+        if (bl) {
+          bl.baseVertices = bl.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+          recalcStats();
+        }
+      });
+
+      // Right-click to remove vertex (min 3 vertices)
+      marker.on('contextmenu', function(e) {
+        L.DomEvent.stopPropagation(e);
+        L.DomEvent.preventDefault(e);
+        var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
+        if (!bl || bl.vertices.length <= 3) {
+          setStatus('Cannot remove: building needs at least 3 corners.');
+          return;
+        }
+        bl.vertices.splice(idx, 1);
+        bl.layer.setLatLngs([bl.vertices]);
+        bl.baseVertices = bl.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+        updateBuildingLabels(bl);
+        recalcStats();
+        createCustomizeHandles(bl); // Rebuild handles
+        setStatus('Corner removed. ' + bl.vertices.length + ' corners remaining.');
+      });
+
+      customizeHandles.push({ marker: marker, type: 'vertex', idx: idx });
+    })(i);
+  }
+
+  // Create edge midpoint handles (yellow circles)
+  for (var j = 0; j < verts.length; j++) {
+    (function(idx) {
+      var nextIdx = (idx + 1) % verts.length;
+      var mid = getMidpoint(verts[idx], verts[nextIdx]);
+      var icon = L.divIcon({
+        className: '',
+        html: '<div class="customize-edge-handle"></div>',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+      var marker = L.marker(mid, {
+        icon: icon,
+        draggable: true,
+        zIndexOffset: 2500
+      }).addTo(map);
+
+      marker.on('dragstart', function() { map.dragging.disable(); });
+      marker.on('drag', function(e) {
+        // On first drag movement, insert a new vertex at this edge position
+        var handle = customizeHandles.find(function(h) { return h.marker === marker; });
+        if (handle && handle.type === 'edge') {
+          var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
+          if (!bl) return;
+          // Insert new vertex after idx
+          var insertAt = handle.idx + 1;
+          bl.vertices.splice(insertAt, 0, e.target.getLatLng());
+          bl.layer.setLatLngs([bl.vertices]);
+          bl.baseVertices = bl.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+          updateBuildingLabels(bl);
+          // Convert this handle to a vertex handle and rebuild all handles
+          handle.type = 'promoted';
+          handle._promotedIdx = insertAt;
+        } else if (handle && handle.type === 'promoted') {
+          var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
+          if (!bl) return;
+          bl.vertices[handle._promotedIdx] = e.target.getLatLng();
+          bl.layer.setLatLngs([bl.vertices]);
+          updateBuildingLabels(bl);
+        }
+      });
+      marker.on('dragend', function() {
+        map.dragging.enable();
+        var bl = buildings.find(function(x) { return x.id === customizeBldgId; });
+        if (bl) {
+          bl.baseVertices = bl.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+          recalcStats();
+          createCustomizeHandles(bl); // Rebuild all handles with new vertex
+        }
+      });
+
+      customizeHandles.push({ marker: marker, type: 'edge', idx: idx });
+    })(j);
+  }
+}
+
+function updateEdgeHandlePositions(b) {
+  // Update only edge midpoint handle positions (not vertex handles, those are being dragged)
+  customizeHandles.forEach(function(h) {
+    if (h.type === 'edge') {
+      var nextIdx = (h.idx + 1) % b.vertices.length;
+      var mid = getMidpoint(b.vertices[h.idx], b.vertices[nextIdx]);
+      h.marker.setLatLng(mid);
+    }
+  });
+}
+
 
 /* ===== GEOCODING ===== */
 
