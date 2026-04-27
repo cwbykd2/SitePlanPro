@@ -2350,13 +2350,7 @@ function drawBuildingOverlays(b) {
         var tc2 = offsetPt(tcTopEdge.ep2, -TRUCK_DEFAULT, 0);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
       }
-      var tcBotEdge = addEdgeOverlay(v[1], v[2], TRUCK_DEFAULT, 1, 0, '#808080', 0.5, 'truckcourt', tcInsetBotL, tcInsetBotR);
-      addOverlayDepthLabel(tcBotEdge, TRUCK_DEFAULT + ' ft');
-      if (b.trailerBottom) {
-        var tc1 = offsetPt(tcBotEdge.ep1, TRUCK_DEFAULT, 0);
-        var tc2 = offsetPt(tcBotEdge.ep2, TRUCK_DEFAULT, 0);
-        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 1, 0, '#f97316', 0.18, 'trailer');
-      }
+      
       // Parking on the LONG edges (top and bottom of the building footprint)
       if (b.leftParking)  { var _pzL3 = addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsLeft));  b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
       if (b.rightParking) { var _pzR3 = addParkingSubZones(v[3], v[2], 0,  1, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
