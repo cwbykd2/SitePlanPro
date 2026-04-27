@@ -989,6 +989,7 @@ function projectOntoAxis(point, center, axis) {
 
 var widthHandle = null;
 var bumpHandles = [];
+var _activeBumpDrag = null;
 var depthHandle = null;
 var rotateHandle = null;
 var handleState = null; // {type:'width'|'depth'|'rotate', bldgId, ...}
@@ -1877,7 +1878,8 @@ function applyBuildingOptions() {
 /* ===== BUILDING OVERLAYS ===== */
 
 function drawBuildingOverlays(b) {
-  hideBumpHandles();
+  bumpHandles.forEach(function(h) { if (h && h !== _activeBumpDrag) map.removeLayer(h); });
+  bumpHandles = _activeBumpDrag ? [_activeBumpDrag] : [];
   b.overlayGroup.clearLayers();
   b.stallCount = 0;
   if (!b.vertices || b.vertices.length < 4) return;
@@ -2220,7 +2222,6 @@ function drawBuildingOverlays(b) {
   // Places a draggable marker on the outer edge of a bump out so the user
   // can resize its depth by dragging.
   function addBumpDragHandle(bldg, key, baseP1, baseP2, dirAlong, dirPerp, depthFt, offFn) {
-    // Outer-edge midpoint of the bumpout
     var outerP1 = offFn(baseP1, dirAlong * depthFt, dirPerp * depthFt);
     var outerP2 = offFn(baseP2, dirAlong * depthFt, dirPerp * depthFt);
     var mid = getMidpoint(outerP1, outerP2);
@@ -2232,33 +2233,37 @@ function drawBuildingOverlays(b) {
 
     var baseMid = getMidpoint(baseP1, baseP2);
 
-    handle.on('dragstart', function() { map.dragging.disable(); });
+    handle.on('dragstart', function() {
+      _activeBumpDrag = handle;
+      map.dragging.disable();
+    });
 
     handle.on('drag', function(e) {
       var pos = e.target.getLatLng();
-      // Compute distance from baseMid to current drag position projected onto
-      // the extrusion direction.  We use the same coordinate system as offsetPt.
       var latSc = Math.cos(baseMid.lat * Math.PI / 180);
       var dx = (pos.lng - baseMid.lng) * latSc;
       var dy = pos.lat - baseMid.lat;
-      // The extrusion unit vector in (x,y) space is (uTopX*dirAlong + uRightX*dirPerp, uTopY*dirAlong + uRightY*dirPerp)
       var extX = uTopX * dirAlong + uRightX * dirPerp;
       var extY = uTopY * dirAlong + uRightY * dirPerp;
       var extLen = Math.sqrt(extX * extX + extY * extY) || 1;
-      var projDist = (dx * extX + dy * extY) / extLen; // in coordinate units
+      var projDist = (dx * extX + dy * extY) / extLen;
       var newDepthFt = Math.round(projDist / ftToCoord);
-      if (newDepthFt < 1) newDepthFt = 1; // minimum 1 ft
-      if (newDepthFt > 200) newDepthFt = 200; // maximum 200 ft
+      if (newDepthFt < 1) newDepthFt = 1;
+      if (newDepthFt > 200) newDepthFt = 200;
 
       bldg.bumpDepths[key] = newDepthFt;
-      // Redraw overlays (which will recreate handles)
-      hideBumpHandles();
       drawBuildingOverlays(bldg);
       updateBuildingLabels(bldg);
       recalcStats();
+
+      // Reposition handle to new outer edge midpoint
+      var newOuterP1 = offFn(baseP1, dirAlong * newDepthFt, dirPerp * newDepthFt);
+      var newOuterP2 = offFn(baseP2, dirAlong * newDepthFt, dirPerp * newDepthFt);
+      handle.setLatLng(getMidpoint(newOuterP1, newOuterP2));
     });
 
     handle.on('dragend', function() {
+      _activeBumpDrag = null;
       map.dragging.enable();
       hideBumpHandles();
       drawBuildingOverlays(bldg);
