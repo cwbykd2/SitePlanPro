@@ -2247,11 +2247,9 @@ function drawBuildingOverlays(b) {
       var extLen = Math.sqrt(extX * extX + extY * extY) || 1;
       var projDist = (dx * extX + dy * extY) / extLen; // in coordinate units
       var newDepthFt = Math.round(projDist / ftToCoord);
-      if (newDepthFt < 10) newDepthFt = 10; // minimum 10 ft
+      if (newDepthFt < 1) newDepthFt = 1; // minimum 1 ft
       if (newDepthFt > 200) newDepthFt = 200; // maximum 200 ft
-      // Snap to nearest 5 ft
-      newDepthFt = Math.round(newDepthFt / 5) * 5;
-      if (newDepthFt < 10) newDepthFt = 10;
+
       bldg.bumpDepths[key] = newDepthFt;
       // Redraw overlays (which will recreate handles)
       hideBumpHandles();
