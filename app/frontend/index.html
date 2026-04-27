@@ -148,8 +148,6 @@ select option{background:var(--panel2)}
 .handle-resize{background:#3b82f6;color:#fff}
 .handle-depth{background:#10b981;color:#fff}
 .handle-rotate{background:#f59e0b;color:#fff}
-.handle-bump-w{background:#3b82f6;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #fff;user-select:none;line-height:1}
-.handle-bump{background:#ef4444;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #fff;user-select:none;line-height:1}
 .site-name{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--accent2);cursor:pointer;padding:4px 8px;border-radius:4px;transition:background .15s;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block}
 .site-name:hover{background:var(--panel2)}
 #site-name-wrap{display:flex;align-items:center;gap:6px}
@@ -423,22 +421,77 @@ select option{background:var(--panel2)}
 
             <!-- Bump Out Configuration -->
             <div>
-              <label style="margin-bottom:6px">Bump Outs <span style="font-size:10px;color:var(--muted)">(std bay size, truck court side)</span></label>
+              <label style="margin-bottom:6px">Bump Outs <span style="font-size:10px;color:var(--muted)">(custom width &amp; depth)</span></label>
               <div id="cross-bumpout-opts">
                 <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Top truck court:</div>
                 <label class="checkbox-row"><input type="checkbox" id="chk-bump-top-left"> Bump out — top left end</label>
+                <div id="bump-dims-top-left" class="hidden" style="margin-left:18px;margin-bottom:6px">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <label style="font-size:9px;color:var(--muted)">W:</label>
+                    <input type="number" id="bump-w-top-left" min="10" max="200" value="52" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <label style="font-size:9px;color:var(--muted)">D:</label>
+                    <input type="number" id="bump-d-top-left" min="10" max="200" value="50" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <span style="font-size:9px;color:var(--muted)">ft</span>
+                  </div>
+                </div>
                 <label class="checkbox-row"><input type="checkbox" id="chk-bump-top-right"> Bump out — top right end</label>
+                <div id="bump-dims-top-right" class="hidden" style="margin-left:18px;margin-bottom:6px">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <label style="font-size:9px;color:var(--muted)">W:</label>
+                    <input type="number" id="bump-w-top-right" min="10" max="200" value="52" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <label style="font-size:9px;color:var(--muted)">D:</label>
+                    <input type="number" id="bump-d-top-right" min="10" max="200" value="50" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <span style="font-size:9px;color:var(--muted)">ft</span>
+                  </div>
+                </div>
                 <div style="font-size:10px;color:var(--muted);margin-bottom:4px;margin-top:6px">Bottom truck court:</div>
                 <label class="checkbox-row"><input type="checkbox" id="chk-bump-bot-left"> Bump out — bottom left end</label>
+                <div id="bump-dims-bot-left" class="hidden" style="margin-left:18px;margin-bottom:6px">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <label style="font-size:9px;color:var(--muted)">W:</label>
+                    <input type="number" id="bump-w-bot-left" min="10" max="200" value="52" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <label style="font-size:9px;color:var(--muted)">D:</label>
+                    <input type="number" id="bump-d-bot-left" min="10" max="200" value="50" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <span style="font-size:9px;color:var(--muted)">ft</span>
+                  </div>
+                </div>
                 <label class="checkbox-row"><input type="checkbox" id="chk-bump-bot-right"> Bump out — bottom right end</label>
+                <div id="bump-dims-bot-right" class="hidden" style="margin-left:18px;margin-bottom:6px">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <label style="font-size:9px;color:var(--muted)">W:</label>
+                    <input type="number" id="bump-w-bot-right" min="10" max="200" value="52" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <label style="font-size:9px;color:var(--muted)">D:</label>
+                    <input type="number" id="bump-d-bot-right" min="10" max="200" value="50" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <span style="font-size:9px;color:var(--muted)">ft</span>
+                  </div>
+                </div>
               </div>
               <div id="rear-bumpout-opts" class="hidden">
                 <label class="checkbox-row"><input type="checkbox" id="chk-bump-rear-left"> Bump out — left end</label>
+                <div id="bump-dims-rear-left" class="hidden" style="margin-left:18px;margin-bottom:6px">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <label style="font-size:9px;color:var(--muted)">W:</label>
+                    <input type="number" id="bump-w-rear-left" min="10" max="200" value="52" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <label style="font-size:9px;color:var(--muted)">D:</label>
+                    <input type="number" id="bump-d-rear-left" min="10" max="200" value="50" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <span style="font-size:9px;color:var(--muted)">ft</span>
+                  </div>
+                </div>
                 <label class="checkbox-row"><input type="checkbox" id="chk-bump-rear-right"> Bump out — right end</label>
+                <div id="bump-dims-rear-right" class="hidden" style="margin-left:18px;margin-bottom:6px">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <label style="font-size:9px;color:var(--muted)">W:</label>
+                    <input type="number" id="bump-w-rear-right" min="10" max="200" value="52" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <label style="font-size:9px;color:var(--muted)">D:</label>
+                    <input type="number" id="bump-d-rear-right" min="10" max="200" value="50" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                    <span style="font-size:9px;color:var(--muted)">ft</span>
+                  </div>
+                </div>
               </div>
               <div style="font-size:10px;color:var(--muted);padding-top:2px">
-                Each bump out: bay width × 50' deep, at building ends facing truck court
+                Custom width &amp; depth per bump out (in feet)
               </div>
+            </div>
             </div>
               <div style="margin-top:8px;">
                 <label style="margin-bottom:4px;font-size:11px;">Truck Court Inset (ft)</label>
@@ -989,8 +1042,8 @@ function projectOntoAxis(point, center, axis) {
 /* ===== CORNER HANDLES (RESIZE & ROTATE) ===== */
 
 var widthHandle = null;
-var bumpHandles = [];
-var _activeBumpDrag = null;
+
+
 var depthHandle = null;
 var rotateHandle = null;
 var handleState = null; // {type:'width'|'depth'|'rotate', bldgId, ...}
@@ -1219,7 +1272,7 @@ function hideAllHandles() {
   if (depthHandle) { map.removeLayer(depthHandle); depthHandle = null; }
   if (rotateHandle) { map.removeLayer(rotateHandle); rotateHandle = null; }
   handleState = null;
-  hideBumpHandles();
+
   hidePavingHandles();
 }
 
@@ -1230,10 +1283,6 @@ function hidePavingHandles() {
   pavHandleState = null;
 }
 
-function hideBumpHandles() {
-  bumpHandles.forEach(function(h) { if (h) map.removeLayer(h); });
-  bumpHandles = [];
-}
 
 function refreshHandlePositions(b) {
   if (!b || b.vertices.length < 4) return;
@@ -1671,6 +1720,23 @@ function showBuildingOpts() {
   if (elBBR) elBBR.checked = b.bumpBotRight || false;
   if (elBRL) elBRL.checked = b.bumpRearLeft || false;
   if (elBRR) elBRR.checked = b.bumpRearRight || false;
+
+  // Show/hide bump dimension inputs and populate values
+  if (!b.bumpWidths) b.bumpWidths = { topLeft: bayWidth, topRight: bayWidth, botLeft: bayWidth, botRight: bayWidth, rearLeft: bayWidth, rearRight: bayWidth };
+  if (!b.bumpDepths) b.bumpDepths = { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 };
+  var bumpKeys = ['top-left','top-right','bot-left','bot-right','rear-left','rear-right'];
+  var bumpMap = {'top-left':'topLeft','top-right':'topRight','bot-left':'botLeft','bot-right':'botRight','rear-left':'rearLeft','rear-right':'rearRight'};
+  var bumpChkMap = {'top-left':b.bumpTopLeft,'top-right':b.bumpTopRight,'bot-left':b.bumpBotLeft,'bot-right':b.bumpBotRight,'rear-left':b.bumpRearLeft,'rear-right':b.bumpRearRight};
+  bumpKeys.forEach(function(k) {
+    var dimsDiv = document.getElementById('bump-dims-' + k);
+    var wInput = document.getElementById('bump-w-' + k);
+    var dInput = document.getElementById('bump-d-' + k);
+    var key = bumpMap[k];
+    if (dimsDiv) dimsDiv.classList.toggle('hidden', !bumpChkMap[k]);
+    if (wInput) wInput.value = Math.round(b.bumpWidths[key] || bayWidth);
+    if (dInput) dInput.value = Math.round(b.bumpDepths[key] || 50);
+  });
+
   updateTrailerOpts(b.type);
   showBuildingHandles(b);
 
@@ -1793,6 +1859,39 @@ function initParkingCheckboxes() {
       });
     }
   });
+  // Attach bump out checkbox toggle listeners (show/hide dims divs)
+  var bumpPairs = [
+    ['chk-bump-top-left', 'bump-dims-top-left'],
+    ['chk-bump-top-right', 'bump-dims-top-right'],
+    ['chk-bump-bot-left', 'bump-dims-bot-left'],
+    ['chk-bump-bot-right', 'bump-dims-bot-right'],
+    ['chk-bump-rear-left', 'bump-dims-rear-left'],
+    ['chk-bump-rear-right', 'bump-dims-rear-right']
+  ];
+  bumpPairs.forEach(function(p) {
+    var chk = document.getElementById(p[0]);
+    var div = document.getElementById(p[1]);
+    if (chk && div) {
+      chk.addEventListener('change', function() {
+        div.classList.toggle('hidden', !chk.checked);
+        applyBuildingOptions();
+      });
+    }
+  });
+
+  // Attach change/input listeners to bump width/depth inputs
+  var bumpInputIds = [
+    'bump-w-top-left','bump-d-top-left','bump-w-top-right','bump-d-top-right',
+    'bump-w-bot-left','bump-d-bot-left','bump-w-bot-right','bump-d-bot-right',
+    'bump-w-rear-left','bump-d-rear-left','bump-w-rear-right','bump-d-rear-right'
+  ];
+  bumpInputIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', function() { applyBuildingOptions(); });
+      el.addEventListener('input', function() { applyBuildingOptions(); });
+    }
+  });
 }
 
 function applyBuildingOptions() {
@@ -1825,6 +1924,25 @@ function applyBuildingOptions() {
     b.bumpBotRight = document.getElementById('chk-bump-bot-right').checked;
     b.bumpRearLeft = false;
     b.bumpRearRight = false;
+    // Read custom widths/depths for cross bumpouts
+    if (!b.bumpWidths) b.bumpWidths = {};
+    if (!b.bumpDepths) b.bumpDepths = {};
+    var bwTL = document.getElementById('bump-w-top-left');
+    var bdTL = document.getElementById('bump-d-top-left');
+    var bwTR = document.getElementById('bump-w-top-right');
+    var bdTR = document.getElementById('bump-d-top-right');
+    var bwBL = document.getElementById('bump-w-bot-left');
+    var bdBL = document.getElementById('bump-d-bot-left');
+    var bwBR = document.getElementById('bump-w-bot-right');
+    var bdBR = document.getElementById('bump-d-bot-right');
+    if (bwTL) b.bumpWidths.topLeft = Math.max(10, Math.min(200, parseFloat(bwTL.value) || bayWidth));
+    if (bdTL) b.bumpDepths.topLeft = Math.max(10, Math.min(200, parseFloat(bdTL.value) || 50));
+    if (bwTR) b.bumpWidths.topRight = Math.max(10, Math.min(200, parseFloat(bwTR.value) || bayWidth));
+    if (bdTR) b.bumpDepths.topRight = Math.max(10, Math.min(200, parseFloat(bdTR.value) || 50));
+    if (bwBL) b.bumpWidths.botLeft = Math.max(10, Math.min(200, parseFloat(bwBL.value) || bayWidth));
+    if (bdBL) b.bumpDepths.botLeft = Math.max(10, Math.min(200, parseFloat(bdBL.value) || 50));
+    if (bwBR) b.bumpWidths.botRight = Math.max(10, Math.min(200, parseFloat(bwBR.value) || bayWidth));
+    if (bdBR) b.bumpDepths.botRight = Math.max(10, Math.min(200, parseFloat(bdBR.value) || 50));
   } else {
     b.bumpRearLeft = document.getElementById('chk-bump-rear-left').checked;
     b.bumpRearRight = document.getElementById('chk-bump-rear-right').checked;
@@ -1832,6 +1950,17 @@ function applyBuildingOptions() {
     b.bumpTopRight = false;
     b.bumpBotLeft = false;
     b.bumpBotRight = false;
+    // Read custom widths/depths for rear bumpouts
+    if (!b.bumpWidths) b.bumpWidths = {};
+    if (!b.bumpDepths) b.bumpDepths = {};
+    var bwRL = document.getElementById('bump-w-rear-left');
+    var bdRL = document.getElementById('bump-d-rear-left');
+    var bwRR = document.getElementById('bump-w-rear-right');
+    var bdRR = document.getElementById('bump-d-rear-right');
+    if (bwRL) b.bumpWidths.rearLeft = Math.max(10, Math.min(200, parseFloat(bwRL.value) || bayWidth));
+    if (bdRL) b.bumpDepths.rearLeft = Math.max(10, Math.min(200, parseFloat(bdRL.value) || 50));
+    if (bwRR) b.bumpWidths.rearRight = Math.max(10, Math.min(200, parseFloat(bwRR.value) || bayWidth));
+    if (bdRR) b.bumpDepths.rearRight = Math.max(10, Math.min(200, parseFloat(bdRR.value) || 50));
   }
   // Auto-calculate truck court insets based on bump outs
   // Each bump out is bayWidth (52/54/56/60 ft) wide at the building end, so the truck court
@@ -1882,8 +2011,8 @@ function applyBuildingOptions() {
 /* ===== BUILDING OVERLAYS ===== */
 
 function drawBuildingOverlays(b) {
-  bumpHandles.forEach(function(h) { if (h && h !== _activeBumpDrag) map.removeLayer(h); });
-  bumpHandles = _activeBumpDrag ? [_activeBumpDrag] : [];
+  
+  
   b.overlayGroup.clearLayers();
   b.stallCount = 0;
   if (!b.vertices || b.vertices.length < 4) return;
@@ -2222,113 +2351,6 @@ function drawBuildingOverlays(b) {
     if (b.rightParking) { var _pzR3 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
   }
 
-  // ===== BUMP OUT DRAG HANDLES =====
-  // Places a draggable marker on the outer edge of a bump out so the user
-  // can resize its depth by dragging.
-  function addBumpWidthHandle(bldg, key, p1, p2, dirAlongFt, dirPerpFt, depthFt, widthFt, offsetPtFn, orient) {
-    // Place handle at the p2 side of bumpout, offset outward by half depth
-    var handlePos = offsetPtFn(p2, dirAlongFt * depthFt / 2, dirPerpFt * depthFt / 2);
-    var icon = createHandleIcon('handle-bump-w', '↔');
-    var marker = L.marker(handlePos, {
-      icon: icon, draggable: true, zIndexOffset: 1100, interactive: true
-    }).addTo(bldg.overlayGroup);
-
-    marker.on('dragstart', function() { map.dragging.disable(); });
-    marker.on('drag', function(e) {
-      var ll = e.target.getLatLng();
-      var anchorPt = p1;
-      var newWidthFt;
-      var refA = map.latLngToLayerPoint(p1);
-      var refB = map.latLngToLayerPoint(p2);
-      var refPx = Math.sqrt(Math.pow(refB.x - refA.x, 2) + Math.pow(refB.y - refA.y, 2));
-      if (refPx < 1) refPx = 1;
-      var pxPerFt = refPx / widthFt;
-      if (orient === 'h') {
-        var dxM = map.latLngToLayerPoint(ll).x - map.latLngToLayerPoint(anchorPt).x;
-        newWidthFt = Math.abs(dxM) / pxPerFt;
-      } else {
-        var dyM = map.latLngToLayerPoint(ll).y - map.latLngToLayerPoint(anchorPt).y;
-        newWidthFt = Math.abs(dyM) / pxPerFt;
-      }
-      if (newWidthFt < 10) newWidthFt = 10;
-      if (newWidthFt > 200) newWidthFt = 200;
-      newWidthFt = Math.round(newWidthFt);
-      if (!bldg.bumpWidths) bldg.bumpWidths = {};
-      bldg.bumpWidths[key] = newWidthFt;
-      recalcStats();
-      drawBuildingOverlays(bldg);
-      drawBayGrid(bldg);
-      refreshHandlePositions(bldg);
-    });
-    marker.on('dragend', function() {
-      map.dragging.enable();
-      var bld = buildings.find(function(x) { return x.id === bldg.id; });
-      if (bld) {
-        bld.baseVertices = bld.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
-        bld.rotation = 0;
-        bld.scale = 100;
-        recalcStats();
-        drawBuildingOverlays(bld);
-        drawBayGrid(bld);
-        refreshHandlePositions(bld);
-        checkOutOfBounds();
-      }
-    });
-  }
-
-  function addBumpDragHandle(bldg, key, baseP1, baseP2, dirAlong, dirPerp, depthFt, offFn) {
-    var outerP1 = offFn(baseP1, dirAlong * depthFt, dirPerp * depthFt);
-    var outerP2 = offFn(baseP2, dirAlong * depthFt, dirPerp * depthFt);
-    var mid = getMidpoint(outerP1, outerP2);
-    var handle = L.marker(mid, {
-      icon: createHandleIcon('handle-bump', '↕'),
-      draggable: true,
-      zIndexOffset: 2100
-    }).addTo(map);
-
-    var baseMid = getMidpoint(baseP1, baseP2);
-
-    handle.on('dragstart', function() {
-      _activeBumpDrag = handle;
-      map.dragging.disable();
-    });
-
-    handle.on('drag', function(e) {
-      var pos = e.target.getLatLng();
-      var latSc = Math.cos(baseMid.lat * Math.PI / 180);
-      var dx = (pos.lng - baseMid.lng) * latSc;
-      var dy = pos.lat - baseMid.lat;
-      var extX = uTopX * dirAlong + uRightX * dirPerp;
-      var extY = uTopY * dirAlong + uRightY * dirPerp;
-      var extLen = Math.sqrt(extX * extX + extY * extY) || 1;
-      var projDist = (dx * extX + dy * extY) / extLen;
-      var newDepthFt = Math.round(projDist / ftToCoord);
-      if (newDepthFt < 1) newDepthFt = 1;
-      if (newDepthFt > 200) newDepthFt = 200;
-
-      bldg.bumpDepths[key] = newDepthFt;
-      drawBuildingOverlays(bldg);
-      updateBuildingLabels(bldg);
-      recalcStats();
-
-      // Reposition handle to new outer edge midpoint
-      var newOuterP1 = offFn(baseP1, dirAlong * newDepthFt, dirPerp * newDepthFt);
-      var newOuterP2 = offFn(baseP2, dirAlong * newDepthFt, dirPerp * newDepthFt);
-      handle.setLatLng(getMidpoint(newOuterP1, newOuterP2));
-    });
-
-    handle.on('dragend', function() {
-      _activeBumpDrag = null;
-      map.dragging.enable();
-      hideBumpHandles();
-      drawBuildingOverlays(bldg);
-      updateBuildingLabels(bldg);
-      recalcStats();
-    });
-
-    bumpHandles.push(handle);
-  }
-
   // ===== BUMP OUTS =====
   // Bump outs are rectangular protrusions at the ends of the building, facing the truck court.
   // Each bump out is bayWidth (52/54/56/60 ft) along the building edge × BAY_STD_DEPTH (50 ft) deep outward.
@@ -2374,16 +2396,12 @@ function drawBuildingOverlays(b) {
         var bl2 = offsetPt(v[0], bwTL, 0);
         addEdgeOverlay(bl1, bl2, bumpDepthTL, 0, -1, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(bl1, bl2, 0, -1, bumpDepthTL, bwTL);
-        addBumpDragHandle(b, 'topLeft', bl1, bl2, 0, -1, bumpDepthTL, offsetPt);
-        addBumpWidthHandle(b, 'topLeft', bl1, bl2, 0, -1, bumpDepthTL, bwTL, offsetPt, 'h');
       }
       if (b.bumpTopRight) {
         var br1 = offsetPt(v[1], -bwTR, 0);
         var br2 = v[1];
         addEdgeOverlay(br1, br2, bumpDepthTR, 0, -1, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(br1, br2, 0, -1, bumpDepthTR, bwTR);
-        addBumpDragHandle(b, 'topRight', br1, br2, 0, -1, bumpDepthTR, offsetPt);
-        addBumpWidthHandle(b, 'topRight', br1, br2, 0, -1, bumpDepthTR, bwTR, offsetPt, 'h');
       }
       // Bottom truck court bump outs (protrude outward from bottom = perp +1)
       if (b.bumpBotLeft) {
@@ -2391,16 +2409,12 @@ function drawBuildingOverlays(b) {
         var bl2 = offsetPt(v[3], bwBL, 0);
         addEdgeOverlay(bl1, bl2, bumpDepthBL, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(bl1, bl2, 0, 1, bumpDepthBL, bwBL);
-        addBumpDragHandle(b, 'botLeft', bl1, bl2, 0, 1, bumpDepthBL, offsetPt);
-        addBumpWidthHandle(b, 'botLeft', bl1, bl2, 0, 1, bumpDepthBL, bwBL, offsetPt, 'h');
       }
       if (b.bumpBotRight) {
         var br1 = offsetPt(v[2], -bwBR, 0);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepthBR, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(br1, br2, 0, 1, bumpDepthBR, bwBR);
-        addBumpDragHandle(b, 'botRight', br1, br2, 0, 1, bumpDepthBR, offsetPt);
-        addBumpWidthHandle(b, 'botRight', br1, br2, 0, 1, bumpDepthBR, bwBR, offsetPt, 'h');
       }
     } else {
       // Rear load: truck court on bottom (south side)
@@ -2409,16 +2423,12 @@ function drawBuildingOverlays(b) {
         var bl2 = offsetPt(v[3], bwRL, 0);
         addEdgeOverlay(bl1, bl2, bumpDepthRL, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(bl1, bl2, 0, 1, bumpDepthRL, bwRL);
-        addBumpDragHandle(b, 'rearLeft', bl1, bl2, 0, 1, bumpDepthRL, offsetPt);
-        addBumpWidthHandle(b, 'rearLeft', bl1, bl2, 0, 1, bumpDepthRL, bwRL, offsetPt, 'h');
       }
       if (b.bumpRearRight) {
         var br1 = offsetPt(v[2], -bwRR, 0);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepthRR, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(br1, br2, 0, 1, bumpDepthRR, bwRR);
-        addBumpDragHandle(b, 'rearRight', br1, br2, 0, 1, bumpDepthRR, offsetPt);
-        addBumpWidthHandle(b, 'rearRight', br1, br2, 0, 1, bumpDepthRR, bwRR, offsetPt, 'h');
       }
     }
   } else {
@@ -2431,16 +2441,12 @@ function drawBuildingOverlays(b) {
         var bl2 = offsetPt(v[0], 0, bwTL);
         addEdgeOverlay(bl1, bl2, bumpDepthTL, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(bl1, bl2, -1, 0, bumpDepthTL, bwTL);
-        addBumpDragHandle(b, 'topLeft', bl1, bl2, -1, 0, bumpDepthTL, offsetPt);
-        addBumpWidthHandle(b, 'topLeft', bl1, bl2, -1, 0, bumpDepthTL, bwTL, offsetPt, 'v');
       }
       if (b.bumpTopRight) {
         var br1 = offsetPt(v[3], 0, -bwTR);
         var br2 = v[3];
         addEdgeOverlay(br1, br2, bumpDepthTR, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(br1, br2, -1, 0, bumpDepthTR, bwTR);
-        addBumpDragHandle(b, 'topRight', br1, br2, -1, 0, bumpDepthTR, offsetPt);
-        addBumpWidthHandle(b, 'topRight', br1, br2, -1, 0, bumpDepthTR, bwTR, offsetPt, 'v');
       }
       // Bottom/right truck court bump outs (protrude outward from right = along +1)
       if (b.bumpBotLeft) {
@@ -2448,16 +2454,12 @@ function drawBuildingOverlays(b) {
         var bl2 = offsetPt(v[1], 0, bwBL);
         addEdgeOverlay(bl1, bl2, bumpDepthBL, 1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(bl1, bl2, 1, 0, bumpDepthBL, bwBL);
-        addBumpDragHandle(b, 'botLeft', bl1, bl2, 1, 0, bumpDepthBL, offsetPt);
-        addBumpWidthHandle(b, 'botLeft', bl1, bl2, 1, 0, bumpDepthBL, bwBL, offsetPt, 'v');
       }
       if (b.bumpBotRight) {
         var br1 = offsetPt(v[2], 0, -bwBR);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepthBR, 1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(br1, br2, 1, 0, bumpDepthBR, bwBR);
-        addBumpDragHandle(b, 'botRight', br1, br2, 1, 0, bumpDepthBR, offsetPt);
-        addBumpWidthHandle(b, 'botRight', br1, br2, 1, 0, bumpDepthBR, bwBR, offsetPt, 'v');
       }
     } else {
       // Rear load: truck court on left (west side)
@@ -2466,16 +2468,12 @@ function drawBuildingOverlays(b) {
         var bl2 = offsetPt(v[0], 0, bwRL);
         addEdgeOverlay(bl1, bl2, bumpDepthRL, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(bl1, bl2, -1, 0, bumpDepthRL, bwRL);
-        addBumpDragHandle(b, 'rearLeft', bl1, bl2, -1, 0, bumpDepthRL, offsetPt);
-        addBumpWidthHandle(b, 'rearLeft', bl1, bl2, -1, 0, bumpDepthRL, bwRL, offsetPt, 'v');
       }
       if (b.bumpRearRight) {
         var br1 = offsetPt(v[3], 0, -bwRR);
         var br2 = v[3];
         addEdgeOverlay(br1, br2, bumpDepthRR, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
         addBumpOutLabel(br1, br2, -1, 0, bumpDepthRR, bwRR);
-        addBumpDragHandle(b, 'rearRight', br1, br2, -1, 0, bumpDepthRR, offsetPt);
-        addBumpWidthHandle(b, 'rearRight', br1, br2, -1, 0, bumpDepthRR, bwRR, offsetPt, 'v');
       }
     }
   }
