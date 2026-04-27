@@ -852,16 +852,45 @@ function updateBuildingPolygon(b, newVerts) {
 
 /* ===== BUILDING DIMENSION LABELS ===== */
 
-function getBuildingDimensions(verts) {
+function getBuildingDimensions(verts, bldg) {
   // For customized polygons with >4 vertices, compute bounding box dimensions
   if (verts.length < 3) return { width: 0, depth: 0, sf: 0 };
   if (verts.length === 4) {
     var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
     var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
-    var w = Math.round(Math.max(d01, d12));
-    var d = Math.round(Math.min(d01, d12));
+    // Use _widthDir to determine which edge is width (survives reshape/rotation)
+    var topIsWidth;
+    if (bldg && bldg._widthDir) {
+      var center = getPolygonCenter(verts);
+      var latScale = Math.cos(center.lat * Math.PI / 180);
+      var topDx = (verts[1].lng - verts[0].lng) * latScale;
+      var topDy = verts[1].lat - verts[0].lat;
+      var topLen = Math.sqrt(topDx * topDx + topDy * topDy);
+      var rightDx = (verts[2].lng - verts[1].lng) * latScale;
+      var rightDy = verts[2].lat - verts[1].lat;
+      var rightLen = Math.sqrt(rightDx * rightDx + rightDy * rightDy);
+      var uTopX = topDx / (topLen || 1);
+      var uTopY = topDy / (topLen || 1);
+      var uRightX = rightDx / (rightLen || 1);
+      var uRightY = rightDy / (rightLen || 1);
+      var dotTop = Math.abs(uTopX * bldg._widthDir.x + uTopY * bldg._widthDir.y);
+      var dotRight = Math.abs(uRightX * bldg._widthDir.x + uRightY * bldg._widthDir.y);
+      topIsWidth = (dotTop >= dotRight);
+    } else {
+      topIsWidth = (d01 >= d12);
+    }
+    var w, d, edgeW;
+    if (topIsWidth) {
+      w = Math.round(d01);
+      d = Math.round(d12);
+      edgeW = 0;
+    } else {
+      w = Math.round(d12);
+      d = Math.round(d01);
+      edgeW = 1;
+    }
     var sf = w * d;
-    return { width: w, depth: d, sf: sf, edgeW: d01 > d12 ? 0 : 1 };
+    return { width: w, depth: d, sf: sf, edgeW: edgeW };
   }
   // For non-rectangular: use bounding box approximation
   var minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
@@ -905,7 +934,7 @@ function updateBuildingLabels(b) {
   var verts = b.vertices;
   if (verts.length < 3) return;
 
-  var dims = getBuildingDimensions(verts);
+  var dims = getBuildingDimensions(verts, b);
   var center = getPolygonCenter(verts);
 
   // SF label in center — include bump out SF (use actual polygon area for custom shapes)
@@ -4645,7 +4674,7 @@ function autoSnapToOptimalBays() {
   var b = getActiveBuilding();
   if (!b) { setStatus('Select a building first'); return; }
   
-  var dims = getBuildingDimensions(b.vertices);
+  var dims = getBuildingDimensions(b.vertices, b);
   if (dims.width < 10 || dims.depth < 10) { setStatus('Building too small for bay snapping'); return; }
   
   var config = calculateBestBayFit(dims.width, dims.depth, b.type);
@@ -4858,7 +4887,7 @@ function drawBayGrid(b) {
     bSpeedDepth = b._baySpeedDepth || 60;
   } else {
     // Calculate best fit from dimensions
-    var dims = getBuildingDimensions(b.vertices);
+    var dims = getBuildingDimensions(b.vertices, b);
     var config = calculateBestBayFit(dims.width, dims.depth, b.type);
     if (!config) return;
     widthBays = config.widthBays;
@@ -5115,7 +5144,7 @@ function drawAllBayGrids() {
 // Update bay UI when a building is selected
 function updateBayUIForBuilding(b) {
   if (!b) return;
-  var dims = getBuildingDimensions(b.vertices);
+  var dims = getBuildingDimensions(b.vertices, b);
   var config = calculateBestBayFit(dims.width, dims.depth, b.type);
   if (config) {
     var elBCW2 = document.getElementById('bay-count-width');
