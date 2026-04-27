@@ -148,6 +148,7 @@ select option{background:var(--panel2)}
 .handle-resize{background:#3b82f6;color:#fff}
 .handle-depth{background:#10b981;color:#fff}
 .handle-rotate{background:#f59e0b;color:#fff}
+.handle-bump-w{background:#3b82f6;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #fff;user-select:none;line-height:1}
 .handle-bump{background:#ef4444;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid #fff;user-select:none;line-height:1}
 .site-name{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--accent2);cursor:pointer;padding:4px 8px;border-radius:4px;transition:background .15s;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block}
 .site-name:hover{background:var(--panel2)}
@@ -1403,7 +1404,8 @@ function registerBuilding(layer, verts) {
     bumpRearLeft: false,
     bumpRearRight: false,
     // Custom bump out depths (default = BAY_STD_DEPTH = 50 ft)
-    bumpDepths: { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 }
+    bumpDepths: { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 },
+    bumpWidths: {}
   };
   // Store the initial width-direction unit vector so resizeBuildingToBays
   // can always determine which current edge aligns with the original width,
@@ -1836,6 +1838,7 @@ function applyBuildingOptions() {
   // should be inset by that amount on the corresponding end to sit inside the bump outs.
   var bumpInset = bayWidth; // same width as bump out (52/54/56/60)
   if (!b.bumpDepths) b.bumpDepths = { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 };
+  if (!b.bumpWidths) b.bumpWidths = {};
   if (b.type === 'rear') {
     var rearInsetBase = parseFloat(document.getElementById('tc-inset-rear').value) || 0;
     // Auto-add bump out inset only when bumpout exists AND has positive depth
@@ -2222,12 +2225,63 @@ function drawBuildingOverlays(b) {
   // ===== BUMP OUT DRAG HANDLES =====
   // Places a draggable marker on the outer edge of a bump out so the user
   // can resize its depth by dragging.
+  function addBumpWidthHandle(bldg, key, p1, p2, dirAlongFt, dirPerpFt, depthFt, widthFt, offsetPtFn, orient) {
+    // Place handle at the p2 side of bumpout, offset outward by half depth
+    var handlePos = offsetPtFn(p2, dirAlongFt * depthFt / 2, dirPerpFt * depthFt / 2);
+    var icon = createHandleIcon('handle-bump-w', '↔');
+    var marker = L.marker(handlePos, {
+      icon: icon, draggable: true, zIndexOffset: 1100, interactive: true
+    }).addTo(bldg.overlayGroup);
+
+    marker.on('dragstart', function() { map.dragging.disable(); });
+    marker.on('drag', function(e) {
+      var ll = e.target.getLatLng();
+      var anchorPt = p1;
+      var newWidthFt;
+      var refA = map.latLngToLayerPoint(p1);
+      var refB = map.latLngToLayerPoint(p2);
+      var refPx = Math.sqrt(Math.pow(refB.x - refA.x, 2) + Math.pow(refB.y - refA.y, 2));
+      if (refPx < 1) refPx = 1;
+      var pxPerFt = refPx / widthFt;
+      if (orient === 'h') {
+        var dxM = map.latLngToLayerPoint(ll).x - map.latLngToLayerPoint(anchorPt).x;
+        newWidthFt = Math.abs(dxM) / pxPerFt;
+      } else {
+        var dyM = map.latLngToLayerPoint(ll).y - map.latLngToLayerPoint(anchorPt).y;
+        newWidthFt = Math.abs(dyM) / pxPerFt;
+      }
+      if (newWidthFt < 10) newWidthFt = 10;
+      if (newWidthFt > 200) newWidthFt = 200;
+      newWidthFt = Math.round(newWidthFt);
+      if (!bldg.bumpWidths) bldg.bumpWidths = {};
+      bldg.bumpWidths[key] = newWidthFt;
+      recalcStats();
+      drawBuildingOverlays(bldg);
+      drawBayGrid(bldg);
+      refreshHandlePositions(bldg);
+    });
+    marker.on('dragend', function() {
+      map.dragging.enable();
+      var bld = buildings.find(function(x) { return x.id === bldg.id; });
+      if (bld) {
+        bld.baseVertices = bld.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
+        bld.rotation = 0;
+        bld.scale = 100;
+        recalcStats();
+        drawBuildingOverlays(bld);
+        drawBayGrid(bld);
+        refreshHandlePositions(bld);
+        checkOutOfBounds();
+      }
+    });
+  }
+
   function addBumpDragHandle(bldg, key, baseP1, baseP2, dirAlong, dirPerp, depthFt, offFn) {
     var outerP1 = offFn(baseP1, dirAlong * depthFt, dirPerp * depthFt);
     var outerP2 = offFn(baseP2, dirAlong * depthFt, dirPerp * depthFt);
     var mid = getMidpoint(outerP1, outerP2);
     var handle = L.marker(mid, {
-      icon: createHandleIcon('handle-bump', '⇔'),
+      icon: createHandleIcon('handle-bump', '↕'),
       draggable: true,
       zIndexOffset: 2100
     }).addTo(map);
@@ -2249,7 +2303,7 @@ function drawBuildingOverlays(b) {
       var extLen = Math.sqrt(extX * extX + extY * extY) || 1;
       var projDist = (dx * extX + dy * extY) / extLen;
       var newDepthFt = Math.round(projDist / ftToCoord);
-      if (newDepthFt < -200) newDepthFt = -200;
+      if (newDepthFt < 1) newDepthFt = 1;
       if (newDepthFt > 200) newDepthFt = 200;
 
       bldg.bumpDepths[key] = newDepthFt;
@@ -2287,15 +2341,21 @@ function drawBuildingOverlays(b) {
   var bumpDepthRL = b.bumpDepths.rearLeft || BAY_STD_DEPTH;
   var bumpDepthRR = b.bumpDepths.rearRight || BAY_STD_DEPTH;
   var bumpWidth = b._bayWidth || bayWidth; // bay width (52/54/56/60)
+  var bwTL = b.bumpWidths.topLeft || bumpWidth;
+  var bwTR = b.bumpWidths.topRight || bumpWidth;
+  var bwBL = b.bumpWidths.botLeft || bumpWidth;
+  var bwBR = b.bumpWidths.botRight || bumpWidth;
+  var bwRL = b.bumpWidths.rearLeft || bumpWidth;
+  var bwRR = b.bumpWidths.rearRight || bumpWidth;
   var BUMP_COLOR = '#ffffff'; // same color as building
   var BUMP_OP = 1;
 
   // Helper: add a dimension label inside a bump out overlay
-  function addBumpOutLabel(p1, p2, dirAlongFt, dirPerpFt, depthFt) {
+  function addBumpOutLabel(p1, p2, dirAlongFt, dirPerpFt, depthFt, widthFt) {
     // Calculate center of the bump out rectangle
     var mid12 = getMidpoint(p1, p2);
     var halfDepthPt = offsetPt(mid12, dirAlongFt * depthFt / 2, dirPerpFt * depthFt / 2);
-    var labelText = bumpWidth + "' × " + depthFt + "'";
+    var labelText = (widthFt || bumpWidth) + "' × " + depthFt + "'";
     var icon = L.divIcon({
       className: 'bldg-label',
       html: '<div style="font-family:DM Mono,monospace;font-size:10px;color:#fff;text-shadow:0 0 5px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.7);white-space:nowrap;text-align:center;pointer-events:none;font-weight:600">' + labelText + '</div>',
@@ -2311,48 +2371,54 @@ function drawBuildingOverlays(b) {
       // Top truck court bump outs (protrude outward from top = perp -1)
       if (b.bumpTopLeft) {
         var bl1 = v[0];
-        var bl2 = offsetPt(v[0], bumpWidth, 0);
+        var bl2 = offsetPt(v[0], bwTL, 0);
         addEdgeOverlay(bl1, bl2, bumpDepthTL, 0, -1, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(bl1, bl2, 0, -1, bumpDepthTL);
+        addBumpOutLabel(bl1, bl2, 0, -1, bumpDepthTL, bwTL);
         addBumpDragHandle(b, 'topLeft', bl1, bl2, 0, -1, bumpDepthTL, offsetPt);
+        addBumpWidthHandle(b, 'topLeft', bl1, bl2, 0, -1, bumpDepthTL, bwTL, offsetPt, 'h');
       }
       if (b.bumpTopRight) {
-        var br1 = offsetPt(v[1], -bumpWidth, 0);
+        var br1 = offsetPt(v[1], -bwTR, 0);
         var br2 = v[1];
         addEdgeOverlay(br1, br2, bumpDepthTR, 0, -1, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(br1, br2, 0, -1, bumpDepthTR);
+        addBumpOutLabel(br1, br2, 0, -1, bumpDepthTR, bwTR);
         addBumpDragHandle(b, 'topRight', br1, br2, 0, -1, bumpDepthTR, offsetPt);
+        addBumpWidthHandle(b, 'topRight', br1, br2, 0, -1, bumpDepthTR, bwTR, offsetPt, 'h');
       }
       // Bottom truck court bump outs (protrude outward from bottom = perp +1)
       if (b.bumpBotLeft) {
         var bl1 = v[3];
-        var bl2 = offsetPt(v[3], bumpWidth, 0);
+        var bl2 = offsetPt(v[3], bwBL, 0);
         addEdgeOverlay(bl1, bl2, bumpDepthBL, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(bl1, bl2, 0, 1, bumpDepthBL);
+        addBumpOutLabel(bl1, bl2, 0, 1, bumpDepthBL, bwBL);
         addBumpDragHandle(b, 'botLeft', bl1, bl2, 0, 1, bumpDepthBL, offsetPt);
+        addBumpWidthHandle(b, 'botLeft', bl1, bl2, 0, 1, bumpDepthBL, bwBL, offsetPt, 'h');
       }
       if (b.bumpBotRight) {
-        var br1 = offsetPt(v[2], -bumpWidth, 0);
+        var br1 = offsetPt(v[2], -bwBR, 0);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepthBR, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(br1, br2, 0, 1, bumpDepthBR);
+        addBumpOutLabel(br1, br2, 0, 1, bumpDepthBR, bwBR);
         addBumpDragHandle(b, 'botRight', br1, br2, 0, 1, bumpDepthBR, offsetPt);
+        addBumpWidthHandle(b, 'botRight', br1, br2, 0, 1, bumpDepthBR, bwBR, offsetPt, 'h');
       }
     } else {
       // Rear load: truck court on bottom (south side)
       if (b.bumpRearLeft) {
         var bl1 = v[3];
-        var bl2 = offsetPt(v[3], bumpWidth, 0);
+        var bl2 = offsetPt(v[3], bwRL, 0);
         addEdgeOverlay(bl1, bl2, bumpDepthRL, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(bl1, bl2, 0, 1, bumpDepthRL);
+        addBumpOutLabel(bl1, bl2, 0, 1, bumpDepthRL, bwRL);
         addBumpDragHandle(b, 'rearLeft', bl1, bl2, 0, 1, bumpDepthRL, offsetPt);
+        addBumpWidthHandle(b, 'rearLeft', bl1, bl2, 0, 1, bumpDepthRL, bwRL, offsetPt, 'h');
       }
       if (b.bumpRearRight) {
-        var br1 = offsetPt(v[2], -bumpWidth, 0);
+        var br1 = offsetPt(v[2], -bwRR, 0);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepthRR, 0, 1, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(br1, br2, 0, 1, bumpDepthRR);
+        addBumpOutLabel(br1, br2, 0, 1, bumpDepthRR, bwRR);
         addBumpDragHandle(b, 'rearRight', br1, br2, 0, 1, bumpDepthRR, offsetPt);
+        addBumpWidthHandle(b, 'rearRight', br1, br2, 0, 1, bumpDepthRR, bwRR, offsetPt, 'h');
       }
     }
   } else {
@@ -2362,48 +2428,54 @@ function drawBuildingOverlays(b) {
       // Top/left truck court bump outs (protrude outward from left = along -1)
       if (b.bumpTopLeft) {
         var bl1 = v[0];
-        var bl2 = offsetPt(v[0], 0, bumpWidth);
+        var bl2 = offsetPt(v[0], 0, bwTL);
         addEdgeOverlay(bl1, bl2, bumpDepthTL, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(bl1, bl2, -1, 0, bumpDepthTL);
+        addBumpOutLabel(bl1, bl2, -1, 0, bumpDepthTL, bwTL);
         addBumpDragHandle(b, 'topLeft', bl1, bl2, -1, 0, bumpDepthTL, offsetPt);
+        addBumpWidthHandle(b, 'topLeft', bl1, bl2, -1, 0, bumpDepthTL, bwTL, offsetPt, 'v');
       }
       if (b.bumpTopRight) {
-        var br1 = offsetPt(v[3], 0, -bumpWidth);
+        var br1 = offsetPt(v[3], 0, -bwTR);
         var br2 = v[3];
         addEdgeOverlay(br1, br2, bumpDepthTR, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(br1, br2, -1, 0, bumpDepthTR);
+        addBumpOutLabel(br1, br2, -1, 0, bumpDepthTR, bwTR);
         addBumpDragHandle(b, 'topRight', br1, br2, -1, 0, bumpDepthTR, offsetPt);
+        addBumpWidthHandle(b, 'topRight', br1, br2, -1, 0, bumpDepthTR, bwTR, offsetPt, 'v');
       }
       // Bottom/right truck court bump outs (protrude outward from right = along +1)
       if (b.bumpBotLeft) {
         var bl1 = v[1];
-        var bl2 = offsetPt(v[1], 0, bumpWidth);
+        var bl2 = offsetPt(v[1], 0, bwBL);
         addEdgeOverlay(bl1, bl2, bumpDepthBL, 1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(bl1, bl2, 1, 0, bumpDepthBL);
+        addBumpOutLabel(bl1, bl2, 1, 0, bumpDepthBL, bwBL);
         addBumpDragHandle(b, 'botLeft', bl1, bl2, 1, 0, bumpDepthBL, offsetPt);
+        addBumpWidthHandle(b, 'botLeft', bl1, bl2, 1, 0, bumpDepthBL, bwBL, offsetPt, 'v');
       }
       if (b.bumpBotRight) {
-        var br1 = offsetPt(v[2], 0, -bumpWidth);
+        var br1 = offsetPt(v[2], 0, -bwBR);
         var br2 = v[2];
         addEdgeOverlay(br1, br2, bumpDepthBR, 1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(br1, br2, 1, 0, bumpDepthBR);
+        addBumpOutLabel(br1, br2, 1, 0, bumpDepthBR, bwBR);
         addBumpDragHandle(b, 'botRight', br1, br2, 1, 0, bumpDepthBR, offsetPt);
+        addBumpWidthHandle(b, 'botRight', br1, br2, 1, 0, bumpDepthBR, bwBR, offsetPt, 'v');
       }
     } else {
       // Rear load: truck court on left (west side)
       if (b.bumpRearLeft) {
         var bl1 = v[0];
-        var bl2 = offsetPt(v[0], 0, bumpWidth);
+        var bl2 = offsetPt(v[0], 0, bwRL);
         addEdgeOverlay(bl1, bl2, bumpDepthRL, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(bl1, bl2, -1, 0, bumpDepthRL);
+        addBumpOutLabel(bl1, bl2, -1, 0, bumpDepthRL, bwRL);
         addBumpDragHandle(b, 'rearLeft', bl1, bl2, -1, 0, bumpDepthRL, offsetPt);
+        addBumpWidthHandle(b, 'rearLeft', bl1, bl2, -1, 0, bumpDepthRL, bwRL, offsetPt, 'v');
       }
       if (b.bumpRearRight) {
-        var br1 = offsetPt(v[3], 0, -bumpWidth);
+        var br1 = offsetPt(v[3], 0, -bwRR);
         var br2 = v[3];
         addEdgeOverlay(br1, br2, bumpDepthRR, -1, 0, BUMP_COLOR, BUMP_OP, 'bumpout');
-        addBumpOutLabel(br1, br2, -1, 0, bumpDepthRR);
+        addBumpOutLabel(br1, br2, -1, 0, bumpDepthRR, bwRR);
         addBumpDragHandle(b, 'rearRight', br1, br2, -1, 0, bumpDepthRR, offsetPt);
+        addBumpWidthHandle(b, 'rearRight', br1, br2, -1, 0, bumpDepthRR, bwRR, offsetPt, 'v');
       }
     }
   }
@@ -4151,6 +4223,7 @@ function serializeSite() {
         bumpRearLeft: b.bumpRearLeft || false,
         bumpRearRight: b.bumpRearRight || false,
         bumpDepths: b.bumpDepths || { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 }
+        bumpWidths: b.bumpWidths || {},
       };
     }),
     roads: roads.map(function(r) {
@@ -4322,6 +4395,7 @@ function deserializeSite(data) {
         bumpRearLeft: bd.bumpRearLeft || false,
         bumpRearRight: bd.bumpRearRight || false,
       bumpDepths: bd.bumpDepths || { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 },
+      bumpWidths: bd.bumpWidths || {},
         labelGroup: null
       };
       buildings.push(bldg);
