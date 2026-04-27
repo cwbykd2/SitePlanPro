@@ -819,9 +819,13 @@ function getBuildingDimensions(verts, bldg) {
   if (verts.length === 4) {
     var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
     var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
-    // Use _widthDir to determine which edge is width (survives reshape/rotation)
+    // Use cached _topIsWidth flag (set at creation / first resize) so the
+    // width/depth assignment never flips.  Fall back to _widthDir dot-product
+    // comparison, then to edge-length heuristic.
     var topIsWidth;
-    if (bldg && bldg._widthDir) {
+    if (bldg && typeof bldg._topIsWidth === 'boolean') {
+      topIsWidth = bldg._topIsWidth;
+    } else if (bldg && bldg._widthDir) {
       var center = getPolygonCenter(verts);
       var latScale = Math.cos(center.lat * Math.PI / 180);
       var topDx = (verts[1].lng - verts[0].lng) * latScale;
@@ -1393,8 +1397,9 @@ function registerBuilding(layer, verts) {
     var latScale = Math.cos(verts[0].lat * Math.PI / 180);
     var d01 = verts[0].distanceTo(verts[1]);
     var d12 = verts[1].distanceTo(verts[2]);
+    var topIsWidth = (d01 >= d12);
     var wEdge; // the edge that represents "width"
-    if (d01 >= d12) {
+    if (topIsWidth) {
       // top edge (0→1) is width
       wEdge = { dx: (verts[1].lng - verts[0].lng) * latScale, dy: verts[1].lat - verts[0].lat };
     } else {
@@ -1403,6 +1408,8 @@ function registerBuilding(layer, verts) {
     }
     var len = Math.sqrt(wEdge.dx * wEdge.dx + wEdge.dy * wEdge.dy);
     bldg._widthDir = { x: wEdge.dx / len, y: wEdge.dy / len };
+    // Cache which edge is width so resizeBuildingToBays never flips
+    bldg._topIsWidth = topIsWidth;
   })();
   buildings.push(bldg);
   activeBuilding = id;
@@ -4450,7 +4457,7 @@ function resizeBuildingToBays(b, config) {
   var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
   var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
   
-  // Edge vectors
+  // Edge unit vectors (in lat/lng-scaled coords)
   var topDx = (verts[1].lng - verts[0].lng) * latScale;
   var topDy = verts[1].lat - verts[0].lat;
   var topLen = Math.sqrt(topDx * topDx + topDy * topDy);
@@ -4463,58 +4470,51 @@ function resizeBuildingToBays(b, config) {
   var uRightX = rightDx / rightLen;
   var uRightY = rightDy / rightLen;
   
-  var ftToCoord = 1 / (111320 * FEET_PER_METER);
-  
-  // Determine which current edge aligns with the original "width" direction.
-  // We compare the current top-edge unit vector against the stored width
-  // direction vector.  If the dot-product magnitude is high (i.e. they are
-  // roughly parallel), the top edge is still the width; otherwise the right
-  // edge is the width.  This survives arbitrary rotations.
+  // Use the cached _topIsWidth flag if available (set once at creation or
+  // first resize) so the assignment never flips between calls.  Fall back
+  // to _widthDir dot-product comparison, then to edge-length heuristic.
   var topIsWidth;
-  if (b._widthDir) {
+  if (typeof b._topIsWidth === 'boolean') {
+    topIsWidth = b._topIsWidth;
+  } else if (b._widthDir) {
     var dotTop   = Math.abs(uTopX * b._widthDir.x + uTopY * b._widthDir.y);
     var dotRight = Math.abs(uRightX * b._widthDir.x + uRightY * b._widthDir.y);
     topIsWidth = (dotTop >= dotRight);
   } else {
-    // Fallback for buildings created before this change
     topIsWidth = (d01 >= d12);
   }
+  // Cache the decision so it never flips on subsequent bay-width changes
+  b._topIsWidth = topIsWidth;
   
-  var widthFt, depthFt;
-  if (topIsWidth) {
-    widthFt = config.totalWidth;
-    depthFt = config.totalDepth;
-  } else {
-    widthFt = config.totalDepth;
-    depthFt = config.totalWidth;
-  }
+  // Desired feet for each edge
+  var topTargetFt  = topIsWidth ? config.totalWidth : config.totalDepth;
+  var rightTargetFt = topIsWidth ? config.totalDepth : config.totalWidth;
   
-  // Scale factors for each axis
-  var topScaleFt = d01;
-  var rightScaleFt = d12;
-  var topRatio = (topIsWidth ? widthFt : depthFt) / topScaleFt;
-  var rightRatio = (topIsWidth ? depthFt : widthFt) / rightScaleFt;
+  // Convert target feet to coordinate-space lengths (same unit as topLen/rightLen)
+  var topTargetLen  = topLen * (topTargetFt / d01);
+  var rightTargetLen = rightLen * (rightTargetFt / d12);
   
-  // Rebuild vertices from center using scaled edge vectors
-  var halfTopLen = (topLen * topRatio) / 2;
-  var halfRightLen = (rightLen * rightRatio) / 2;
+  // Anchor the resize to the CENTER of the building so it stays in place.
+  // Rebuild the four corners from center + half-extents along each edge direction.
+  var halfTop = topTargetLen / 2;
+  var halfRight = rightTargetLen / 2;
   
   var newVerts = [
     L.latLng(
-      center.lat - uTopY * halfTopLen - uRightY * halfRightLen,
-      center.lng + (-uTopX * halfTopLen - uRightX * halfRightLen) / latScale
+      center.lat - uTopY * halfTop - uRightY * halfRight,
+      center.lng + (-uTopX * halfTop - uRightX * halfRight) / latScale
     ),
     L.latLng(
-      center.lat + uTopY * halfTopLen - uRightY * halfRightLen,
-      center.lng + (uTopX * halfTopLen - uRightX * halfRightLen) / latScale
+      center.lat + uTopY * halfTop - uRightY * halfRight,
+      center.lng + (uTopX * halfTop - uRightX * halfRight) / latScale
     ),
     L.latLng(
-      center.lat + uTopY * halfTopLen + uRightY * halfRightLen,
-      center.lng + (uTopX * halfTopLen + uRightX * halfRightLen) / latScale
+      center.lat + uTopY * halfTop + uRightY * halfRight,
+      center.lng + (uTopX * halfTop + uRightX * halfRight) / latScale
     ),
     L.latLng(
-      center.lat - uTopY * halfTopLen + uRightY * halfRightLen,
-      center.lng + (-uTopX * halfTopLen + uRightX * halfRightLen) / latScale
+      center.lat - uTopY * halfTop + uRightY * halfRight,
+      center.lng + (-uTopX * halfTop + uRightX * halfRight) / latScale
     )
   ];
   
@@ -4524,7 +4524,7 @@ function resizeBuildingToBays(b, config) {
   b.scale = 100;
 
   // Update the stored width-direction vector from the freshly-baked vertices
-  // so future resizes (even after further rotations) stay consistent.
+  // so future resizes stay consistent.
   (function updateWidthDir() {
     var v = b.vertices;
     var ls = Math.cos(getPolygonCenter(v).lat * Math.PI / 180);
@@ -4678,10 +4678,12 @@ function drawBayGrid(b) {
   // Determine if this is a cross dock building (speed bays on both ends)
   var isCrossDock = b.type === 'cross';
 
-  // Use stored width-direction vector to determine which edge is width,
-  // consistent with resizeBuildingToBays (survives rotations).
+  // Use cached _topIsWidth flag for consistent width/depth assignment,
+  // falling back to _widthDir dot-product, then edge-length heuristic.
   var bayTopIsWidth;
-  if (b._widthDir) {
+  if (typeof b._topIsWidth === 'boolean') {
+    bayTopIsWidth = b._topIsWidth;
+  } else if (b._widthDir) {
     var dotTop   = Math.abs(uTopX * b._widthDir.x + uTopY * b._widthDir.y);
     var dotRight = Math.abs(uRightX * b._widthDir.x + uRightY * b._widthDir.y);
     bayTopIsWidth = (dotTop >= dotRight);
