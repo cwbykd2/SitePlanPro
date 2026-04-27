@@ -1835,24 +1835,25 @@ function applyBuildingOptions() {
   // Each bump out is bayWidth (52/54/56/60 ft) wide at the building end, so the truck court
   // should be inset by that amount on the corresponding end to sit inside the bump outs.
   var bumpInset = bayWidth; // same width as bump out (52/54/56/60)
+  if (!b.bumpDepths) b.bumpDepths = { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 };
   if (b.type === 'rear') {
     var rearInsetBase = parseFloat(document.getElementById('tc-inset-rear').value) || 0;
-    // Auto-add bump out inset on top of any manual inset
-    var autoInsetLeft = b.bumpRearLeft ? bumpInset : 0;
-    var autoInsetRight = b.bumpRearRight ? bumpInset : 0;
+    // Auto-add bump out inset only when bumpout exists AND has positive depth
+    var autoInsetLeft = (b.bumpRearLeft && b.bumpDepths.rearLeft > 0) ? bumpInset : 0;
+    var autoInsetRight = (b.bumpRearRight && b.bumpDepths.rearRight > 0) ? bumpInset : 0;
     b.tcInsetLeft = rearInsetBase + autoInsetLeft;
     b.tcInsetRight = rearInsetBase + autoInsetRight;
   } else {
     var topInsetBase = parseFloat(document.getElementById('tc-inset-top').value) || 0;
     var botInsetBase = parseFloat(document.getElementById('tc-inset-bot').value) || 0;
-    // Top truck court: auto-inset where bump outs exist
-    var autoTopLeft = b.bumpTopLeft ? bumpInset : 0;
-    var autoTopRight = b.bumpTopRight ? bumpInset : 0;
+    // Top truck court: auto-inset only when bumpout exists AND has positive depth
+    var autoTopLeft = (b.bumpTopLeft && b.bumpDepths.topLeft > 0) ? bumpInset : 0;
+    var autoTopRight = (b.bumpTopRight && b.bumpDepths.topRight > 0) ? bumpInset : 0;
     b.tcInsetTopLeft = topInsetBase + autoTopLeft;
     b.tcInsetTopRight = topInsetBase + autoTopRight;
-    // Bottom truck court: auto-inset where bump outs exist
-    var autoBotLeft = b.bumpBotLeft ? bumpInset : 0;
-    var autoBotRight = b.bumpBotRight ? bumpInset : 0;
+    // Bottom truck court: auto-inset only when bumpout exists AND has positive depth
+    var autoBotLeft = (b.bumpBotLeft && b.bumpDepths.botLeft > 0) ? bumpInset : 0;
+    var autoBotRight = (b.bumpBotRight && b.bumpDepths.botRight > 0) ? bumpInset : 0;
     b.tcInsetBottomLeft = botInsetBase + autoBotLeft;
     b.tcInsetBottomRight = botInsetBase + autoBotRight;
   }
@@ -2248,7 +2249,7 @@ function drawBuildingOverlays(b) {
       var extLen = Math.sqrt(extX * extX + extY * extY) || 1;
       var projDist = (dx * extX + dy * extY) / extLen;
       var newDepthFt = Math.round(projDist / ftToCoord);
-      if (newDepthFt < 1) newDepthFt = 1;
+      if (newDepthFt < -200) newDepthFt = -200;
       if (newDepthFt > 200) newDepthFt = 200;
 
       bldg.bumpDepths[key] = newDepthFt;
