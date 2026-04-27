@@ -2351,7 +2351,7 @@ function drawBuildingOverlays(b) {
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
       }
       
-      // Parking on the LONG edges (top and bottom of the building footprint)
+// Parking on the LONG edges (top and bottom of the building footprint)
       if (b.leftParking)  { var _pzL3 = addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsLeft));  b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
       if (b.rightParking) { var _pzR3 = addParkingSubZones(v[3], v[2], 0,  1, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
     } else {
@@ -2375,10 +2375,8 @@ function drawBuildingOverlays(b) {
       if (b.rightParking) { var _pzR3 = addParkingSubZones(v[1], v[2],  1, 0, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
     }
   }
-    // Cross dock side parking — sub-zoned
-    if (b.leftParking) { var _pzL3 = addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
-    if (b.rightParking) { var _pzR3 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
-  }
+
+  // ===== BUMP OUTS =====
 
   // ===== BUMP OUTS =====
   // Bump outs are rectangular protrusions at the ends of the building, facing the truck court.
