@@ -90,7 +90,7 @@ button{font-family:'Syne',sans-serif;font-weight:600;font-size:12px;cursor:point
 .btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
 .toolbar-sep{width:1px;height:28px;background:var(--border);flex-shrink:0}
 .app-body{flex:1;display:flex;overflow:hidden}
-.sidebar{width:290px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:500}
+.sidebar{width:290px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:1001}
 .sidebar-scroll{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
 .sidebar-scroll::-webkit-scrollbar{width:4px}
 .sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
@@ -725,7 +725,7 @@ select option{background:var(--panel2)}
 
     </div>
   </div>
-  <div style="flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column">
+  <div style="flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;z-index:0">
     <div id="road-width-modal" class="road-width-modal-overlay">
       <div class="road-width-modal">
         <h3>Road Width</h3>
