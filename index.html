@@ -250,6 +250,8 @@ select option{background:var(--panel2)}
   <button class="btn-ghost" id="btn-redraw-site" onclick="redrawSite()" style="display:none">Redraw Site</button>
   <button class="btn-ghost" onclick="clearAll()">Clear All</button>
   <button class="btn-ghost" id="btn-topo" onclick="toggleTopoLayer()" style="margin-left:auto">🏔 Elevation</button>
+  <button class="btn-ghost" id="btn-nwi" onclick="toggleNWILayer()">💧 Wetlands</button>
+  <button class="btn-ghost" id="btn-fema" onclick="toggleFEMALayer()">🌊 Flood</button>
   <button class="btn-ghost" id="btn-export-pdf" onclick="exportPDF()">📄 Export PDF</button>
 </header>
 <div class="app-body">
@@ -817,6 +819,59 @@ function toggleTopoLayer() {
     btn.style.background = 'rgba(0,200,150,0.08)';
   }
 }
+
+var nwiLayer = L.tileLayer.wms('https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/services/Wetlands/MapServer/WMSServer', {
+  layers:'1',
+  format:'image/png',
+  transparent:true,
+  opacity:0.65,
+  attribution:'NWI &copy; USFWS'
+});
+var nwiVisible = false;
+
+function toggleNWILayer() {
+  var btn = document.getElementById('btn-nwi');
+  if (nwiVisible) {
+    map.removeLayer(nwiLayer);
+    nwiVisible = false;
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    btn.style.background = '';
+  } else {
+    nwiLayer.addTo(map);
+    nwiVisible = true;
+    btn.style.borderColor = '#0ea5e9';
+    btn.style.color = '#0ea5e9';
+    btn.style.background = 'rgba(14,165,233,0.08)';
+  }
+}
+
+var femaLayer = L.tileLayer.wms('https://hazards.fema.gov/arcgis/services/public/NFHLWMS/MapServer/WMSServer', {
+  layers:'28',
+  format:'image/png',
+  transparent:true,
+  opacity:0.55,
+  attribution:'NFHL &copy; FEMA'
+});
+var femaVisible = false;
+
+function toggleFEMALayer() {
+  var btn = document.getElementById('btn-fema');
+  if (femaVisible) {
+    map.removeLayer(femaLayer);
+    femaVisible = false;
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    btn.style.background = '';
+  } else {
+    femaLayer.addTo(map);
+    femaVisible = true;
+    btn.style.borderColor = '#f59e0b';
+    btn.style.color = '#f59e0b';
+    btn.style.background = 'rgba(245,158,11,0.08)';
+  }
+}
+
 /* ===== ZOOM-RESPONSIVE LABEL SCALING ===== */
 var LABEL_BASE_ZOOM = 17;
 function updateLabelScaling() {
