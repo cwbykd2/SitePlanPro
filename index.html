@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>SitePlan Pro</title>
+<title>SitePlan Prep</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap"/>
@@ -4154,14 +4154,14 @@ function setSiteName(name) {
   sep.style.display = '';
   display.textContent = name;
   display.title = 'Click to rename: ' + name;
-  document.title = name + ' — SitePlan Pro';
+  document.title = name + ' — SitePlan Prep';
 }
 
 function clearSiteName() {
   currentSiteName = null;
   document.getElementById('site-name-wrap').classList.add('hidden');
   document.getElementById('site-name-sep').style.display = 'none';
-  document.title = 'SitePlan Pro';
+  document.title = 'SitePlan Prep';
 }
 
 function renameSite() {
