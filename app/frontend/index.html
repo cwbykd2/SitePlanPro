@@ -4286,6 +4286,8 @@ function exportPDF() {
 
 function clearAll() {
   if (!confirm('Clear everything?')) return;
+  currentSiteName = null;
+  clearSiteName();
   stopDraw();
   disableSiteEditing();
   clearOutOfBoundsLayers();
@@ -4337,7 +4339,11 @@ function getSavedSites() {
 }
 
 function saveSitesIndex(sites) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sites));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sites));
+  } catch(e) {
+    setStatus('Storage full — could not save. Try deleting old sites.');
+  }
 }
 
 function promptSiteName(isRename) {
@@ -5819,10 +5825,10 @@ function escHtml(s) {
 }
 
 function loadSite(name) {
-  // Unescape the name
   name = name.replace(/\\'/g, "'");
   var sites = getSavedSites();
   if (!sites[name]) { setStatus('Site not found.'); return; }
+  currentSiteName = null;
   deserializeSite(sites[name]);
   setSiteName(name);
   document.getElementById('sites-dropdown').classList.add('hidden');
@@ -5855,6 +5861,8 @@ function newSite() {
 }
 
 function clearAll_noConfirm() {
+  var prevName = currentSiteName;
+  currentSiteName = null;
   stopDraw();
   exitRoadEditMode();
   disableSiteEditing();
