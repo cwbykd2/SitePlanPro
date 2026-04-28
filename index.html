@@ -243,6 +243,8 @@ select option{background:var(--panel2)}
 .login-box .login-btn:active{transform:translateY(0)}
 .login-box .login-error{font-size:11px;color:var(--red);margin-top:12px;min-height:16px}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-minimal .label-paving,body.labels-minimal .label-bay,body.labels-minimal .label-overlay-dim,body.labels-minimal .label-stall{display:none!important}
+.btn-ghost.toggled{background:var(--accent);color:#fff}
 </style>
 </head>
 <body>
@@ -277,6 +279,7 @@ select option{background:var(--panel2)}
   <button class="btn-ghost" id="btn-topo" onclick="toggleTopoLayer()" style="margin-left:auto">🏔 Elevation</button>
   <button class="btn-ghost" id="btn-nwi" onclick="toggleNWILayer()">💧 Wetlands</button>
   <button class="btn-ghost" id="btn-fema" onclick="toggleFEMALayer()">🌊 Flood</button>
+  <button class="btn-ghost" id="btn-toggle-labels" onclick="toggleMinimalLabels()">SF Only</button>
   <button class="btn-ghost" id="btn-export-pdf" onclick="exportPDF()">📄 Export PDF</button>
 </header>
 <div class="app-body">
@@ -1178,7 +1181,7 @@ function updateBuildingLabels(b) {
                totalSF >= 1e3 ? (totalSF / 1e3).toFixed(1) + 'K SF' :
                Math.round(totalSF).toLocaleString() + ' SF';
   var sfIcon = L.divIcon({
-    className: 'bldg-label',
+    className: 'bldg-label label-bldg-sf',
     html: '<div class="bldg-label-sf-total">' + sfText + '</div>',
     iconSize: [120, 20],
     iconAnchor: [60, 10]
@@ -1197,14 +1200,14 @@ function updateBuildingLabels(b) {
       depthMid = getMidpoint(verts[0], verts[1]);
     }
     var widthIcon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-dim',
       html: '<div class="bldg-label-dim">' + dims.width + ' ft</div>',
       iconSize: [80, 16],
       iconAnchor: [40, 8]
     });
     L.marker(widthMid, {icon: widthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
     var depthIcon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-dim',
       html: '<div class="bldg-label-dim">' + dims.depth + ' ft</div>',
       iconSize: [80, 16],
       iconAnchor: [40, 8]
@@ -1218,7 +1221,7 @@ function updateBuildingLabels(b) {
       if (edgeLen < 5) continue; // Skip tiny edges
       var edgeMid = getMidpoint(verts[ei], verts[nextEi]);
       var edgeIcon = L.divIcon({
-        className: 'bldg-label',
+        className: 'bldg-label label-dim',
         html: '<div class="bldg-label-dim">' + edgeLen + ' ft</div>',
         iconSize: [80, 16],
         iconAnchor: [40, 8]
@@ -2317,10 +2320,9 @@ function drawBuildingOverlays(b) {
 
   // Helper: add a depth label on the perpendicular side of an overlay
   function addOverlayDepthLabel(ov, labelText) {
-    // Place label at midpoint of the depth edge (ep1→p4)
     var mid = getMidpoint(ov.ep1, ov.p4);
     var icon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-overlay-dim',
       html: '<div class="bldg-label-dim" style="color:#000000;font-size:10px;text-shadow:0 0 4px rgba(255,255,255,1),0 0 8px rgba(255,255,255,1),0 0 2px rgba(255,255,255,1);">' + labelText + '</div>',
       iconSize: [70, 14], iconAnchor: [35, 7]
     });
@@ -2388,7 +2390,7 @@ function drawBuildingOverlays(b) {
       // Add depth label on the perpendicular side (midpoint of startP1→farP1)
       var mid = getMidpoint(startP1, farP1);
       var icon = L.divIcon({
-        className: 'bldg-label',
+        className: 'bldg-label label-overlay-dim',
         html: '<div class="bldg-label-dim" style="color:#000000;font-size:9px;text-shadow:0 0 4px rgba(255,255,255,1),0 0 8px rgba(255,255,255,1),0 0 2px rgba(255,255,255,1);">' + labelText + '</div>',
         iconSize: [60, 14], iconAnchor: [30, 7]
       });
@@ -2927,7 +2929,7 @@ function updatePavingLabels(p) {
     var stallCount = p.stallCount || 0;
     if (stallCount > 0) {
       var stallIcon = L.divIcon({
-        className: 'bldg-label',
+        className: 'bldg-label label-stall',
         html: '<div class="bldg-label-sf" style="' + pavLabelStyle + ';font-size:7px;font-weight:700;">' + stallCount + '</div>',
         iconSize: [80, 24], iconAnchor: [40, 12]
       });
@@ -2946,7 +2948,7 @@ function updatePavingLabels(p) {
     var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + sfText + '</div>';
 
     var sfIcon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-paving',
       html: labelHtml,
       iconSize: [120, 30], iconAnchor: [60, 15]
     });
@@ -2963,14 +2965,14 @@ function updatePavingLabels(p) {
     }
 
     var wIcon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-paving',
       html: '<div class="bldg-label-dim" style="' + pavLabelStyle + '">' + dims.width + ' ft</div>',
       iconSize: [80, 16], iconAnchor: [40, 8]
     });
     L.marker(widthMid, {icon: wIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
 
     var dIcon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-paving',
       html: '<div class="bldg-label-dim" style="' + pavLabelStyle + '">' + dims.depth + ' ft</div>',
       iconSize: [80, 16], iconAnchor: [40, 8]
     });
@@ -2982,7 +2984,7 @@ function updatePavingLabels(p) {
                  Math.round(sf).toLocaleString() + ' SF';
     var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + sfText + '</div>';
     var sfIcon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-paving',
       html: labelHtml,
       iconSize: [120, 30], iconAnchor: [60, 15]
     });
@@ -3464,7 +3466,7 @@ function updatePondLabel(pond) {
   if (sf <= 0) return;
   var center = pond.layer.getBounds().getCenter();
   var sfIcon = L.divIcon({
-    className: 'pond-sf-label',
+    className: 'pond-sf-label label-pond',
     html: '<span style="background:rgba(6,182,212,0.85);color:#fff;padding:2px 8px;border-radius:4px;font-family:DM Mono,monospace;font-size:12px;font-weight:600;white-space:nowrap;">' + fmt(sf) + ' SF</span>',
     iconSize: [0, 0],
     iconAnchor: [0, 0]
@@ -4087,7 +4089,7 @@ function updateRoadLabels(centerlineLatLngs, widthFt, labelGroup, curved) {
       var typeLabel = curved ? ' ⌒' : '';
       var label = L.marker([midLat, midLng], {
         icon: L.divIcon({
-          className: 'road-dim-label',
+          className: 'road-dim-label label-road',
           html: '<span style="background:rgba(107,114,128,0.85);color:#fff;padding:2px 6px;border-radius:4px;font-family:DM Mono,monospace;font-size:11px;white-space:nowrap;">' + widthFt + '\' W' + typeLabel + '</span>',
           iconSize: [0, 0],
           iconAnchor: [0, 0]
@@ -5041,7 +5043,7 @@ function drawBayGrid(b) {
   // Helper: add a bay dimension label at a position
   function addBayDimLabel(pos, text, color) {
     var icon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-bay',
       html: '<div style="font-family:DM Mono,monospace;font-size:9px;color:#000;text-shadow:0 0 4px rgba(255,255,255,.9),0 0 8px rgba(255,255,255,.6);white-space:nowrap;text-align:center;pointer-events:none;font-weight:600">' + text + '</div>',
       iconSize: [90, 14], iconAnchor: [45, 7]
     });
@@ -5322,6 +5324,12 @@ function lookupCostPerSF(bldgSF, clearHeight) {
     }
   }
   return closest;
+}
+
+function toggleMinimalLabels() {
+  document.body.classList.toggle('labels-minimal');
+  var btn = document.getElementById('btn-toggle-labels');
+  btn.classList.toggle('toggled');
 }
 
 function toggleStatsPanel() {
