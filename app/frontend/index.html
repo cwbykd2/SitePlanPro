@@ -1195,7 +1195,7 @@ function updateBuildingLabels(b) {
   L.marker(center, {icon: sfIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
 
   if (verts.length === 4) {
-    // Standard rectangular labels
+    // Standard rectangular labels — offset slightly toward center to avoid handle overlap
     var widthEdgeIdx = dims.edgeW === 0 ? 0 : 1;
     var widthMid, depthMid;
     if (widthEdgeIdx === 0) {
@@ -1205,6 +1205,15 @@ function updateBuildingLabels(b) {
       widthMid = getMidpoint(verts[1], verts[2]);
       depthMid = getMidpoint(verts[0], verts[1]);
     }
+    var insetFrac = 0.12;
+    widthMid = L.latLng(
+      widthMid.lat + (center.lat - widthMid.lat) * insetFrac,
+      widthMid.lng + (center.lng - widthMid.lng) * insetFrac
+    );
+    depthMid = L.latLng(
+      depthMid.lat + (center.lat - depthMid.lat) * insetFrac,
+      depthMid.lng + (center.lng - depthMid.lng) * insetFrac
+    );
     var widthIcon = L.divIcon({
       className: 'bldg-label label-dim',
       html: '<div class="bldg-label-dim">' + dims.width + ' ft</div>',
