@@ -2336,24 +2336,46 @@ function drawBuildingOverlays(b) {
       if (b.rightParking) { var _pzR2 = addParkingSubZones(v[3], v[2], 0, 1, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR2 && _pzR2.stallCount) || 0; }
     }
   } else {
-    // Cross dock: truck court on both top and bottom
-    var tcTopEdge = addEdgeOverlay(v[0], v[1], TRUCK_DEFAULT, 0, -1, '#808080', 0.5, 'truckcourt', tcInsetTopL, tcInsetTopR);
-    addOverlayDepthLabel(tcTopEdge, TRUCK_DEFAULT + ' ft');
-    if (b.trailerTop) {
-      var tc1 = offsetPt(tcTopEdge.ep1, 0, -TRUCK_DEFAULT);
-      var tc2 = offsetPt(tcTopEdge.ep2, 0, -TRUCK_DEFAULT);
-      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#f97316', 0.18, 'trailer');
+    // Cross dock: truck courts on the speed bay sides (the depth ends of the building)
+    if (topFt >= rightFt) {
+      // Landscape: top edge is width, depth runs top→bottom → truck courts on top and bottom
+      var tcTopEdge = addEdgeOverlay(v[0], v[1], TRUCK_DEFAULT, 0, -1, '#808080', 0.5, 'truckcourt', tcInsetTopL, tcInsetTopR);
+      addOverlayDepthLabel(tcTopEdge, TRUCK_DEFAULT + ' ft');
+      if (b.trailerTop) {
+        var tc1 = offsetPt(tcTopEdge.ep1, 0, -TRUCK_DEFAULT);
+        var tc2 = offsetPt(tcTopEdge.ep2, 0, -TRUCK_DEFAULT);
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#f97316', 0.18, 'trailer');
+      }
+      var tcBotEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'truckcourt', tcInsetBotL, tcInsetBotR);
+      addOverlayDepthLabel(tcBotEdge, TRUCK_DEFAULT + ' ft');
+      if (b.trailerBottom) {
+        var tc1 = offsetPt(tcBotEdge.ep1, 0, TRUCK_DEFAULT);
+        var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
+      }
+      // Cross dock side parking — sub-zoned
+      if (b.leftParking) { var _pzL3 = addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
+      if (b.rightParking) { var _pzR3 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
+    } else {
+      // Portrait: right edge is width, depth runs left→right → truck courts on left and right
+      var tcLeftEdge = addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#808080', 0.5, 'truckcourt', tcInsetTopL, tcInsetTopR);
+      addOverlayDepthLabel(tcLeftEdge, TRUCK_DEFAULT + ' ft');
+      if (b.trailerTop) {
+        var tc1 = offsetPt(tcLeftEdge.ep1, -TRUCK_DEFAULT, 0);
+        var tc2 = offsetPt(tcLeftEdge.ep2, -TRUCK_DEFAULT, 0);
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
+      }
+      var tcRightEdge = addEdgeOverlay(v[1], v[2], TRUCK_DEFAULT, 1, 0, '#808080', 0.5, 'truckcourt', tcInsetBotL, tcInsetBotR);
+      addOverlayDepthLabel(tcRightEdge, TRUCK_DEFAULT + ' ft');
+      if (b.trailerBottom) {
+        var tc1 = offsetPt(tcRightEdge.ep1, TRUCK_DEFAULT, 0);
+        var tc2 = offsetPt(tcRightEdge.ep2, TRUCK_DEFAULT, 0);
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 1, 0, '#f97316', 0.18, 'trailer');
+      }
+      // Cross dock side parking — sub-zoned (top/bottom are now the short sides)
+      if (b.leftParking) { var _pzL3 = addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
+      if (b.rightParking) { var _pzR3 = addParkingSubZones(v[3], v[2], 0, 1, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
     }
-    var tcBotEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'truckcourt', tcInsetBotL, tcInsetBotR);
-    addOverlayDepthLabel(tcBotEdge, TRUCK_DEFAULT + ' ft');
-    if (b.trailerBottom) {
-      var tc1 = offsetPt(tcBotEdge.ep1, 0, TRUCK_DEFAULT);
-      var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
-      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
-    }
-    // Cross dock side parking — sub-zoned
-    if (b.leftParking) { var _pzL3 = addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
-    if (b.rightParking) { var _pzR3 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR3 && _pzR3.stallCount) || 0; }
   }
 
   // ===== BUMP OUTS =====
