@@ -412,7 +412,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                   <div id="left-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-left-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-left-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-left-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -420,7 +420,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                   <div id="right-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-right-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-right-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-right-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -431,7 +431,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                     <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px">Main parking (opposite truck court)</label>
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-main-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-main-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-main-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -439,7 +439,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                   <div id="left-park-depth-rear" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-rleft-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-rleft-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-rleft-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -447,7 +447,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                   <div id="right-park-depth-rear" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-rright-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-rright-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-rright-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -1982,24 +1982,31 @@ function selectType(type) {
   updateTrailerOpts(type);
 }
 
-// Calculate total parking depth for a given number of rows (1-4)
-// 1 row:  10' SW + 20' stalls + 26' fire lane = 56'
-// 2 rows: 10' SW + 20' stalls + 26' fire lane + 20' stalls = 76'
-// 3 rows: 10' SW + 20' stalls + 26' FL + 20' stalls + 0.5' curb + 20' stalls + 26' FL = 122.5'
-// 4 rows: 10' SW + 20' stalls + 26' FL + 20' stalls + 0.5' curb + 20' stalls + 26' FL + 20' stalls = 142.5'
+// Calculate total parking depth for a given number of rows (1-20)
 function calcParkingDepth(numRows) {
-  numRows = Math.max(1, Math.min(4, parseInt(numRows) || 2));
-  if (numRows === 1) return 56;
-  if (numRows === 2) return 76;
-  if (numRows === 3) return 122.5;
-  return 142.5; // 4 rows
+  numRows = Math.max(1, Math.min(20, parseInt(numRows) || 2));
+  // Pattern: 10' sidewalk + first pair (20' stall + 26' fire lane) = 56' for 1 row
+  // 2nd row adds 20' stall = 76'
+  // Each additional pair after that: 0.5' curb + 20' stall + 26' fire lane (+ 20' stall if even row in pair)
+  var depth = 10 + 20 + 26; // 56' base: sidewalk + 1 stall + 1 fire lane
+  if (numRows >= 2) depth += 20; // 2nd stall row = 76'
+  var remaining = numRows - 2;
+  while (remaining > 0) {
+    depth += 0.5 + 20 + 26; // curb + stall + fire lane
+    remaining--;
+    if (remaining > 0) {
+      depth += 20; // another stall row
+      remaining--;
+    }
+  }
+  return depth;
 }
 
 function setParkingRows(inputId, labelId) {
   var input = document.getElementById(inputId);
   var label = document.getElementById(labelId);
   if (input && label) {
-    var rows = Math.max(1, Math.min(4, parseInt(input.value) || 2));
+    var rows = Math.max(1, Math.min(20, parseInt(input.value) || 2));
     input.value = rows;
     label.textContent = calcParkingDepth(rows) + "'";
   }
@@ -2031,7 +2038,7 @@ function setParkingSide(side, mode) {
     } else {
       numRows = (mode === 'single') ? 1 : 2;
     }
-    inputEl.value = Math.max(1, Math.min(4, numRows));
+    inputEl.value = Math.max(1, Math.min(20, numRows));
     setParkingRows(mapping[side], labelMapping[side]);
   }
 }
@@ -2121,15 +2128,15 @@ function applyBuildingOptions() {
     b.topParking = false; // No top parking for cross-dock (truck court on top)
     b.leftParking = document.getElementById('chk-left-cross').checked;
     b.rightParking = document.getElementById('chk-right-cross').checked;
-    b.parkingRowsLeft = Math.max(1, Math.min(4, parseInt(document.getElementById('park-left-rows').value) || 2));
-    b.parkingRowsRight = Math.max(1, Math.min(4, parseInt(document.getElementById('park-right-rows').value) || 2));
+    b.parkingRowsLeft = Math.max(1, Math.min(20, parseInt(document.getElementById('park-left-rows').value) || 2));
+    b.parkingRowsRight = Math.max(1, Math.min(20, parseInt(document.getElementById('park-right-rows').value) || 2));
   } else {
     b.topParking = false;
     b.leftParking = document.getElementById('chk-left-rear').checked;
     b.rightParking = document.getElementById('chk-right-rear').checked;
-    b.parkingRowsMain = Math.max(1, Math.min(4, parseInt(document.getElementById('park-main-rows').value) || 2));
-    b.parkingRowsLeft = Math.max(1, Math.min(4, parseInt(document.getElementById('park-rleft-rows').value) || 2));
-    b.parkingRowsRight = Math.max(1, Math.min(4, parseInt(document.getElementById('park-rright-rows').value) || 2));
+    b.parkingRowsMain = Math.max(1, Math.min(20, parseInt(document.getElementById('park-main-rows').value) || 2));
+    b.parkingRowsLeft = Math.max(1, Math.min(20, parseInt(document.getElementById('park-rleft-rows').value) || 2));
+    b.parkingRowsRight = Math.max(1, Math.min(20, parseInt(document.getElementById('park-rright-rows').value) || 2));
   }
   // Read bump out flags
   if (b.type === 'cross') {
@@ -2357,7 +2364,7 @@ function drawBuildingOverlays(b) {
     } else {
       numRows = parseInt(numRowsOrBool) || 2;
     }
-    numRows = Math.max(1, Math.min(4, numRows));
+    numRows = Math.max(1, Math.min(20, numRows));
     var totalDepth = calcParkingDepth(numRows);
 
     // Apply insets to get effective edge points
@@ -2439,50 +2446,38 @@ function drawBuildingOverlays(b) {
 
     var curEdge;
 
-    // 1. Sidewalk (10') - light tan, dotted border
+    // 1. Sidewalk (10')
     curEdge = drawStrip(ep1, ep2, SIDEWALK, '#d4c9a8', 0.6, '3,3', 'sidewalk', "10' SW");
 
     var zoneStallCount = 0;
 
     // 2. First row of car stalls (20')
-    var stallEdge1 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+    var stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
     zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
-    curEdge = stallEdge1;
+    curEdge = stallEdge;
 
     // 3. First fire lane (26')
-    var flEdge1 = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
+    var flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
     addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
-    curEdge = flEdge1;
+    curEdge = flEdge;
 
-    // 4. Second row of car stalls (20') - rows >= 2
-    if (numRows >= 2) {
-      var stallEdge2 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
-      curEdge = stallEdge2;
-    }
-
-    // 5. For rows >= 3: curb (0.5') + third row stalls (20') + second fire lane (26')
-    if (numRows >= 3) {
-      // 6" curb
-      var curbEdge = drawStrip(curEdge.p1, curEdge.p2, CURB, '#555555', 0.8, null, 'curb', "6\" Curb");
-      curEdge = curbEdge;
-
-      // Third row of car stalls (20')
-      var stallEdge3 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
-      curEdge = stallEdge3;
-
-      // Second fire lane (26')
-      var flEdge2 = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
-      addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
-      curEdge = flEdge2;
-    }
-
-    // 6. For rows >= 4: fourth row of car stalls (20')
-    if (numRows >= 4) {
-      var stallEdge4 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
-      curEdge = stallEdge4;
+    // 4. Additional rows (2 through numRows)
+    for (var ri = 2; ri <= numRows; ri++) {
+      if (ri % 2 === 0) {
+        // Even rows: just a stall row
+        stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+        zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+        curEdge = stallEdge;
+      } else {
+        // Odd rows (3, 5, 7...): curb + stall + fire lane
+        curEdge = drawStrip(curEdge.p1, curEdge.p2, CURB, '#555555', 0.8, null, 'curb', '6" Curb');
+        stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+        zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+        curEdge = stallEdge;
+        flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
+        addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
+        curEdge = flEdge;
+      }
     }
 
     // Return overall overlay bounds for compatibility, plus stall count
