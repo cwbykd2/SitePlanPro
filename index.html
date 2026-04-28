@@ -4872,38 +4872,18 @@ function drawBayGrid(b) {
     var depthRowLabels = []; // label for each row
 
     if (isCrossDock) {
-      // Cross dock: std bays (top half) + speed bay + speed bay + std bays (bottom half)
-      var halfStd = Math.floor(stdBays / 2);
-      var remainStd = stdBays - halfStd;
-      // Top standard bays
-      for (var j = 0; j < halfStd; j++) {
-        var dFrac = (j + 1) * BAY_STD_DEPTH / d12;
+      // Cross dock: speed bay (top) + N standard bays + speed bay (bottom)
+      var topSpeedFrac = bSpeedDepth / d12;
+      depthRowFracs.push(Math.min(topSpeedFrac, 1));
+      depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
+      // Standard bays in the middle
+      for (var j = 1; j <= stdBays; j++) {
+        var dFrac = (bSpeedDepth + j * BAY_STD_DEPTH) / d12;
         if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
         depthRowFracs.push(dFrac);
         depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
       }
-      // First speed bay (interior)
-      var afterTopStd = halfStd * BAY_STD_DEPTH;
-      var speedFrac1 = (afterTopStd + bSpeedDepth) / d12;
-      if (speedFrac1 <= 1) {
-        depthRowFracs.push(Math.min(speedFrac1, 1));
-        depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
-      }
-      // Second speed bay (interior)
-      var speedFrac2 = (afterTopStd + 2 * bSpeedDepth) / d12;
-      if (speedFrac2 <= 1) {
-        depthRowFracs.push(Math.min(speedFrac2, 1));
-        depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
-      }
-      // Bottom standard bays
-      var afterSpeeds = afterTopStd + 2 * bSpeedDepth;
-      for (var j = 0; j < remainStd; j++) {
-        var dFrac = (afterSpeeds + (j + 1) * BAY_STD_DEPTH) / d12;
-        if (dFrac > 1) { dFrac = 1; depthRowFracs.push(dFrac); depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
-        depthRowFracs.push(dFrac);
-        depthRowLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
-      }
-      // Ensure we reach the end
+      // Bottom speed bay - from last standard bay to end
       var lastFrac = depthRowFracs[depthRowFracs.length - 1];
       if (lastFrac < 1) {
         depthRowFracs.push(1);
@@ -4944,9 +4924,8 @@ function drawBayGrid(b) {
       if (rowFrac >= 1) break;
       var isSpeedLine;
       if (isCrossDock) {
-        // Cross dock: speed lines around the interior speed bays
-        var _halfStd = Math.floor(stdBays / 2);
-        isSpeedLine = (ri === _halfStd) || (ri === _halfStd + 1) || (ri === _halfStd + 2);
+        // Cross dock: speed lines at first and last internal boundaries
+        isSpeedLine = (ri === 1) || (ri === depthRowFracs.length - 2);
       } else {
         // Rear load: speed line at the last internal boundary (truck court side = bottom)
         isSpeedLine = (ri === depthRowFracs.length - 2);
@@ -4991,38 +4970,16 @@ function drawBayGrid(b) {
     var depthColLabels = [];
 
     if (isCrossDock) {
-      // Cross dock: std bays (left half) + speed bay + speed bay + std bays (right half)
-      var halfStdP = Math.floor(stdBays / 2);
-      var remainStdP = stdBays - halfStdP;
-      // Left standard bays
-      for (var j = 0; j < halfStdP; j++) {
-        var dFrac = (j + 1) * BAY_STD_DEPTH / d01;
+      // Cross dock: speed bay at start + standard bays + speed bay at end
+      var topSpeedFrac = bSpeedDepth / d01;
+      depthColFracs.push(Math.min(topSpeedFrac, 1));
+      depthColLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
+      for (var j = 1; j <= stdBays; j++) {
+        var dFrac = (bSpeedDepth + j * BAY_STD_DEPTH) / d01;
         if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
         depthColFracs.push(dFrac);
         depthColLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
       }
-      // First speed bay (interior)
-      var afterLeftStd = halfStdP * BAY_STD_DEPTH;
-      var speedFrac1P = (afterLeftStd + bSpeedDepth) / d01;
-      if (speedFrac1P <= 1) {
-        depthColFracs.push(Math.min(speedFrac1P, 1));
-        depthColLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
-      }
-      // Second speed bay (interior)
-      var speedFrac2P = (afterLeftStd + 2 * bSpeedDepth) / d01;
-      if (speedFrac2P <= 1) {
-        depthColFracs.push(Math.min(speedFrac2P, 1));
-        depthColLabels.push({ text: bBayWidth + "'" + ' × ' + bSpeedDepth + "'", color: '#000' });
-      }
-      // Right standard bays
-      var afterSpeedsP = afterLeftStd + 2 * bSpeedDepth;
-      for (var j = 0; j < remainStdP; j++) {
-        var dFrac = (afterSpeedsP + (j + 1) * BAY_STD_DEPTH) / d01;
-        if (dFrac > 1) { dFrac = 1; depthColFracs.push(dFrac); depthColLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' }); break; }
-        depthColFracs.push(dFrac);
-        depthColLabels.push({ text: bBayWidth + "'" + ' × ' + BAY_STD_DEPTH + "'", color: '#000' });
-      }
-      // Ensure we reach the end
       var lastFrac = depthColFracs[depthColFracs.length - 1];
       if (lastFrac < 1) {
         depthColFracs.push(1);
@@ -5056,13 +5013,7 @@ function drawBayGrid(b) {
     for (var ci = 1; ci < depthColFracs.length; ci++) {
       var colFrac = depthColFracs[ci];
       if (colFrac >= 1) break;
-      var _halfStdP = Math.floor(stdBays / 2);
-      var isSpeedLine;
-      if (isCrossDock) {
-        isSpeedLine = (ci === _halfStdP) || (ci === _halfStdP + 1) || (ci === _halfStdP + 2);
-      } else {
-        isSpeedLine = (ci === 1);
-      }
+      var isSpeedLine = (ci === 1) || (isCrossDock && ci === depthColFracs.length - 2);
       var lineColor = isSpeedLine ? speedBayColor : bayGridColor;
       var lineWeight = isSpeedLine ? 2 : bayGridWeight;
       var lineDash = isSpeedLine ? '8,4' : bayGridDash;
