@@ -120,7 +120,7 @@ select option{background:var(--panel2)}
 .bldg-item.selected-bldg{border-color:var(--accent);background:rgba(59,130,246,.08)}
 .bldg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 .bldg-info{flex:1}.bldg-name{font-weight:600;color:var(--text)}.bldg-meta{color:var(--muted);margin-top:1px}
-.bldg-del{color:var(--muted);cursor:pointer;padding:2px 5px}.bldg-del:hover{color:var(--red)}
+.bldg-del,.bldg-dup{color:var(--muted);cursor:pointer;padding:2px 5px}.bldg-del:hover{color:var(--red)}.bldg-dup:hover{color:var(--accent)}
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .stat-box{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px}
 .stat-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:#fff;line-height:1}
@@ -4131,6 +4131,7 @@ function updateBuildingList() {
       +'<div class="bldg-dot" style="background:'+color+';border:1px solid #000"></div>'
       +'<div class="bldg-info"><div class="bldg-name">Building '+(i+1)+'</div>'
       +'<div class="bldg-meta">'+label+' &middot; '+fmt(totalSF)+' SF</div></div>'
+      +'<span class="bldg-dup" onclick="event.stopPropagation();duplicateBuilding('+b.id+')" title="Duplicate building">&#x29C9;</span>'
       +'<span class="bldg-del" onclick="event.stopPropagation();deleteBuilding('+b.id+')">&#x2715;</span>'
       +'</div>';
   }).join('');
@@ -4161,9 +4162,78 @@ function deleteBuilding(id) {
   checkOutOfBounds();
 }
 
+function duplicateBuilding(id) {
+  var src = buildings.find(function(x) { return x.id === id; });
+  if (!src) return;
 
+  // Compute an offset so the copy appears next to the original
+  var bounds = src.layer.getBounds();
+  var latOff = (bounds.getNorth() - bounds.getSouth()) * 0.15;
+  var lngOff = (bounds.getEast() - bounds.getWest()) * 1.15;
 
+  var newVerts = src.vertices.map(function(v) { return L.latLng(v.lat + latOff, v.lng + lngOff); });
+  var polygon = L.polygon(newVerts, { color: '#000000', weight: 2, fillColor: '#ffffff', fillOpacity: 1 });
+  drawnItems.addLayer(polygon);
 
+  var newId = Date.now();
+  var bldg = {
+    id: newId,
+    layer: polygon,
+    vertices: newVerts.map(function(v) { return L.latLng(v.lat, v.lng); }),
+    baseVertices: newVerts.map(function(v) { return L.latLng(v.lat, v.lng); }),
+    overlayGroup: L.featureGroup().addTo(map),
+    type: src.type,
+    spacing: src.spacing,
+    customW: src.customW,
+    customD: src.customD,
+    trailerTop: src.trailerTop,
+    trailerBottom: src.trailerBottom,
+    trailerRear: src.trailerRear,
+    leftParking: src.leftParking,
+    rightParking: src.rightParking,
+    topParking: src.topParking,
+    parkingRows: src.parkingRows || 'double',
+    parkingRowsTop: src.parkingRowsTop || 2,
+    parkingRowsLeft: src.parkingRowsLeft || 2,
+    parkingRowsRight: src.parkingRowsRight || 2,
+    parkingRowsMain: src.parkingRowsMain || 2,
+    tcInsetLeft: src.tcInsetLeft || 0,
+    tcInsetRight: src.tcInsetRight || 0,
+    tcInsetTopLeft: src.tcInsetTopLeft || 0,
+    tcInsetTopRight: src.tcInsetTopRight || 0,
+    tcInsetBottomLeft: src.tcInsetBottomLeft || 0,
+    tcInsetBottomRight: src.tcInsetBottomRight || 0,
+    clearHeight: src.clearHeight || '40',
+    rotation: src.rotation || 0,
+    scale: src.scale || 100,
+    bumpTopLeft: src.bumpTopLeft || false,
+    bumpTopRight: src.bumpTopRight || false,
+    bumpBotLeft: src.bumpBotLeft || false,
+    bumpBotRight: src.bumpBotRight || false,
+    bumpRearLeft: src.bumpRearLeft || false,
+    bumpRearRight: src.bumpRearRight || false,
+    bumpDepths: JSON.parse(JSON.stringify(src.bumpDepths || { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 })),
+    bumpWidths: JSON.parse(JSON.stringify(src.bumpWidths || {})),
+    labelGroup: null
+  };
+
+  if (src._widthDir) bldg._widthDir = { x: src._widthDir.x, y: src._widthDir.y };
+  if (src._topIsWidth !== undefined) bldg._topIsWidth = src._topIsWidth;
+
+  buildings.push(bldg);
+  setupBuildingDrag(bldg);
+  updateBuildingLabels(bldg);
+  drawBuildingOverlays(bldg);
+
+  activeBuilding = newId;
+  showBuildingOpts();
+  updateBuildingList();
+  recalcStats();
+  drawAllBayGrids();
+  checkOutOfBounds();
+  autoSave();
+  setStatus('Building duplicated.');
+}
 
 /* ===== GEOCODING ===== */
 
