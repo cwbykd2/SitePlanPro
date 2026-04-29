@@ -1605,7 +1605,7 @@ map.on(L.Draw.Event.CREATED, function(e) {
     beginPavingDraw();
 
   } else if (mode === 'paving-free') {
-    layer.setStyle({color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:0.25});
+    layer.setStyle({color:'#10b981',weight:2,fillColor:'#10b981',fillOpacity:1});
     drawnItems.addLayer(layer);
     registerPaving(layer, false);
     currentTool = 'paving';
@@ -2442,16 +2442,16 @@ function drawBuildingOverlays(b) {
     var curEdge;
 
     // Sidewalk (10')
-    curEdge = drawStrip(ep1, ep2, SIDEWALK, '#d4c9a8', 0.6, '3,3', 'sidewalk', "10' SW");
+    curEdge = drawStrip(ep1, ep2, SIDEWALK, '#d4c9a8', 1, '3,3', 'sidewalk', "10' SW");
 
     var zoneStallCount = 0;
 
     // Row 1: stalls + fire lane
-    var stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+    var stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 1, '5,3', 'carstall', "20' Stall");
     zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
     curEdge = stallEdge;
 
-    var flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
+    var flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 1, null, 'firelane', "26' Fire");
     addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
     curEdge = flEdge;
 
@@ -2459,19 +2459,19 @@ function drawBuildingOverlays(b) {
     for (var ri = 2; ri <= numRows; ri++) {
       if (ri % 2 === 0) {
         // Even row: back-to-back stalls sharing the previous fire lane
-        stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+        stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 1, '5,3', 'carstall', "20' Stall");
         zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
         curEdge = stallEdge;
       } else {
         // Odd row: curb + stalls + fire lane (new pair)
-        var curbEdge = drawStrip(curEdge.p1, curEdge.p2, CURB, '#555555', 0.8, null, 'curb', '6" Curb');
+        var curbEdge = drawStrip(curEdge.p1, curEdge.p2, CURB, '#555555', 1, null, 'curb', '6" Curb');
         curEdge = curbEdge;
 
-        stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+        stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 1, '5,3', 'carstall', "20' Stall");
         zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
         curEdge = stallEdge;
 
-        flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
+        flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 1, null, 'firelane', "26' Fire");
         addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
         curEdge = flEdge;
       }
@@ -2509,12 +2509,12 @@ function drawBuildingOverlays(b) {
     // Rear load: truck court on the LONGER side
     if (topFt >= rightFt) {
       // Top/bottom edges are longer → truck court on bottom (south), car parking on top (north)
-      var tcEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'truckcourt', tcInsetL, tcInsetR);
+      var tcEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 1, 'truckcourt', tcInsetL, tcInsetR);
       addOverlayDepthLabel(tcEdge, TRUCK_DEFAULT + ' ft');
       if (b.trailerRear) {
         var tc1 = offsetPt(tcEdge.ep1, 0, TRUCK_DEFAULT);
         var tc2 = offsetPt(tcEdge.ep2, 0, TRUCK_DEFAULT);
-        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#808080', 1, 'trailer');
       }
       // Car parking on top (opposite side) — sub-zoned
       var _pz1 = addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsMain));
@@ -2523,12 +2523,12 @@ function drawBuildingOverlays(b) {
       if (b.rightParking) { var _pzR1 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsRight)); b.stallCount += (_pzR1 && _pzR1.stallCount) || 0; }
     } else {
       // Left/right edges are longer → truck court on left (west), car parking on right (east)
-      var tcEdge = addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#808080', 0.5, 'truckcourt', tcInsetL, tcInsetR);
+      var tcEdge = addEdgeOverlay(v[0], v[3], TRUCK_DEFAULT, -1, 0, '#808080', 1, 'truckcourt', tcInsetL, tcInsetR);
       addOverlayDepthLabel(tcEdge, TRUCK_DEFAULT + ' ft');
       if (b.trailerRear) {
         var tc1 = offsetPt(tcEdge.ep1, -TRUCK_DEFAULT, 0);
         var tc2 = offsetPt(tcEdge.ep2, -TRUCK_DEFAULT, 0);
-        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#808080', 1, 'trailer');
       }
       // Car parking on right (east) — sub-zoned
       var _pz2 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsMain));
@@ -2538,19 +2538,19 @@ function drawBuildingOverlays(b) {
     }
   } else {
     // Cross dock: truck court on both top and bottom
-    var tcTopEdge = addEdgeOverlay(v[0], v[1], TRUCK_DEFAULT, 0, -1, '#808080', 0.5, 'truckcourt', tcInsetTopL, tcInsetTopR);
+    var tcTopEdge = addEdgeOverlay(v[0], v[1], TRUCK_DEFAULT, 0, -1, '#808080', 1, 'truckcourt', tcInsetTopL, tcInsetTopR);
     addOverlayDepthLabel(tcTopEdge, TRUCK_DEFAULT + ' ft');
     if (b.trailerTop) {
       var tc1 = offsetPt(tcTopEdge.ep1, 0, -TRUCK_DEFAULT);
       var tc2 = offsetPt(tcTopEdge.ep2, 0, -TRUCK_DEFAULT);
-      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#f97316', 0.18, 'trailer');
+      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#808080', 1, 'trailer');
     }
-    var tcBotEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'truckcourt', tcInsetBotL, tcInsetBotR);
+    var tcBotEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 1, 'truckcourt', tcInsetBotL, tcInsetBotR);
     addOverlayDepthLabel(tcBotEdge, TRUCK_DEFAULT + ' ft');
     if (b.trailerBottom) {
       var tc1 = offsetPt(tcBotEdge.ep1, 0, TRUCK_DEFAULT);
       var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
-      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
+      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#808080', 1, 'trailer');
     }
     // Cross dock side parking — sub-zoned
     if (b.leftParking) { var _pzL3 = addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
@@ -2713,12 +2713,12 @@ function beginPavingDraw() {
   var c = getPavingColor(currentPavingType);
   if (pavingMode === 'rect') {
     drawingMode = 'paving-rect';
-    activeDraw = new L.Draw.Rectangle(map, {shapeOptions:{color:c,weight:2,fillColor:c,fillOpacity:0.25},showArea:false});
+    activeDraw = new L.Draw.Rectangle(map, {shapeOptions:{color:c,weight:2,fillColor:c,fillOpacity:1},showArea:false});
     activeDraw.enable();
     setStatus('Drag to draw a paving rectangle - shows dimensions as you draw');
   } else {
     drawingMode = 'paving-free';
-    activeDraw = new L.Draw.Polygon(map, {shapeOptions:{color:c,weight:2,fillColor:c,fillOpacity:0.25},allowIntersection:false,showArea:false});
+    activeDraw = new L.Draw.Polygon(map, {shapeOptions:{color:c,weight:2,fillColor:c,fillOpacity:1},allowIntersection:false,showArea:false});
     activeDraw.enable();
     setStatus('Click points to draw paving area - double-click to finish');
   }
@@ -2845,11 +2845,11 @@ function updatePavingCarParkOverlays(p) {
     var stripType, stripDepth, stripColor, stripOpacity, stripDash;
     var phase = stripIndex % 4;
     if (phase === 0 || phase === 2) {
-      stripType = 'carstall'; stripDepth = STALL; stripColor = '#a0a0a0'; stripOpacity = 0.5; stripDash = '5,3';
+      stripType = 'carstall'; stripDepth = STALL; stripColor = '#a0a0a0'; stripOpacity = 1; stripDash = '5,3';
     } else if (phase === 1) {
-      stripType = 'firelane'; stripDepth = FIRELANE; stripColor = '#a0a0a0'; stripOpacity = 0.5; stripDash = null;
+      stripType = 'firelane'; stripDepth = FIRELANE; stripColor = '#a0a0a0'; stripOpacity = 1; stripDash = null;
     } else {
-      stripType = 'curb'; stripDepth = CURB; stripColor = '#555555'; stripOpacity = 0.8; stripDash = null;
+      stripType = 'curb'; stripDepth = CURB; stripColor = '#555555'; stripOpacity = 1; stripDash = null;
     }
 
     // Clamp to remaining depth
@@ -2882,12 +2882,12 @@ function registerPaving(layer, isRect) {
   if (isRect) {
     var bounds = layer.getBounds();
     verts = rectToVerts(bounds);
-    var polygon = L.polygon(verts, {color:c,weight:2,fillColor:c,fillOpacity:0.25});
+    var polygon = L.polygon(verts, {color:c,weight:2,fillColor:c,fillOpacity:1});
     drawnItems.removeLayer(layer);
     drawnItems.addLayer(polygon);
     layer = polygon;
   } else {
-    layer.setStyle({color:c,weight:2,fillColor:c,fillOpacity:0.25});
+    layer.setStyle({color:c,weight:2,fillColor:c,fillOpacity:1});
     verts = layer.getLatLngs()[0] || layer.getLatLngs();
     verts = verts.map(function(v) { return L.latLng(v.lat, v.lng); });
   }
@@ -3030,9 +3030,9 @@ function selectPaving(id) {
   pavings.forEach(function(pv) {
     var c = getPavingColor(pv.pavingType || 'other');
     if (pv.id === id) {
-      pv.layer.setStyle({ weight: 3, fillOpacity: 0.35 });
+      pv.layer.setStyle({ weight: 3, fillOpacity: 1 });
     } else {
-      pv.layer.setStyle({ weight: 2, fillOpacity: 0.25 });
+      pv.layer.setStyle({ weight: 2, fillOpacity: 1 });
     }
   });
   setStatus('Paving selected. Drag to move' + (p && p.isRect ? ', use handles to resize/rotate' : '') + '. Press Delete to remove.');
@@ -3043,7 +3043,7 @@ function deselectPaving() {
   var prev = pavings.find(function(x) { return x.id === selectedPaving; });
   if (prev) {
     var c = getPavingColor(prev.pavingType || 'other');
-    prev.layer.setStyle({ weight: 2, fillOpacity: 0.25 });
+    prev.layer.setStyle({ weight: 2, fillOpacity: 1 });
   }
   selectedPaving = null;
   hidePavingHandles();
@@ -3810,7 +3810,7 @@ function createRoadFromCenterline(centerlineLatLngs, widthFt, curved) {
 
   var polyCoords = buffered.geometry.coordinates[0].map(function(c) { return L.latLng(c[1], c[0]); });
   var roadPolygon = L.polygon(polyCoords, {
-    color: '#6b7280', weight: 1, fillColor: '#9ca3af', fillOpacity: 0.7, opacity: 0.9
+    color: '#6b7280', weight: 1, fillColor: '#9ca3af', fillOpacity: 1, opacity: 1
   });
   drawnItems.addLayer(roadPolygon);
 
@@ -3976,7 +3976,7 @@ function renderRoadEditHandles(road) {
 function exitRoadEditMode() {
   if (!editingRoad) return;
   // Restore road style
-  editingRoad.layer.setStyle({ color: '#6b7280', weight: 1, fillColor: '#9ca3af', fillOpacity: 0.7, opacity: 0.9 });
+  editingRoad.layer.setStyle({ color: '#6b7280', weight: 1, fillColor: '#9ca3af', fillOpacity: 1, opacity: 1 });
   if (editingRoad.editGroup) {
     map.removeLayer(editingRoad.editGroup);
     editingRoad.editGroup = null;
@@ -4055,7 +4055,7 @@ function mergeRoadIntersections(newRoad) {
         if (inter) {
           // Draw intersection area with a slightly different style to show the merge
           var interLayer = L.geoJSON(inter, {
-            style: { color: '#9ca3af', weight: 0, fillColor: '#b0b8c8', fillOpacity: 0.85, interactive: false }
+            style: { color: '#9ca3af', weight: 0, fillColor: '#b0b8c8', fillOpacity: 1, interactive: false }
           }).addTo(map);
           roads[i]._intersectionLayers = roads[i]._intersectionLayers || [];
           roads[i]._intersectionLayers.push(interLayer);
@@ -4614,7 +4614,7 @@ function deserializeSite(data) {
       var baseVerts = pd.baseVertices ? pd.baseVertices.map(function(v) { return L.latLng(v.lat, v.lng); }) : lls.map(function(v) { return L.latLng(v.lat, v.lng); });
       var pType = pd.pavingType || 'other';
       var c = getPavingColor(pType);
-      var poly = L.polygon(lls, { color: c, weight: 2, fillColor: c, fillOpacity: 0.25 });
+      var poly = L.polygon(lls, { color: c, weight: 2, fillColor: c, fillOpacity: 1 });
       drawnItems.addLayer(poly);
       var paving = {
         id: pd.id || Date.now() + Math.random(),
