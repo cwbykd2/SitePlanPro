@@ -2348,7 +2348,7 @@ function drawBuildingOverlays(b) {
     }
     var p3 = offsetPt(ep2, dirAlongFt * depthFt, dirPerpFt * depthFt);
     var p4 = offsetPt(ep1, dirAlongFt * depthFt, dirPerpFt * depthFt);
-    var strokeColor = (overlayType === 'bumpout' || overlayType === 'carparking' || overlayType === 'truckcourt') ? '#000000' : color;
+    var strokeColor = (overlayType === 'bumpout' || overlayType === 'carparking' || overlayType === 'truckcourt' || overlayType === 'trailer') ? '#000000' : color;
     var poly = L.polygon([ep1, ep2, p3, p4], {color:strokeColor, weight:1, fillColor:color, fillOpacity:op, interactive:false});
     poly._overlayType = overlayType || 'truckcourt';
     poly.addTo(b.overlayGroup);
@@ -2383,7 +2383,7 @@ function drawBuildingOverlays(b) {
       );
       var linePtFar = offsetPt(linePt, dirAF * depth, dirPF * depth);
       L.polyline([linePt, linePtFar], {
-        color: '#f97316', weight: 0.8, opacity: 0.7, interactive: false
+        color: '#000000', weight: 0.8, opacity: 0.7, interactive: false
       }).addTo(b.overlayGroup);
     }
     return numStalls;
@@ -2566,7 +2566,7 @@ function drawBuildingOverlays(b) {
       if (b.trailerRear) {
         var tc1 = offsetPt(tcEdge.ep1, 0, TRUCK_DEFAULT);
         var tc2 = offsetPt(tcEdge.ep2, 0, TRUCK_DEFAULT);
-        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'trailer');
         addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1);
       }
       // Car parking on top (opposite side) — sub-zoned
@@ -2581,7 +2581,7 @@ function drawBuildingOverlays(b) {
       if (b.trailerRear) {
         var tc1 = offsetPt(tcEdge.ep1, -TRUCK_DEFAULT, 0);
         var tc2 = offsetPt(tcEdge.ep2, -TRUCK_DEFAULT, 0);
-        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
+        addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#808080', 0.5, 'trailer');
         addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0);
       }
       // Car parking on right (east) — sub-zoned
@@ -2597,7 +2597,7 @@ function drawBuildingOverlays(b) {
     if (b.trailerTop) {
       var tc1 = offsetPt(tcTopEdge.ep1, 0, -TRUCK_DEFAULT);
       var tc2 = offsetPt(tcTopEdge.ep2, 0, -TRUCK_DEFAULT);
-      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#f97316', 0.18, 'trailer');
+      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#808080', 0.5, 'trailer');
       addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1);
     }
     var tcBotEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'truckcourt', tcInsetBotL, tcInsetBotR);
@@ -2605,7 +2605,7 @@ function drawBuildingOverlays(b) {
     if (b.trailerBottom) {
       var tc1 = offsetPt(tcBotEdge.ep1, 0, TRUCK_DEFAULT);
       var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
-      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#f97316', 0.18, 'trailer');
+      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#808080', 0.5, 'trailer');
       addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1);
     }
     // Cross dock side parking — sub-zoned
@@ -2618,7 +2618,7 @@ function drawBuildingOverlays(b) {
     if (b.trailerTop) {
       var tc1 = offsetPt(tcLeftEdge.ep1, -TRUCK_DEFAULT, 0);
       var tc2 = offsetPt(tcLeftEdge.ep2, -TRUCK_DEFAULT, 0);
-      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#f97316', 0.18, 'trailer');
+      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#808080', 0.5, 'trailer');
       addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0);
     }
     var tcRightEdge = addEdgeOverlay(v[1], v[2], TRUCK_DEFAULT, 1, 0, '#808080', 0.5, 'truckcourt', tcInsetBotL, tcInsetBotR);
@@ -2626,7 +2626,7 @@ function drawBuildingOverlays(b) {
     if (b.trailerBottom) {
       var tc1 = offsetPt(tcRightEdge.ep1, TRUCK_DEFAULT, 0);
       var tc2 = offsetPt(tcRightEdge.ep2, TRUCK_DEFAULT, 0);
-      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 1, 0, '#f97316', 0.18, 'trailer');
+      addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 1, 0, '#808080', 0.5, 'trailer');
       addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 1, 0);
     }
     // Cross dock end parking (top/bottom are the short sides now)
@@ -2766,7 +2766,7 @@ function drawBuildingOverlays(b) {
 
 function getPavingColor(pavingType) {
   if (pavingType === 'carparking') return '#b0b0b0';
-  if (pavingType === 'trailer') return '#f97316';
+  if (pavingType === 'trailer') return '#808080';
   return '#10b981';
 }
 
