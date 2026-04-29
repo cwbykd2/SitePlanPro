@@ -26,6 +26,7 @@ function showApp() {
   loadingEl.classList.add("hidden");
   overlay.classList.add("hidden");
   appShell.classList.add("visible");
+  setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
 }
 
 showLoading();
