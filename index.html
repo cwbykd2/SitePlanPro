@@ -292,6 +292,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
   <button class="btn-ghost" id="btn-site" onclick="toggleSiteTool()">Draw Site</button>
   <button class="btn-ghost" id="btn-redraw-site" onclick="redrawSite()" style="display:none">Redraw Site</button>
   <button class="btn-ghost" onclick="clearAll()">Clear All</button>
+  <button class="btn-ghost" onclick="duplicateSite()">⧉ Duplicate</button>
   <button class="btn-ghost" id="btn-topo" onclick="toggleTopoLayer()" style="margin-left:auto">🏔 Elevation</button>
   <button class="btn-ghost" id="btn-nwi" onclick="toggleNWILayer()">💧 Wetlands</button>
   <button class="btn-ghost" id="btn-fema" onclick="toggleFEMALayer()">🌊 Flood</button>
@@ -5719,6 +5720,7 @@ function _setupSitesDropdown() {
   dd.innerHTML = '<div id="sites-list"></div>'
     + '<div class="sites-dropdown-footer">'
     + '<button class="btn-ghost" style="width:100%;font-size:11px" onclick="event.stopPropagation();newSite();">+ New Site</button>'
+    + '<button class="btn-ghost" style="width:100%;font-size:11px;margin-top:4px" onclick="event.stopPropagation();duplicateSite();">⧉ Duplicate Current Site</button>'
     + '</div>';
   dd.addEventListener('click', function(e) { e.stopPropagation(); });
   document.body.appendChild(dd);
@@ -5841,6 +5843,40 @@ function newSite() {
   clearAll_noConfirm();
   clearSiteName();
   setStatus('Ready for a new site. Draw a site boundary to begin.');
+}
+
+function duplicateSite() {
+  var dd = document.getElementById('sites-dropdown');
+  if (dd) { dd.classList.add('hidden'); _sitesDropdownOpen = false; }
+
+  if (!currentSiteName) {
+    setStatus('Save the current site first before duplicating.');
+    return;
+  }
+
+  var sites = getSavedSites();
+  var baseName = currentSiteName + ' - Option ';
+  var n = 2;
+  while (sites[baseName + n]) n++;
+  var suggested = baseName + n;
+
+  var newName = prompt('Duplicate site as:', suggested);
+  if (!newName || !newName.trim()) return;
+  newName = newName.trim();
+
+  if (sites[newName]) {
+    if (!confirm('A site named "' + newName + '" already exists. Overwrite it?')) return;
+  }
+
+  var data = serializeSite();
+  data.name = newName;
+  data.updatedAt = Date.now();
+  sites[newName] = data;
+  saveSitesIndex(sites);
+
+  setSiteName(newName);
+  flashSaveIndicator();
+  setStatus('Site duplicated as "' + newName + '"');
 }
 
 function clearAll_noConfirm() {
