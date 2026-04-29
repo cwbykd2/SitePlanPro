@@ -4543,16 +4543,15 @@ function exportPDF() {
     var imgData = canvas.toDataURL('image/jpeg', 0.92);
     var imgAspect = canvas.width / canvas.height;
 
-    // Determine PDF orientation based on map aspect ratio
-    var orientation = imgAspect >= 1 ? 'landscape' : 'portrait';
-    var pdf = new jsPDF({ orientation: orientation, unit: 'mm', format: 'a4' });
+    var pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     var pageW = pdf.internal.pageSize.getWidth();
     var pageH = pdf.internal.pageSize.getHeight();
 
-    // Fill the entire page with the map image, preserving aspect ratio
-    var margin = 5;
+    // Reserve space for stats table below the map
+    var margin = 8;
+    var statsHeight = 50;
     var availW = pageW - margin * 2;
-    var availH = pageH - margin * 2;
+    var availH = pageH - margin * 2 - statsHeight;
     var drawW = availW;
     var drawH = drawW / imgAspect;
     if (drawH > availH) {
@@ -4560,9 +4559,111 @@ function exportPDF() {
       drawW = drawH * imgAspect;
     }
     var mapX = (pageW - drawW) / 2;
-    var mapY = (pageH - drawH) / 2;
+    var mapY = margin;
 
     pdf.addImage(imgData, 'JPEG', mapX, mapY, drawW, drawH);
+
+    // --- Stats Table Below Map ---
+    var tableTop = mapY + drawH + 6;
+    var col1 = margin;
+
+    // Gather building data
+    var bldgData = [];
+    var totalBldgSF = 0;
+    var totalCarParks = 0;
+    var totalTrailerParks = 0;
+
+    buildings.forEach(function(b, i) {
+      var sf = areaSF(b.layer);
+      b.overlayGroup.eachLayer(function(o) {
+        if (o._overlayType === 'bumpout') sf += areaSF(o);
+      });
+      var carStalls = b.stallCount || 0;
+      var trailerStalls = b.trailerStallCount || 0;
+      totalBldgSF += sf;
+      totalCarParks += carStalls;
+      totalTrailerParks += trailerStalls;
+      bldgData.push({ name: 'Building ' + (i + 1), sf: sf, cars: carStalls, trailers: trailerStalls });
+    });
+
+    // Additional car parks from paving areas
+    var additionalCarParks = 0;
+    pavings.forEach(function(pv) {
+      if (pv.pavingType === 'carparking' && pv.isRect && (pv.stallCount || 0) > 0) {
+        additionalCarParks += pv.stallCount;
+      }
+    });
+    totalCarParks += additionalCarParks;
+
+    // Draw table header
+    pdf.setFillColor(30, 35, 50);
+    pdf.rect(col1, tableTop, availW, 7, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(200, 210, 230);
+    var colWidths = [availW * 0.3, availW * 0.25, availW * 0.22, availW * 0.23];
+    var headers = ['Building', 'Square Footage', 'Car Parks', 'Trailer Parks'];
+    var cx = col1;
+    headers.forEach(function(h, i) {
+      pdf.text(h, cx + 3, tableTop + 5);
+      cx += colWidths[i];
+    });
+
+    // Draw rows
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    var rowY = tableTop + 7;
+    var rowH = 6;
+
+    bldgData.forEach(function(row, idx) {
+      if (idx % 2 === 0) {
+        pdf.setFillColor(20, 25, 38);
+        pdf.rect(col1, rowY, availW, rowH, 'F');
+      }
+      pdf.setTextColor(220, 225, 235);
+      var rx = col1;
+      pdf.text(row.name, rx + 3, rowY + 4.2);
+      rx += colWidths[0];
+      pdf.text(Math.round(row.sf).toLocaleString() + ' SF', rx + 3, rowY + 4.2);
+      rx += colWidths[1];
+      pdf.text(row.cars.toLocaleString(), rx + 3, rowY + 4.2);
+      rx += colWidths[2];
+      pdf.text(row.trailers.toLocaleString(), rx + 3, rowY + 4.2);
+      rowY += rowH;
+    });
+
+    // Additional parking row if any
+    if (additionalCarParks > 0) {
+      if (bldgData.length % 2 === 0) {
+        pdf.setFillColor(20, 25, 38);
+        pdf.rect(col1, rowY, availW, rowH, 'F');
+      }
+      pdf.setTextColor(180, 185, 195);
+      var rx = col1;
+      pdf.text('Additional Parking Lots', rx + 3, rowY + 4.2);
+      rx += colWidths[0];
+      pdf.text('—', rx + 3, rowY + 4.2);
+      rx += colWidths[1];
+      pdf.text(additionalCarParks.toLocaleString(), rx + 3, rowY + 4.2);
+      rx += colWidths[2];
+      pdf.text('—', rx + 3, rowY + 4.2);
+      rowY += rowH;
+    }
+
+    // Totals row
+    pdf.setFillColor(40, 50, 70);
+    pdf.rect(col1, rowY, availW, 7, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(255, 255, 255);
+    var rx = col1;
+    pdf.text('TOTAL', rx + 3, rowY + 5);
+    rx += colWidths[0];
+    pdf.text(Math.round(totalBldgSF).toLocaleString() + ' SF', rx + 3, rowY + 5);
+    rx += colWidths[1];
+    pdf.text(totalCarParks.toLocaleString() + ' stalls', rx + 3, rowY + 5);
+    rx += colWidths[2];
+    pdf.text(totalTrailerParks.toLocaleString() + ' stalls', rx + 3, rowY + 5);
 
     // Save PDF
     var siteName = document.getElementById('site-name-display').textContent || 'Untitled Site';
