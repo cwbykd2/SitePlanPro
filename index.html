@@ -245,13 +245,25 @@ select option{background:var(--panel2)}
 .login-box .login-btn:active{transform:translateY(0)}
 .login-box .login-error{font-size:11px;color:var(--red);margin-top:12px;min-height:16px}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.auth-loading-overlay{position:fixed;inset:0;background:var(--bg);z-index:100001;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.auth-loading-overlay.hidden{display:none}
+.auth-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:auth-spin 0.7s linear infinite}
+@keyframes auth-spin{to{transform:rotate(360deg)}}
+.auth-loading-overlay .auth-label{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)}
+.app-shell{display:none}
+.app-shell.visible{display:contents}
 body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-minimal .label-paving,body.labels-minimal .label-bay,body.labels-minimal .label-overlay-dim,body.labels-minimal .label-stall{display:none!important}
 .btn-ghost.toggled{background:var(--accent);color:#fff}
 </style>
 </head>
 <body>
 
-<div class="login-overlay" id="login-overlay">
+<div class="auth-loading-overlay" id="auth-loading">
+  <div class="auth-spinner"></div>
+  <div class="auth-label">Loading...</div>
+</div>
+
+<div class="login-overlay hidden" id="login-overlay">
   <div class="login-box">
     <div class="login-logo">Site<span>Plan</span> Prep</div>
     <div class="login-sub">Sign in to continue</div>
@@ -262,6 +274,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
   </div>
 </div>
 
+<div class="app-shell" id="app-shell">
 <header>
   <div class="logo">Site<span>Plan</span> Prep</div>
   <div class="toolbar-sep"></div>
@@ -792,6 +805,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
     <div id="dim-tip"></div>
   </div>
 </div>
+</div><!-- /app-shell -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>

@@ -1,11 +1,34 @@
 import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
 
+const loadingEl = document.getElementById("auth-loading") as HTMLDivElement;
 const overlay = document.getElementById("login-overlay") as HTMLDivElement;
+const appShell = document.getElementById("app-shell") as HTMLDivElement;
 const emailInput = document.getElementById("login-email") as HTMLInputElement;
 const pwInput = document.getElementById("login-password") as HTMLInputElement;
 const btn = document.getElementById("login-btn") as HTMLButtonElement;
 const errEl = document.getElementById("login-error") as HTMLDivElement;
+
+function showLoading() {
+  loadingEl.classList.remove("hidden");
+  overlay.classList.add("hidden");
+  appShell.classList.remove("visible");
+}
+
+function showLogin() {
+  loadingEl.classList.add("hidden");
+  overlay.classList.remove("hidden");
+  appShell.classList.remove("visible");
+  emailInput.focus();
+}
+
+function showApp() {
+  loadingEl.classList.add("hidden");
+  overlay.classList.add("hidden");
+  appShell.classList.add("visible");
+}
+
+showLoading();
 
 function showError(msg: string) {
   errEl.textContent = msg;
@@ -52,9 +75,9 @@ async function attemptLogin() {
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    overlay.classList.add("hidden");
+    showApp();
   } else {
-    overlay.classList.remove("hidden");
+    showLogin();
   }
 });
 
