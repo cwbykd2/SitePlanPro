@@ -339,6 +339,10 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
               Measure
             </button>
           </div>
+          <button id="btn-clear-measure" class="hidden" onclick="clearMeasurements()" style="width:100%;margin-top:6px;padding:8px 10px;font-size:11px;font-weight:700;background:var(--panel);border:1px solid var(--border);color:var(--red);border-radius:6px;cursor:pointer;transition:all .15s;font-family:'Syne',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+            Delete Measurement
+          </button>
           <button id="btn-adjust-site" class="hidden" onclick="unlockSiteBoundary()" style="width:100%;margin-top:6px;padding:8px 10px;font-size:11px;font-weight:700;background:var(--panel);border:1px solid var(--border);color:var(--warn);border-radius:6px;cursor:pointer;transition:all .15s;font-family:'Syne',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
             Adjust Site
@@ -1561,6 +1565,7 @@ function setTool(tool) {
   }
   // Show/hide paving options panel
   document.getElementById('paving-opts-panel').classList.toggle('hidden', tool !== 'paving');
+  document.getElementById('btn-clear-measure').classList.toggle('hidden', tool !== 'measure');
 
   if (tool !== 'measure') stopMeasure();
 
