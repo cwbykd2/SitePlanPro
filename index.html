@@ -1721,7 +1721,7 @@ map.on(L.Draw.Event.CREATED, function(e) {
     // Convert rectangle to polygon for transform support
     var bounds = layer.getBounds();
     var verts = rectToVerts(bounds);
-    var polygon = L.polygon(verts, {color:'#000000',weight:2,fillColor:'#ffffff',fillOpacity:1});
+    var polygon = L.polygon(verts, {color:'#000000',weight:2,fillColor:'#ffffff',fillOpacity:1,bubblingMouseEvents:false});
     drawnItems.addLayer(polygon);
     registerBuilding(polygon, verts);
     setTool('select');
@@ -1872,8 +1872,12 @@ function setupBuildingDrag(bldg) {
     showBuildingOpts();
     updateBuildingList();
 
-    // Prepare for potential drag (don't start until threshold met)
+    // Immediately disable map dragging to prevent map pan with canvas renderer
+    map.dragging.disable();
     L.DomEvent.stopPropagation(e);
+    if (e.originalEvent) { e.originalEvent.stopPropagation(); e.originalEvent.preventDefault(); }
+
+    // Prepare for potential drag (don't start until threshold met)
     var pendingDrag = {
       bldgId: bldg.id,
       startLatLng: e.latlng,
@@ -1927,8 +1931,10 @@ function setupBuildingDrag(bldg) {
 
     function onPendingUp(ev) {
       map.off('mousemove', onPendingMove);
-      if (pendingDrag.activated) {
+      if (pendingDrag && pendingDrag.activated) {
         onBuildingDragEnd(ev);
+      } else {
+        map.dragging.enable();
       }
       pendingDrag = null;
     }
@@ -1943,6 +1949,8 @@ function setupBuildingDrag(bldg) {
         map.off('mousemove', onBuildingDrag);
         map.dragging.enable();
         dragState = null;
+      } else {
+        map.dragging.enable();
       }
       pendingDrag = null;
     }, { once: true });
@@ -3088,12 +3096,13 @@ function registerPaving(layer, isRect) {
   if (isRect) {
     var bounds = layer.getBounds();
     verts = rectToVerts(bounds);
-    var polygon = L.polygon(verts, {color:c,weight:2,fillColor:c,fillOpacity:1});
+    var polygon = L.polygon(verts, {color:c,weight:2,fillColor:c,fillOpacity:1,bubblingMouseEvents:false});
     drawnItems.removeLayer(layer);
     drawnItems.addLayer(polygon);
     layer = polygon;
   } else {
     layer.setStyle({color:c,weight:2,fillColor:c,fillOpacity:1});
+    layer.options.bubblingMouseEvents = false;
     verts = layer.getLatLngs()[0] || layer.getLatLngs();
     verts = verts.map(function(v) { return L.latLng(v.lat, v.lng); });
   }
@@ -3460,7 +3469,9 @@ function setupPavingDrag(paving) {
   var el = paving.layer;
   el.on('mousedown', function(e) {
     if (currentTool !== 'select') return;
+    map.dragging.disable();
     L.DomEvent.stopPropagation(e);
+    if (e.originalEvent) { e.originalEvent.stopPropagation(); e.originalEvent.preventDefault(); }
     selectPaving(paving.id);
 
     var pendingDrag = {
@@ -3498,7 +3509,7 @@ function setupPavingDrag(paving) {
 
     function onPendingUp() {
       map.off('mousemove', onPendingMove);
-      if (pendingDrag.activated) {
+      if (pendingDrag && pendingDrag.activated) {
         map.dragging.enable();
         var pav = pavings.find(function(x) { return x.id === pavDragState.pavId; });
         if (pav) {
@@ -3510,6 +3521,8 @@ function setupPavingDrag(paving) {
           autoSave();
         }
         pavDragState = null;
+      } else {
+        map.dragging.enable();
       }
       pendingDrag = null;
     }
@@ -4396,7 +4409,7 @@ function duplicateBuilding(id) {
   var verts = src.vertices.map(function(v) { return L.latLng(v.lat, v.lng + offsetLng); });
   var baseVerts = (src.baseVertices || src.vertices).map(function(v) { return L.latLng(v.lat, v.lng + offsetLng); });
 
-  var polygon = L.polygon(verts, { color: '#000000', weight: 2, fillColor: '#ffffff', fillOpacity: 1 });
+  var polygon = L.polygon(verts, { color: '#000000', weight: 2, fillColor: '#ffffff', fillOpacity: 1, bubblingMouseEvents: false });
   drawnItems.addLayer(polygon);
 
   var newId = Date.now() + Math.floor(Math.random() * 1000);
@@ -5058,7 +5071,7 @@ function deserializeSite(data) {
   if (data.buildings) {
     data.buildings.forEach(function(bd) {
       var verts = bd.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
-      var polygon = L.polygon(verts, { color: '#000000', weight: 2, fillColor: '#ffffff', fillOpacity: 1 });
+      var polygon = L.polygon(verts, { color: '#000000', weight: 2, fillColor: '#ffffff', fillOpacity: 1, bubblingMouseEvents: false });
       drawnItems.addLayer(polygon);
 
       var bldg = {
