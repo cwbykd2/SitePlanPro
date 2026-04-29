@@ -229,35 +229,11 @@ select option{background:var(--panel2)}
 
 
 
-.login-overlay{position:fixed;inset:0;background:var(--bg);z-index:100000;display:flex;align-items:center;justify-content:center}
-.login-overlay.hidden{display:none}
-.login-box{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:360px;max-width:90vw;box-shadow:0 24px 80px rgba(0,0,0,0.6);text-align:center}
-.login-box .login-logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-0.5px}
-.login-box .login-logo span{color:var(--accent)}
-.login-box .login-sub{font-size:12px;color:var(--muted);margin-bottom:28px}
-.login-box input[type="password"]{width:100%;padding:12px 16px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:14px;outline:none;transition:border-color 0.2s}
-.login-box input[type="password"]:focus{border-color:var(--accent)}
-.login-box input[type="password"].shake{animation:shake 0.4s ease}
-.login-box .login-btn{width:100%;margin-top:14px;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;border:none;border-radius:8px;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;letter-spacing:0.3px}
-.login-box .login-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,0.35)}
-.login-box .login-btn:active{transform:translateY(0)}
-.login-box .login-error{font-size:11px;color:var(--red);margin-top:12px;min-height:16px}
-@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-minimal .label-paving,body.labels-minimal .label-bay,body.labels-minimal .label-overlay-dim,body.labels-minimal .label-stall{display:none!important}
 .btn-ghost.toggled{background:var(--accent);color:#fff}
 </style>
 </head>
 <body>
-
-<div class="login-overlay" id="login-overlay">
-  <div class="login-box">
-    <div class="login-logo">Site<span>Plan</span> Prep</div>
-    <div class="login-sub">Enter password to continue</div>
-    <input type="password" id="login-password" placeholder="Password" autocomplete="off" autofocus>
-    <button class="login-btn" id="login-btn" onclick="attemptLogin()">Sign In</button>
-    <div class="login-error" id="login-error"></div>
-  </div>
-</div>
 
 <header>
   <div class="logo">Site<span>Plan</span> Prep</div>
@@ -795,35 +771,6 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-var SITE_PASSWORD = 'C5IP';
-
-function attemptLogin() {
-  var input = document.getElementById('login-password');
-  var errEl = document.getElementById('login-error');
-  if (input.value === SITE_PASSWORD) {
-    sessionStorage.setItem('sp_auth', '1');
-    document.getElementById('login-overlay').classList.add('hidden');
-  } else {
-    errEl.textContent = 'Incorrect password';
-    input.classList.add('shake');
-    setTimeout(function(){ input.classList.remove('shake'); }, 400);
-    input.value = '';
-    input.focus();
-  }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  var pwInput = document.getElementById('login-password');
-  if (pwInput) {
-    pwInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') attemptLogin();
-    });
-  }
-  if (sessionStorage.getItem('sp_auth') === '1') {
-    document.getElementById('login-overlay').classList.add('hidden');
-  }
-});
-
 var FEET_PER_METER = 3.28084;
 var currentTool = 'select';
 var buildings = [];
