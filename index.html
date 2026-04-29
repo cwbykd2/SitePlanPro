@@ -2262,6 +2262,7 @@ function drawBuildingOverlays(b) {
   
   b.overlayGroup.clearLayers();
   b.stallCount = 0;
+  b.trailerStallCount = 0;
   if (!b.vertices || b.vertices.length < 4) return;
 
   // Work directly with the ACTUAL building vertices (already transformed)
