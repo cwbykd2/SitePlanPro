@@ -4532,6 +4532,41 @@ function exportPDF() {
 
   var mapEl = document.getElementById('map');
 
+  // Fix Leaflet transform issue with html2canvas:
+  // Leaflet uses CSS translate3d on map panes which html2canvas cannot render.
+  // We temporarily convert transforms to explicit top/left positioning.
+  var mapPane = mapEl.querySelector('.leaflet-map-pane');
+  var origTransform = mapPane ? mapPane.style.transform : '';
+  var transformPanes = [];
+  if (mapPane) {
+    var transform = window.getComputedStyle(mapPane).transform;
+    if (transform && transform !== 'none') {
+      var match = transform.match(/matrix.*\((.+)\)/);
+      if (match) {
+        var values = match[1].split(',').map(Number);
+        var tx = values[4] || 0;
+        var ty = values[5] || 0;
+        mapPane.style.transform = '';
+        mapPane.style.left = tx + 'px';
+        mapPane.style.top = ty + 'px';
+      }
+    }
+    // Also fix child panes (tile pane, overlay pane, etc.)
+    mapPane.querySelectorAll('[style*="transform"]').forEach(function(el) {
+      var elTransform = window.getComputedStyle(el).transform;
+      if (elTransform && elTransform !== 'none') {
+        var m = elTransform.match(/matrix.*\((.+)\)/);
+        if (m) {
+          var v = m[1].split(',').map(Number);
+          transformPanes.push({ el: el, origTransform: el.style.transform, origLeft: el.style.left, origTop: el.style.top });
+          el.style.transform = '';
+          el.style.left = (parseFloat(el.style.left || 0) + (v[4] || 0)) + 'px';
+          el.style.top = (parseFloat(el.style.top || 0) + (v[5] || 0)) + 'px';
+        }
+      }
+    });
+  }
+
   html2canvas(mapEl, {
     useCORS: true,
     allowTaint: true,
@@ -4539,6 +4574,17 @@ function exportPDF() {
     backgroundColor: '#1a1a2e',
     logging: false
   }).then(function(canvas) {
+    // Restore transforms
+    if (mapPane) {
+      mapPane.style.transform = origTransform;
+      mapPane.style.left = '';
+      mapPane.style.top = '';
+      transformPanes.forEach(function(item) {
+        item.el.style.transform = item.origTransform;
+        item.el.style.left = item.origLeft;
+        item.el.style.top = item.origTop;
+      });
+    }
     var jsPDF = window.jspdf.jsPDF;
     var imgData = canvas.toDataURL('image/jpeg', 0.92);
     var imgAspect = canvas.width / canvas.height;
@@ -4680,6 +4726,17 @@ function exportPDF() {
     setStatus('PDF exported successfully!');
   }).catch(function(err) {
     console.error('PDF export error:', err);
+    // Restore transforms on error
+    if (mapPane) {
+      mapPane.style.transform = origTransform;
+      mapPane.style.left = '';
+      mapPane.style.top = '';
+      transformPanes.forEach(function(item) {
+        item.el.style.transform = item.origTransform;
+        item.el.style.left = item.origLeft;
+        item.el.style.top = item.origTop;
+      });
+    }
     // Restore UI on error
     handles.forEach(function(h) { h.style.display = ''; });
     statusBar.style.display = origStatus;
