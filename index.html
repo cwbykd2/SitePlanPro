@@ -2337,6 +2337,30 @@ function drawBuildingOverlays(b) {
     L.marker(mid, {icon: icon, interactive: false, zIndexOffset: 910}).addTo(b.overlayGroup);
   }
 
+  // Helper to draw trailer stall lines (12' wide stalls running the full depth)
+  function addTrailerStallLines(startP1, startP2, depth, dirAF, dirPF) {
+    var dxEdge = (startP2.lng - startP1.lng);
+    var dyEdge = (startP2.lat - startP1.lat);
+    var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
+    var stallWidthFt = 12;
+    var stallWidthCoord = stallWidthFt * ftToCoord;
+    var numStalls = Math.floor(edgeLenCoord / stallWidthCoord);
+    if (numStalls < 1) return 0;
+    for (var i = 0; i <= numStalls; i++) {
+      var frac = i / numStalls;
+      var linePt = L.latLng(
+        startP1.lat + dyEdge * frac,
+        startP1.lng + dxEdge * frac
+      );
+      var linePtFar = offsetPt(linePt, dirAF * depth, dirPF * depth);
+      var line = L.polyline([linePt, linePtFar], {
+        color: '#000000', weight: 1, opacity: 1, interactive: false
+      });
+      line.addTo(b.overlayGroup);
+    }
+    return numStalls;
+  }
+
   // ===== PARKING SUB-ZONE HELPER =====
   // Draws stacked sub-zones for parking instead of a single overlay.
   // 1 row (56'):    10' SW + 20' stalls + 26' fire lane
@@ -2515,6 +2539,7 @@ function drawBuildingOverlays(b) {
         var tc1 = offsetPt(tcEdge.ep1, 0, TRUCK_DEFAULT);
         var tc2 = offsetPt(tcEdge.ep2, 0, TRUCK_DEFAULT);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#808080', 1, 'trailer');
+        b.trailerStallCount += addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1);
       }
       // Car parking on top (opposite side) — sub-zoned
       var _pz1 = addParkingSubZones(v[0], v[1], 0, -1, toNumRows(b.parkingRowsMain));
@@ -2529,6 +2554,7 @@ function drawBuildingOverlays(b) {
         var tc1 = offsetPt(tcEdge.ep1, -TRUCK_DEFAULT, 0);
         var tc2 = offsetPt(tcEdge.ep2, -TRUCK_DEFAULT, 0);
         addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0, '#808080', 1, 'trailer');
+        b.trailerStallCount += addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, -1, 0);
       }
       // Car parking on right (east) — sub-zoned
       var _pz2 = addParkingSubZones(v[1], v[2], 1, 0, toNumRows(b.parkingRowsMain));
@@ -2544,6 +2570,7 @@ function drawBuildingOverlays(b) {
       var tc1 = offsetPt(tcTopEdge.ep1, 0, -TRUCK_DEFAULT);
       var tc2 = offsetPt(tcTopEdge.ep2, 0, -TRUCK_DEFAULT);
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1, '#808080', 1, 'trailer');
+      b.trailerStallCount += addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, -1);
     }
     var tcBotEdge = addEdgeOverlay(v[3], v[2], TRUCK_DEFAULT, 0, 1, '#808080', 1, 'truckcourt', tcInsetBotL, tcInsetBotR);
     addOverlayDepthLabel(tcBotEdge, TRUCK_DEFAULT + ' ft');
@@ -2551,6 +2578,7 @@ function drawBuildingOverlays(b) {
       var tc1 = offsetPt(tcBotEdge.ep1, 0, TRUCK_DEFAULT);
       var tc2 = offsetPt(tcBotEdge.ep2, 0, TRUCK_DEFAULT);
       addEdgeOverlay(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1, '#808080', 1, 'trailer');
+      b.trailerStallCount += addTrailerStallLines(tc1, tc2, TRUCK_EXTENDED - TRUCK_DEFAULT, 0, 1);
     }
     // Cross dock side parking — sub-zoned
     if (b.leftParking) { var _pzL3 = addParkingSubZones(v[0], v[3], -1, 0, toNumRows(b.parkingRowsLeft)); b.stallCount += (_pzL3 && _pzL3.stallCount) || 0; }
