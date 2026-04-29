@@ -858,7 +858,7 @@ var dimStart = null;
 // Drag state
 var dragState = null; // {bldgId, startLatLng, origVerts}
 
-var map = L.map('map', {center:[32.7767,-96.7970], zoom:14, zoomControl:true});
+var map = L.map('map', {center:[32.7767,-96.7970], zoom:14, zoomControl:true, preferCanvas:true});
 document.getElementById("map").style.position = "relative";
 
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
