@@ -258,6 +258,9 @@ select option{background:var(--panel2)}
 .app-shell.visible{display:contents}
 body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-minimal .label-paving,body.labels-minimal .label-bay,body.labels-minimal .label-overlay-dim,body.labels-minimal .label-stall{display:none!important}
 .btn-ghost.toggled{background:var(--accent);color:#fff}
+.measure-label{background:none;border:none}
+.measure-label span{background:rgba(239,68,68,0.9);color:#fff;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.measure-total span{background:rgba(239,68,68,1);font-weight:700;font-size:12px;padding:3px 8px}
 </style>
 </head>
 <body>
@@ -330,6 +333,10 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
             <button class="tool-btn paving-tool" id="tool-paving" onclick="setTool('paving')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="1"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="2" y1="16" x2="22" y2="16"/><line x1="8" y1="4" x2="8" y2="10"/><line x1="15" y1="10" x2="15" y2="16"/><line x1="8" y1="16" x2="8" y2="20"/></svg>
               Paving
+            </button>
+            <button class="tool-btn" id="tool-measure" onclick="setTool('measure')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20"/><path d="M6 8v8"/><path d="M18 8v8"/><path d="M10 10v4"/><path d="M14 10v4"/></svg>
+              Measure
             </button>
           </div>
           <button id="btn-adjust-site" class="hidden" onclick="unlockSiteBoundary()" style="width:100%;margin-top:6px;padding:8px 10px;font-size:11px;font-weight:700;background:var(--panel);border:1px solid var(--border);color:var(--warn);border-radius:6px;cursor:pointer;transition:all .15s;font-family:'Syne',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">
@@ -1555,6 +1562,8 @@ function setTool(tool) {
   // Show/hide paving options panel
   document.getElementById('paving-opts-panel').classList.toggle('hidden', tool !== 'paving');
 
+  if (tool !== 'measure') stopMeasure();
+
   if (tool === 'select') {
     setStatus('Pan and zoom freely - click a building to select and drag it');
   } else if (tool === 'building') {
@@ -1568,6 +1577,9 @@ function setTool(tool) {
     setStatus('Click points to draw pond - double-click to finish');
   } else if (tool === 'paving') {
     beginPavingDraw();
+  } else if (tool === 'measure') {
+    startMeasure();
+    setStatus('Click to place measurement points - double-click or press Enter to finish. Press Esc to clear.');
   }
 }
 
@@ -1588,6 +1600,111 @@ function beginDraw(type, mode) {
     activeDraw = new L.Draw.Polygon(map, {shapeOptions:{color:c,weight:2,fillOpacity:op},allowIntersection:false,showArea:false});
   }
   activeDraw.enable();
+}
+
+/* ===== MEASUREMENT TOOL ===== */
+var measurePoints = [];
+var measureLayers = L.layerGroup().addTo(map);
+var measureActive = false;
+
+function startMeasure() {
+  measureActive = true;
+  measurePoints = [];
+  map.getContainer().style.cursor = 'crosshair';
+  map.doubleClickZoom.disable();
+  map.on('click', onMeasureClick);
+  map.on('dblclick', onMeasureFinish);
+  map.on('mousemove', onMeasureMouseMove);
+}
+
+function stopMeasure() {
+  measureActive = false;
+  map.getContainer().style.cursor = '';
+  map.doubleClickZoom.enable();
+  map.off('click', onMeasureClick);
+  map.off('dblclick', onMeasureFinish);
+  map.off('mousemove', onMeasureMouseMove);
+  if (measurePreviewLine) { measureLayers.removeLayer(measurePreviewLine); measurePreviewLine = null; }
+}
+
+function clearMeasurements() {
+  measureLayers.clearLayers();
+  measurePoints = [];
+  if (measurePreviewLine) { measurePreviewLine = null; }
+}
+
+var measurePreviewLine = null;
+
+function onMeasureClick(e) {
+  if (!measureActive) return;
+  measurePoints.push(e.latlng);
+  // Draw point marker
+  var marker = L.circleMarker(e.latlng, { radius: 5, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1, weight: 2 });
+  measureLayers.addLayer(marker);
+  // Draw line segment and label
+  if (measurePoints.length > 1) {
+    var p1 = measurePoints[measurePoints.length - 2];
+    var p2 = measurePoints[measurePoints.length - 1];
+    var line = L.polyline([p1, p2], { color: '#ef4444', weight: 2, dashArray: '6,4' });
+    measureLayers.addLayer(line);
+    var distFt = Math.round(p1.distanceTo(p2) * FEET_PER_METER);
+    var mid = L.latLng((p1.lat + p2.lat) / 2, (p1.lng + p2.lng) / 2);
+    var label = L.marker(mid, {
+      icon: L.divIcon({
+        className: 'measure-label',
+        html: '<span>' + distFt.toLocaleString() + ' ft</span>',
+        iconSize: [80, 20],
+        iconAnchor: [40, 10]
+      })
+    });
+    measureLayers.addLayer(label);
+  }
+  // Show total if more than one segment
+  if (measurePoints.length > 2) {
+    updateMeasureTotal();
+  }
+}
+
+function onMeasureMouseMove(e) {
+  if (!measureActive || measurePoints.length === 0) return;
+  var lastPt = measurePoints[measurePoints.length - 1];
+  if (measurePreviewLine) measureLayers.removeLayer(measurePreviewLine);
+  measurePreviewLine = L.polyline([lastPt, e.latlng], { color: '#ef4444', weight: 1.5, dashArray: '4,4', opacity: 0.6 });
+  measureLayers.addLayer(measurePreviewLine);
+}
+
+function onMeasureFinish(e) {
+  if (!measureActive) return;
+  if (measurePreviewLine) { measureLayers.removeLayer(measurePreviewLine); measurePreviewLine = null; }
+  updateMeasureTotal();
+  setStatus('Measurement complete. Total: ' + getMeasureTotal() + ' ft. Click to start a new measurement or press Esc to clear.');
+  measurePoints = [];
+}
+
+function getMeasureTotal() {
+  var total = 0;
+  for (var i = 1; i < measurePoints.length; i++) {
+    total += measurePoints[i - 1].distanceTo(measurePoints[i]) * FEET_PER_METER;
+  }
+  return Math.round(total).toLocaleString();
+}
+
+function updateMeasureTotal() {
+  if (measurePoints.length < 2) return;
+  var lastPt = measurePoints[measurePoints.length - 1];
+  var totalDist = 0;
+  for (var i = 1; i < measurePoints.length; i++) {
+    totalDist += measurePoints[i - 1].distanceTo(measurePoints[i]) * FEET_PER_METER;
+  }
+  var label = L.marker(lastPt, {
+    icon: L.divIcon({
+      className: 'measure-label measure-total',
+      html: '<span>Total: ' + Math.round(totalDist).toLocaleString() + ' ft</span>',
+      iconSize: [120, 22],
+      iconAnchor: [60, -8]
+    })
+  });
+  measureLayers.addLayer(label);
 }
 
 map.on(L.Draw.Event.CREATED, function(e) {
@@ -4116,6 +4233,19 @@ document.addEventListener('keydown', function(e) {
     e.preventDefault();
     performUndo();
     return;
+  }
+  if (currentTool === 'measure') {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      clearMeasurements();
+      setStatus('Measurements cleared. Click to start a new measurement.');
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onMeasureFinish();
+      return;
+    }
   }
   if ((e.key === 'Delete' || e.key === 'Backspace') && currentTool === 'select') {
     if (editingRoad) {
