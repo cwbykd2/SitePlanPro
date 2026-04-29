@@ -256,7 +256,7 @@ select option{background:var(--panel2)}
 .auth-loading-overlay .auth-label{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)}
 .app-shell{display:none}
 .app-shell.visible{display:contents}
-body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-minimal .label-paving,body.labels-minimal .label-bay,body.labels-minimal .label-overlay-dim,body.labels-minimal .label-stall{display:none!important}
+body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-minimal .label-paving,body.labels-minimal .label-bay,body.labels-minimal .label-overlay-dim,body.labels-minimal .label-stall,body.labels-minimal .label-bump{display:none!important}
 .btn-ghost.toggled{background:var(--accent);color:#fff}
 </style>
 </head>
@@ -2663,7 +2663,7 @@ function drawBuildingOverlays(b) {
     var halfDepthPt = offsetPt(mid12, dirAlongFt * depthFt / 2, dirPerpFt * depthFt / 2);
     var labelText = (widthFt || bumpWidth) + "' × " + depthFt + "'";
     var icon = L.divIcon({
-      className: 'bldg-label',
+      className: 'bldg-label label-bump',
       html: '<div style="font-family:DM Mono,monospace;font-size:10px;color:#fff;text-shadow:0 0 5px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.7);white-space:nowrap;text-align:center;pointer-events:none;font-weight:600">' + labelText + '</div>',
       iconSize: [80, 14], iconAnchor: [40, 7]
     });
