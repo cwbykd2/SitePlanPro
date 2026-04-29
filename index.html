@@ -1194,20 +1194,29 @@ function updateBuildingLabels(b) {
       widthMid = getMidpoint(verts[1], verts[2]);
       depthMid = getMidpoint(verts[0], verts[1]);
     }
+    var insetFrac = 0.15;
+    var wLbl = L.latLng(
+      widthMid.lat + (center.lat - widthMid.lat) * insetFrac,
+      widthMid.lng + (center.lng - widthMid.lng) * insetFrac
+    );
+    var dLbl = L.latLng(
+      depthMid.lat + (center.lat - depthMid.lat) * insetFrac,
+      depthMid.lng + (center.lng - depthMid.lng) * insetFrac
+    );
     var widthIcon = L.divIcon({
       className: 'bldg-label label-dim',
       html: '<div class="bldg-label-dim">' + dims.width + ' ft</div>',
       iconSize: [80, 16],
       iconAnchor: [40, 8]
     });
-    L.marker(widthMid, {icon: widthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
+    L.marker(wLbl, {icon: widthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
     var depthIcon = L.divIcon({
       className: 'bldg-label label-dim',
       html: '<div class="bldg-label-dim">' + dims.depth + ' ft</div>',
       iconSize: [80, 16],
       iconAnchor: [40, 8]
     });
-    L.marker(depthMid, {icon: depthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
+    L.marker(dLbl, {icon: depthIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
   } else {
     // Custom polygon: show edge lengths for each side
     for (var ei = 0; ei < verts.length; ei++) {
