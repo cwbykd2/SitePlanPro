@@ -80,11 +80,14 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);height
 .fee-template-item .tpl-delete:hover{background:rgba(239,68,68,0.15)}
 .fee-no-templates{padding:10px;font-size:10px;color:var(--muted);text-align:center}
 
-header{display:flex;align-items:center;gap:10px;padding:0 12px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative;overflow:visible}
+header{display:flex;align-items:center;gap:10px;padding:0 12px;height:52px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;z-index:1000;position:relative;overflow-x:auto;overflow-y:hidden}
+header::-webkit-scrollbar{height:4px}
+header::-webkit-scrollbar-track{background:transparent}
+header::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
 header .btn-ghost,header .btn-primary{flex-shrink:0}
 .logo{font-size:17px;font-weight:800;letter-spacing:-0.5px;color:#fff;white-space:nowrap}
 .logo span{color:var(--accent)}
-.addr-wrap{flex:1;display:flex;gap:8px;max-width:340px;min-width:160px}
+.addr-wrap{display:flex;gap:8px;width:280px;min-width:200px;flex-shrink:0}
 .addr-wrap input{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:7px 12px;border-radius:6px;outline:none;transition:border-color .2s}
 .addr-wrap input:focus{border-color:var(--accent)}
 .addr-wrap input::placeholder{color:var(--muted)}
