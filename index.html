@@ -917,39 +917,13 @@ function toggleTopoLayer() {
   }
 }
 
-var NWIDynamicLayer = L.GridLayer.extend({
-  createTile: function(coords, done) {
-    var tile = document.createElement('img');
-    tile.crossOrigin = 'anonymous';
-    tile.alt = '';
-    var size = this.getTileSize();
-    var nwPoint = coords.scaleBy(size);
-    var sePoint = nwPoint.add(size);
-    var nw = this._map.unproject(nwPoint, coords.z);
-    var se = this._map.unproject(sePoint, coords.z);
-    var bbox = [
-      Math.min(nw.lng, se.lng),
-      Math.min(nw.lat, se.lat),
-      Math.max(nw.lng, se.lng),
-      Math.max(nw.lat, se.lat)
-    ].join(',');
-    var url = 'https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/rest/services/Wetlands/MapServer/export'
-      + '?bbox=' + bbox
-      + '&bboxSR=4326&imageSR=3857'
-      + '&size=' + size.x + ',' + size.y
-      + '&format=png32&transparent=true'
-      + '&layers=show:0'
-      + '&f=image';
-    tile.onload = function() { done(null, tile); };
-    tile.onerror = function() { done(null, tile); };
-    tile.src = url;
-    return tile;
-  }
-});
-var nwiLayer = new NWIDynamicLayer({
+var nwiLayer = L.tileLayer.wms('https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/services/Wetlands/MapServer/WMSServer', {
+  layers: '0',
+  format: 'image/png',
+  transparent: true,
   opacity: 0.7,
-  attribution: 'NWI &copy; USFWS',
-  maxZoom: 19
+  maxZoom: 19,
+  attribution: 'NWI &copy; USFWS'
 });
 var nwiVisible = false;
 
