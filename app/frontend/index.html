@@ -120,7 +120,7 @@ select option{background:var(--panel2)}
 .bldg-item.selected-bldg{border-color:var(--accent);background:rgba(59,130,246,.08)}
 .bldg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 .bldg-info{flex:1}.bldg-name{font-weight:600;color:var(--text)}.bldg-meta{color:var(--muted);margin-top:1px}
-.bldg-del,.bldg-dup{color:var(--muted);cursor:pointer;padding:2px 5px}.bldg-del:hover{color:var(--red)}.bldg-dup:hover{color:var(--accent)}
+.bldg-del{color:var(--muted);cursor:pointer;padding:2px 5px}.bldg-del:hover{color:var(--red)}
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .stat-box{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px}
 .stat-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:#fff;line-height:1}
@@ -275,7 +275,6 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
   <button class="btn-ghost" id="btn-sites" onclick="event.stopPropagation();event.preventDefault();toggleSitesDropdown();">📁 Sites</button>
   <button class="btn-ghost" id="btn-site" onclick="toggleSiteTool()">Draw Site</button>
   <button class="btn-ghost" id="btn-redraw-site" onclick="redrawSite()" style="display:none">Redraw Site</button>
-  <button class="btn-ghost" onclick="duplicateSite()">&#x29C9; Duplicate</button>
   <button class="btn-ghost" onclick="clearAll()">Clear All</button>
   <button class="btn-ghost" id="btn-topo" onclick="toggleTopoLayer()" style="margin-left:auto">🏔 Elevation</button>
   <button class="btn-ghost" id="btn-nwi" onclick="toggleNWILayer()">💧 Wetlands</button>
@@ -413,7 +412,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                   <div id="left-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-left-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-left-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-left-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -421,7 +420,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                   <div id="right-park-depth-cross" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-right-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-right-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-right-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -432,7 +431,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                     <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px">Main parking (opposite truck court)</label>
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-main-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-main-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-main-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -440,7 +439,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                   <div id="left-park-depth-rear" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-rleft-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-rleft-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-rleft-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -448,7 +447,7 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
                   <div id="right-park-depth-rear" class="hidden" style="margin-left:18px;margin-bottom:4px">
                     <div style="display:flex;align-items:center;gap:6px">
                       <label style="font-size:9px;color:var(--muted);white-space:nowrap">Rows:</label>
-                      <input type="number" id="park-rright-rows" min="1" max="20" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                      <input type="number" id="park-rright-rows" min="1" max="4" value="2" style="width:48px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
                       <span id="park-rright-depth-label" style="font-size:9px;color:var(--muted)">76'</span>
                     </div>
                   </div>
@@ -857,12 +856,6 @@ document.getElementById("map").style.position = "relative";
 
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   {attribution:'Tiles &copy; Esri', maxZoom:19}).addTo(map);
-var streetOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-  {maxZoom:19, opacity:0.9, pane:'overlayPane'});
-var streetLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-  {maxZoom:19, opacity:0.9, pane:'overlayPane'});
-streetOverlay.addTo(map);
-streetLabels.addTo(map);
 setTimeout(function(){ map.invalidateSize(); }, 200);
 
 (function(){
@@ -1196,7 +1189,7 @@ function updateBuildingLabels(b) {
   L.marker(center, {icon: sfIcon, interactive: false, zIndexOffset: 1000}).addTo(b.labelGroup);
 
   if (verts.length === 4) {
-    // Standard rectangular labels — offset slightly toward center to avoid handle overlap
+    // Standard rectangular labels
     var widthEdgeIdx = dims.edgeW === 0 ? 0 : 1;
     var widthMid, depthMid;
     if (widthEdgeIdx === 0) {
@@ -1206,15 +1199,6 @@ function updateBuildingLabels(b) {
       widthMid = getMidpoint(verts[1], verts[2]);
       depthMid = getMidpoint(verts[0], verts[1]);
     }
-    var insetFrac = 0.12;
-    widthMid = L.latLng(
-      widthMid.lat + (center.lat - widthMid.lat) * insetFrac,
-      widthMid.lng + (center.lng - widthMid.lng) * insetFrac
-    );
-    depthMid = L.latLng(
-      depthMid.lat + (center.lat - depthMid.lat) * insetFrac,
-      depthMid.lng + (center.lng - depthMid.lng) * insetFrac
-    );
     var widthIcon = L.divIcon({
       className: 'bldg-label label-dim',
       html: '<div class="bldg-label-dim">' + dims.width + ' ft</div>',
@@ -1992,31 +1976,24 @@ function selectType(type) {
   updateTrailerOpts(type);
 }
 
-// Calculate total parking depth for a given number of rows (1-20)
+// Calculate total parking depth for a given number of rows (1-4)
+// 1 row:  10' SW + 20' stalls + 26' fire lane = 56'
+// 2 rows: 10' SW + 20' stalls + 26' fire lane + 20' stalls = 76'
+// 3 rows: 10' SW + 20' stalls + 26' FL + 20' stalls + 0.5' curb + 20' stalls + 26' FL = 122.5'
+// 4 rows: 10' SW + 20' stalls + 26' FL + 20' stalls + 0.5' curb + 20' stalls + 26' FL + 20' stalls = 142.5'
 function calcParkingDepth(numRows) {
-  numRows = Math.max(1, Math.min(20, parseInt(numRows) || 2));
-  // Pattern: 10' sidewalk + first pair (20' stall + 26' fire lane) = 56' for 1 row
-  // 2nd row adds 20' stall = 76'
-  // Each additional pair after that: 0.5' curb + 20' stall + 26' fire lane (+ 20' stall if even row in pair)
-  var depth = 10 + 20 + 26; // 56' base: sidewalk + 1 stall + 1 fire lane
-  if (numRows >= 2) depth += 20; // 2nd stall row = 76'
-  var remaining = numRows - 2;
-  while (remaining > 0) {
-    depth += 0.5 + 20 + 26; // curb + stall + fire lane
-    remaining--;
-    if (remaining > 0) {
-      depth += 20; // another stall row
-      remaining--;
-    }
-  }
-  return depth;
+  numRows = Math.max(1, Math.min(4, parseInt(numRows) || 2));
+  if (numRows === 1) return 56;
+  if (numRows === 2) return 76;
+  if (numRows === 3) return 122.5;
+  return 142.5; // 4 rows
 }
 
 function setParkingRows(inputId, labelId) {
   var input = document.getElementById(inputId);
   var label = document.getElementById(labelId);
   if (input && label) {
-    var rows = Math.max(1, Math.min(20, parseInt(input.value) || 2));
+    var rows = Math.max(1, Math.min(4, parseInt(input.value) || 2));
     input.value = rows;
     label.textContent = calcParkingDepth(rows) + "'";
   }
@@ -2048,7 +2025,7 @@ function setParkingSide(side, mode) {
     } else {
       numRows = (mode === 'single') ? 1 : 2;
     }
-    inputEl.value = Math.max(1, Math.min(20, numRows));
+    inputEl.value = Math.max(1, Math.min(4, numRows));
     setParkingRows(mapping[side], labelMapping[side]);
   }
 }
@@ -2138,15 +2115,15 @@ function applyBuildingOptions() {
     b.topParking = false; // No top parking for cross-dock (truck court on top)
     b.leftParking = document.getElementById('chk-left-cross').checked;
     b.rightParking = document.getElementById('chk-right-cross').checked;
-    b.parkingRowsLeft = Math.max(1, Math.min(20, parseInt(document.getElementById('park-left-rows').value) || 2));
-    b.parkingRowsRight = Math.max(1, Math.min(20, parseInt(document.getElementById('park-right-rows').value) || 2));
+    b.parkingRowsLeft = Math.max(1, Math.min(4, parseInt(document.getElementById('park-left-rows').value) || 2));
+    b.parkingRowsRight = Math.max(1, Math.min(4, parseInt(document.getElementById('park-right-rows').value) || 2));
   } else {
     b.topParking = false;
     b.leftParking = document.getElementById('chk-left-rear').checked;
     b.rightParking = document.getElementById('chk-right-rear').checked;
-    b.parkingRowsMain = Math.max(1, Math.min(20, parseInt(document.getElementById('park-main-rows').value) || 2));
-    b.parkingRowsLeft = Math.max(1, Math.min(20, parseInt(document.getElementById('park-rleft-rows').value) || 2));
-    b.parkingRowsRight = Math.max(1, Math.min(20, parseInt(document.getElementById('park-rright-rows').value) || 2));
+    b.parkingRowsMain = Math.max(1, Math.min(4, parseInt(document.getElementById('park-main-rows').value) || 2));
+    b.parkingRowsLeft = Math.max(1, Math.min(4, parseInt(document.getElementById('park-rleft-rows').value) || 2));
+    b.parkingRowsRight = Math.max(1, Math.min(4, parseInt(document.getElementById('park-rright-rows').value) || 2));
   }
   // Read bump out flags
   if (b.type === 'cross') {
@@ -2374,7 +2351,7 @@ function drawBuildingOverlays(b) {
     } else {
       numRows = parseInt(numRowsOrBool) || 2;
     }
-    numRows = Math.max(1, Math.min(20, numRows));
+    numRows = Math.max(1, Math.min(4, numRows));
     var totalDepth = calcParkingDepth(numRows);
 
     // Apply insets to get effective edge points
@@ -2456,38 +2433,50 @@ function drawBuildingOverlays(b) {
 
     var curEdge;
 
-    // 1. Sidewalk (10')
+    // 1. Sidewalk (10') - light tan, dotted border
     curEdge = drawStrip(ep1, ep2, SIDEWALK, '#d4c9a8', 0.6, '3,3', 'sidewalk', "10' SW");
 
     var zoneStallCount = 0;
 
     // 2. First row of car stalls (20')
-    var stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+    var stallEdge1 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
     zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
-    curEdge = stallEdge;
+    curEdge = stallEdge1;
 
     // 3. First fire lane (26')
-    var flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
+    var flEdge1 = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
     addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
-    curEdge = flEdge;
+    curEdge = flEdge1;
 
-    // 4. Additional rows (2 through numRows)
-    for (var ri = 2; ri <= numRows; ri++) {
-      if (ri % 2 === 0) {
-        // Even rows: just a stall row
-        stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-        zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
-        curEdge = stallEdge;
-      } else {
-        // Odd rows (3, 5, 7...): curb + stall + fire lane
-        curEdge = drawStrip(curEdge.p1, curEdge.p2, CURB, '#555555', 0.8, null, 'curb', '6" Curb');
-        stallEdge = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
-        zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
-        curEdge = stallEdge;
-        flEdge = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
-        addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
-        curEdge = flEdge;
-      }
+    // 4. Second row of car stalls (20') - rows >= 2
+    if (numRows >= 2) {
+      var stallEdge2 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+      curEdge = stallEdge2;
+    }
+
+    // 5. For rows >= 3: curb (0.5') + third row stalls (20') + second fire lane (26')
+    if (numRows >= 3) {
+      // 6" curb
+      var curbEdge = drawStrip(curEdge.p1, curEdge.p2, CURB, '#555555', 0.8, null, 'curb', "6\" Curb");
+      curEdge = curbEdge;
+
+      // Third row of car stalls (20')
+      var stallEdge3 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+      curEdge = stallEdge3;
+
+      // Second fire lane (26')
+      var flEdge2 = drawStrip(curEdge.p1, curEdge.p2, FIRELANE, '#a0a0a0', 0.5, null, 'firelane', "26' Fire");
+      addFireLaneHash(curEdge.p1, curEdge.p2, FIRELANE, dirAlongFt, dirPerpFt);
+      curEdge = flEdge2;
+    }
+
+    // 6. For rows >= 4: fourth row of car stalls (20')
+    if (numRows >= 4) {
+      var stallEdge4 = drawStrip(curEdge.p1, curEdge.p2, STALL, '#a0a0a0', 0.5, '5,3', 'carstall', "20' Stall");
+      zoneStallCount += addStallLines(curEdge.p1, curEdge.p2, STALL, dirAlongFt, dirPerpFt);
+      curEdge = stallEdge4;
     }
 
     // Return overall overlay bounds for compatibility, plus stall count
@@ -4131,7 +4120,6 @@ function updateBuildingList() {
       +'<div class="bldg-dot" style="background:'+color+';border:1px solid #000"></div>'
       +'<div class="bldg-info"><div class="bldg-name">Building '+(i+1)+'</div>'
       +'<div class="bldg-meta">'+label+' &middot; '+fmt(totalSF)+' SF</div></div>'
-      +'<span class="bldg-dup" onclick="event.stopPropagation();duplicateBuilding('+b.id+')" title="Duplicate building">&#x29C9;</span>'
       +'<span class="bldg-del" onclick="event.stopPropagation();deleteBuilding('+b.id+')">&#x2715;</span>'
       +'</div>';
   }).join('');
@@ -4162,78 +4150,9 @@ function deleteBuilding(id) {
   checkOutOfBounds();
 }
 
-function duplicateBuilding(id) {
-  var src = buildings.find(function(x) { return x.id === id; });
-  if (!src) return;
 
-  // Compute an offset so the copy appears next to the original
-  var bounds = src.layer.getBounds();
-  var latOff = (bounds.getNorth() - bounds.getSouth()) * 0.15;
-  var lngOff = (bounds.getEast() - bounds.getWest()) * 1.15;
 
-  var newVerts = src.vertices.map(function(v) { return L.latLng(v.lat + latOff, v.lng + lngOff); });
-  var polygon = L.polygon(newVerts, { color: '#000000', weight: 2, fillColor: '#ffffff', fillOpacity: 1 });
-  drawnItems.addLayer(polygon);
 
-  var newId = Date.now();
-  var bldg = {
-    id: newId,
-    layer: polygon,
-    vertices: newVerts.map(function(v) { return L.latLng(v.lat, v.lng); }),
-    baseVertices: newVerts.map(function(v) { return L.latLng(v.lat, v.lng); }),
-    overlayGroup: L.featureGroup().addTo(map),
-    type: src.type,
-    spacing: src.spacing,
-    customW: src.customW,
-    customD: src.customD,
-    trailerTop: src.trailerTop,
-    trailerBottom: src.trailerBottom,
-    trailerRear: src.trailerRear,
-    leftParking: src.leftParking,
-    rightParking: src.rightParking,
-    topParking: src.topParking,
-    parkingRows: src.parkingRows || 'double',
-    parkingRowsTop: src.parkingRowsTop || 2,
-    parkingRowsLeft: src.parkingRowsLeft || 2,
-    parkingRowsRight: src.parkingRowsRight || 2,
-    parkingRowsMain: src.parkingRowsMain || 2,
-    tcInsetLeft: src.tcInsetLeft || 0,
-    tcInsetRight: src.tcInsetRight || 0,
-    tcInsetTopLeft: src.tcInsetTopLeft || 0,
-    tcInsetTopRight: src.tcInsetTopRight || 0,
-    tcInsetBottomLeft: src.tcInsetBottomLeft || 0,
-    tcInsetBottomRight: src.tcInsetBottomRight || 0,
-    clearHeight: src.clearHeight || '40',
-    rotation: src.rotation || 0,
-    scale: src.scale || 100,
-    bumpTopLeft: src.bumpTopLeft || false,
-    bumpTopRight: src.bumpTopRight || false,
-    bumpBotLeft: src.bumpBotLeft || false,
-    bumpBotRight: src.bumpBotRight || false,
-    bumpRearLeft: src.bumpRearLeft || false,
-    bumpRearRight: src.bumpRearRight || false,
-    bumpDepths: JSON.parse(JSON.stringify(src.bumpDepths || { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 })),
-    bumpWidths: JSON.parse(JSON.stringify(src.bumpWidths || {})),
-    labelGroup: null
-  };
-
-  if (src._widthDir) bldg._widthDir = { x: src._widthDir.x, y: src._widthDir.y };
-  if (src._topIsWidth !== undefined) bldg._topIsWidth = src._topIsWidth;
-
-  buildings.push(bldg);
-  setupBuildingDrag(bldg);
-  updateBuildingLabels(bldg);
-  drawBuildingOverlays(bldg);
-
-  activeBuilding = newId;
-  showBuildingOpts();
-  updateBuildingList();
-  recalcStats();
-  drawAllBayGrids();
-  checkOutOfBounds();
-  autoSave();
-  setStatus('Building duplicated.');
-}
 
 /* ===== GEOCODING ===== */
 
@@ -4367,8 +4286,6 @@ function exportPDF() {
 
 function clearAll() {
   if (!confirm('Clear everything?')) return;
-  currentSiteName = null;
-  clearSiteName();
   stopDraw();
   disableSiteEditing();
   clearOutOfBoundsLayers();
@@ -4420,11 +4337,7 @@ function getSavedSites() {
 }
 
 function saveSitesIndex(sites) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sites));
-  } catch(e) {
-    setStatus('Storage full — could not save. Try deleting old sites.');
-  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sites));
 }
 
 function promptSiteName(isRename) {
@@ -5817,7 +5730,6 @@ function _setupSitesDropdown() {
   dd.innerHTML = '<div id="sites-list"></div>'
     + '<div class="sites-dropdown-footer">'
     + '<button class="btn-ghost" style="width:100%;font-size:11px" onclick="event.stopPropagation();newSite();">+ New Site</button>'
-    + '<button class="btn-ghost" style="width:100%;font-size:11px;margin-top:4px" onclick="event.stopPropagation();document.getElementById(\'sites-dropdown\').classList.add(\'hidden\');_sitesDropdownOpen=false;duplicateSite();">&#x29C9; Duplicate Current Site</button>'
     + '</div>';
   dd.addEventListener('click', function(e) { e.stopPropagation(); });
   document.body.appendChild(dd);
@@ -5907,10 +5819,10 @@ function escHtml(s) {
 }
 
 function loadSite(name) {
+  // Unescape the name
   name = name.replace(/\\'/g, "'");
   var sites = getSavedSites();
   if (!sites[name]) { setStatus('Site not found.'); return; }
-  currentSiteName = null;
   deserializeSite(sites[name]);
   setSiteName(name);
   document.getElementById('sites-dropdown').classList.add('hidden');
@@ -5942,38 +5854,7 @@ function newSite() {
   setStatus('Ready for a new site. Draw a site boundary to begin.');
 }
 
-function duplicateSite() {
-  if (!currentSiteName) {
-    setStatus('Save this site first before duplicating.');
-    return;
-  }
-  var sites = getSavedSites();
-  var baseName = currentSiteName.replace(/ - Option \d+$/, '');
-  var optNum = 2;
-  var suggested = baseName + ' - Option ' + optNum;
-  while (sites[suggested]) {
-    optNum++;
-    suggested = baseName + ' - Option ' + optNum;
-  }
-  var newName = prompt('Duplicate site as:', suggested);
-  if (!newName || !newName.trim()) return;
-  newName = newName.trim();
-  if (sites[newName]) {
-    if (!confirm('A site named "' + newName + '" already exists. Overwrite it?')) return;
-  }
-  var data = serializeSite();
-  data.name = newName;
-  data.updatedAt = Date.now();
-  sites[newName] = data;
-  saveSitesIndex(sites);
-  setSiteName(newName);
-  flashSaveIndicator();
-  setStatus('Duplicated as "' + newName + '"');
-}
-
 function clearAll_noConfirm() {
-  var prevName = currentSiteName;
-  currentSiteName = null;
   stopDraw();
   exitRoadEditMode();
   disableSiteEditing();
