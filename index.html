@@ -2366,6 +2366,29 @@ function drawBuildingOverlays(b) {
     L.marker(mid, {icon: icon, interactive: false, zIndexOffset: 910}).addTo(b.overlayGroup);
   }
 
+  // Helper to draw trailer stall lines (12' wide stalls running the full depth)
+  function addTrailerStallLines(startP1, startP2, depth, dirAF, dirPF) {
+    var dxEdge = (startP2.lng - startP1.lng);
+    var dyEdge = (startP2.lat - startP1.lat);
+    var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
+    var stallWidthFt = 12;
+    var stallWidthCoord = stallWidthFt * ftToCoord;
+    var numStalls = Math.floor(edgeLenCoord / stallWidthCoord);
+    if (numStalls < 1) return 0;
+    for (var i = 0; i <= numStalls; i++) {
+      var frac = i / numStalls;
+      var linePt = L.latLng(
+        startP1.lat + dyEdge * frac,
+        startP1.lng + dxEdge * frac
+      );
+      var linePtFar = offsetPt(linePt, dirAF * depth, dirPF * depth);
+      L.polyline([linePt, linePtFar], {
+        color: '#f97316', weight: 0.8, opacity: 0.7, interactive: false
+      }).addTo(b.overlayGroup);
+    }
+    return numStalls;
+  }
+
   // ===== PARKING SUB-ZONE HELPER =====
   // Draws stacked sub-zones for parking instead of a single overlay.
   // 1 row (56'):    10' SW + 20' stalls + 26' fire lane
@@ -2459,29 +2482,6 @@ function drawBuildingOverlays(b) {
           color: '#ffffff', weight: 0.8, opacity: 0.6, interactive: false, dashArray: '2,2'
         });
         line.addTo(b.overlayGroup);
-      }
-      return numStalls;
-    }
-
-    // Helper to draw trailer stall lines (12' wide, depth from outer edge inward)
-    function addTrailerStallLines(startP1, startP2, depth, dirAF, dirPF) {
-      var dxEdge = (startP2.lng - startP1.lng);
-      var dyEdge = (startP2.lat - startP1.lat);
-      var edgeLenCoord = Math.sqrt((dxEdge * latScale) * (dxEdge * latScale) + dyEdge * dyEdge);
-      var stallWidthFt = 12;
-      var stallWidthCoord = stallWidthFt * ftToCoord;
-      var numStalls = Math.floor(edgeLenCoord / stallWidthCoord);
-      if (numStalls < 1) return 0;
-      for (var i = 0; i <= numStalls; i++) {
-        var frac = i / numStalls;
-        var linePt = L.latLng(
-          startP1.lat + dyEdge * frac,
-          startP1.lng + dxEdge * frac
-        );
-        var linePtFar = offsetPt(linePt, dirAF * depth, dirPF * depth);
-        L.polyline([linePt, linePtFar], {
-          color: '#f97316', weight: 0.8, opacity: 0.7, interactive: false
-        }).addTo(b.overlayGroup);
       }
       return numStalls;
     }
