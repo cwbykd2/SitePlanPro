@@ -1143,6 +1143,21 @@ function getBuildingDimensions(verts, bldg) {
   // For polygons with >4 vertices, compute bounding box dimensions
   if (verts.length < 3) return { width: 0, depth: 0, sf: 0 };
   if (verts.length === 4) {
+    // Use stored nominal dimensions if available (prevents drift when dragging)
+    if (bldg && bldg._nominalWidthFt && bldg._nominalDepthFt) {
+      var w = bldg._nominalWidthFt;
+      var d = bldg._nominalDepthFt;
+      var topIsWidth;
+      if (typeof bldg._topIsWidth === 'boolean') {
+        topIsWidth = bldg._topIsWidth;
+      } else {
+        var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
+        var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
+        topIsWidth = (d01 >= d12);
+      }
+      var edgeW = topIsWidth ? 0 : 1;
+      return { width: w, depth: d, sf: w * d, edgeW: edgeW };
+    }
     var d01 = verts[0].distanceTo(verts[1]) * FEET_PER_METER;
     var d12 = verts[1].distanceTo(verts[2]) * FEET_PER_METER;
     // Use cached _topIsWidth flag (set at creation / first resize) so the
@@ -1180,6 +1195,11 @@ function getBuildingDimensions(verts, bldg) {
       d = Math.round(d01);
       edgeW = 1;
     }
+    // Store nominal dimensions now that we've computed them
+    if (bldg) {
+      bldg._nominalWidthFt = w;
+      bldg._nominalDepthFt = d;
+    }
     var sf = w * d;
     return { width: w, depth: d, sf: sf, edgeW: edgeW };
   }
@@ -1207,7 +1227,12 @@ function getMidpoint(a, b) {
 
 function getTotalBuildingSF(b) {
   // Returns the total building SF including bump outs
-  var sf = areaSF(b.layer);
+  var sf;
+  if (b.vertices.length === 4 && b._nominalWidthFt && b._nominalDepthFt) {
+    sf = b._nominalWidthFt * b._nominalDepthFt;
+  } else {
+    sf = areaSF(b.layer);
+  }
   b.overlayGroup.eachLayer(function(o) {
     if (o._overlayType === 'bumpout') {
       sf += areaSF(o);
@@ -1420,6 +1445,12 @@ function showBuildingHandles(b) {
       bld.baseVertices = bld.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
       bld.rotation = 0;
       bld.scale = 100;
+      // Recompute nominal dimensions from new geometry
+      var d01 = bld.vertices[0].distanceTo(bld.vertices[1]) * FEET_PER_METER;
+      var d12 = bld.vertices[1].distanceTo(bld.vertices[2]) * FEET_PER_METER;
+      var tiw = (typeof bld._topIsWidth === 'boolean') ? bld._topIsWidth : (d01 >= d12);
+      bld._nominalWidthFt = Math.round(tiw ? d01 : d12);
+      bld._nominalDepthFt = Math.round(tiw ? d12 : d01);
       recalcStats();
       drawBuildingOverlays(bld);
       drawBayGrid(bld);
@@ -1479,6 +1510,12 @@ function showBuildingHandles(b) {
       bld.baseVertices = bld.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
       bld.rotation = 0;
       bld.scale = 100;
+      // Recompute nominal dimensions from new geometry
+      var d01 = bld.vertices[0].distanceTo(bld.vertices[1]) * FEET_PER_METER;
+      var d12 = bld.vertices[1].distanceTo(bld.vertices[2]) * FEET_PER_METER;
+      var tiw = (typeof bld._topIsWidth === 'boolean') ? bld._topIsWidth : (d01 >= d12);
+      bld._nominalWidthFt = Math.round(tiw ? d01 : d12);
+      bld._nominalDepthFt = Math.round(tiw ? d12 : d01);
       recalcStats();
       drawBuildingOverlays(bld);
       drawBayGrid(bld);
@@ -1865,6 +1902,11 @@ function registerBuilding(layer, verts) {
     bldg._widthDir = { x: wEdge.dx / len, y: wEdge.dy / len };
     // Cache which edge is width so resizeBuildingToBays never flips
     bldg._topIsWidth = topIsWidth;
+    // Store nominal dimensions in feet so SF doesn't drift when dragging
+    var d01Ft = d01 * FEET_PER_METER;
+    var d12Ft = d12 * FEET_PER_METER;
+    bldg._nominalWidthFt = Math.round(topIsWidth ? d01Ft : d12Ft);
+    bldg._nominalDepthFt = Math.round(topIsWidth ? d12Ft : d01Ft);
   })();
   buildings.push(bldg);
   activeBuilding = id;
@@ -3805,7 +3847,11 @@ function recalcStats() {
   var bldgSF=0, pavedSF=0, pondSF=0, siteSF=0;
   var carparkingSF=0, truckcourtSF=0, trailerSF=0, roadSF=0, pavingAreaSF=0;
   buildings.forEach(function(b) {
-    bldgSF += areaSF(b.layer);
+    if (b.vertices.length === 4 && b._nominalWidthFt && b._nominalDepthFt) {
+      bldgSF += b._nominalWidthFt * b._nominalDepthFt;
+    } else {
+      bldgSF += areaSF(b.layer);
+    }
     b.overlayGroup.eachLayer(function(o){
       var sf = areaSF(o);
       var otype = o._overlayType || 'truckcourt';
@@ -4470,6 +4516,8 @@ function duplicateBuilding(id) {
 
   if (src._widthDir) bldg._widthDir = { x: src._widthDir.x, y: src._widthDir.y };
   if (src._topIsWidth !== undefined) bldg._topIsWidth = src._topIsWidth;
+  if (src._nominalWidthFt) bldg._nominalWidthFt = src._nominalWidthFt;
+  if (src._nominalDepthFt) bldg._nominalDepthFt = src._nominalDepthFt;
 
   buildings.push(bldg);
   setupBuildingDrag(bldg);
@@ -4647,10 +4695,7 @@ function exportPDF() {
     var totalTrailerParks = 0;
 
     buildings.forEach(function(b, i) {
-      var sf = areaSF(b.layer);
-      b.overlayGroup.eachLayer(function(o) {
-        if (o._overlayType === 'bumpout') sf += areaSF(o);
-      });
+      var sf = getTotalBuildingSF(b);
       var carStalls = b.stallCount || 0;
       var trailerStalls = b.trailerStallCount || 0;
       totalBldgSF += sf;
@@ -4958,6 +5003,8 @@ function serializeSite() {
         bumpRearRight: b.bumpRearRight || false,
         bumpDepths: b.bumpDepths || { topLeft: 50, topRight: 50, botLeft: 50, botRight: 50, rearLeft: 50, rearRight: 50 },
         bumpWidths: b.bumpWidths || {},
+        _nominalWidthFt: b._nominalWidthFt || 0,
+        _nominalDepthFt: b._nominalDepthFt || 0,
       };
     }),
     roads: roads.map(function(r) {
@@ -5132,6 +5179,8 @@ function deserializeSite(data) {
       bumpWidths: bd.bumpWidths || {},
         labelGroup: null
       };
+      if (bd._nominalWidthFt) bldg._nominalWidthFt = bd._nominalWidthFt;
+      if (bd._nominalDepthFt) bldg._nominalDepthFt = bd._nominalDepthFt;
       buildings.push(bldg);
       setupBuildingDrag(bldg);
       updateBuildingLabels(bldg);
@@ -5442,6 +5491,9 @@ function resizeBuildingToBays(b, config) {
   b.baseVertices = b.vertices.map(function(v) { return L.latLng(v.lat, v.lng); });
   b.rotation = 0;
   b.scale = 100;
+  // Store nominal dimensions so SF doesn't drift when dragging
+  b._nominalWidthFt = Math.round(config.totalWidth);
+  b._nominalDepthFt = Math.round(config.totalDepth);
 
   // Update the stored width-direction vector from the freshly-baked vertices
   // so future resizes stay consistent.
