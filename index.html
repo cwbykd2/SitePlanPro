@@ -254,6 +254,12 @@ select option{background:var(--panel2)}
 .auth-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:auth-spin 0.7s linear infinite}
 @keyframes auth-spin{to{transform:rotate(360deg)}}
 .auth-loading-overlay .auth-label{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)}
+.migration-overlay,.sites-loading-overlay{position:fixed;inset:0;background:rgba(13,15,20,0.92);z-index:100000;display:flex;align-items:center;justify-content:center}
+.migration-overlay.hidden,.sites-loading-overlay.hidden{display:none}
+.migration-box{display:flex;flex-direction:column;align-items:center;gap:16px;padding:32px;background:var(--panel);border:1px solid var(--border);border-radius:12px}
+.migration-label{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)}
+.sites-error-msg{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--red);color:var(--red);font-family:'DM Mono',monospace;font-size:12px;padding:10px 20px;border-radius:8px;z-index:100002;max-width:400px;text-align:center}
+.sites-error-msg.hidden{display:none}
 .app-shell{display:none}
 .app-shell.visible{display:contents}
 body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-minimal .label-paving,body.labels-minimal .label-bay,body.labels-minimal .label-overlay-dim,body.labels-minimal .label-stall{display:none!important}
@@ -280,6 +286,22 @@ body.labels-minimal .label-dim,body.labels-minimal .label-road,body.labels-minim
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
+
+<div class="migration-overlay hidden" id="migration-overlay">
+  <div class="migration-box">
+    <div class="auth-spinner"></div>
+    <div class="migration-label">Syncing your sites to the cloud...</div>
+  </div>
+</div>
+
+<div class="sites-loading-overlay hidden" id="sites-loading-overlay">
+  <div class="migration-box">
+    <div class="auth-spinner"></div>
+    <div class="migration-label">Loading your sites...</div>
+  </div>
+</div>
+
+<div class="sites-error-msg hidden" id="sites-error-msg"></div>
 
 <div class="app-shell" id="app-shell">
 <header>
@@ -4806,8 +4828,10 @@ map.on('mouseup', function() { dimStart=null; document.getElementById('dim-tip')
 /* ===== SITE NAMING & PERSISTENCE ===== */
 
 var currentSiteName = null;
+var currentSiteId = null; // Firestore document ID
 var saveTimeout = null;
 var STORAGE_KEY = 'siteplan_pro_sites';
+var cachedSites = {}; // In-memory cache of Firestore sites (keyed by siteId)
 
 /* ===== UNDO SYSTEM ===== */
 var undoStack = [];
@@ -4838,11 +4862,11 @@ function updateUndoBtn() {
 }
 
 function getSavedSites() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch(e) { return {}; }
+  return cachedSites;
 }
 
 function saveSitesIndex(sites) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sites));
+  cachedSites = sites;
 }
 
 function promptSiteName(isRename) {
@@ -4867,27 +4891,30 @@ function setSiteName(name) {
 
 function clearSiteName() {
   currentSiteName = null;
+  currentSiteId = null;
   document.getElementById('site-name-wrap').classList.add('hidden');
   document.getElementById('site-name-sep').style.display = 'none';
   document.title = 'SitePlan Prep';
 }
 
 function renameSite() {
-  if (!currentSiteName) return;
+  if (!currentSiteName || !currentSiteId) return;
   var oldName = currentSiteName;
   var newName = promptSiteName(true);
   if (!newName || newName === oldName) return;
-  var sites = getSavedSites();
-  if (sites[oldName]) {
-    sites[newName] = sites[oldName];
-    sites[newName].name = newName;
-    sites[newName].updatedAt = Date.now();
-    delete sites[oldName];
-    saveSitesIndex(sites);
+  var userId = window.__currentUserId;
+  if (!userId) return;
+  // Update local cache
+  if (cachedSites[currentSiteId]) {
+    cachedSites[currentSiteId].name = newName;
+    cachedSites[currentSiteId].updatedAt = Date.now();
   }
   setSiteName(newName);
-  autoSave();
   setStatus('Site renamed to "' + newName + '"');
+  // Persist to Firestore
+  window.__firestore.renameSiteDoc(userId, currentSiteId, newName).catch(function(err) {
+    console.error('Failed to rename site in Firestore:', err);
+  });
 }
 
 /* ===== SERIALIZATION ===== */
@@ -5132,13 +5159,29 @@ function deserializeSite(data) {
 
 function autoSave() {
   if (!currentSiteName) return;
+  if (window.__migrationInProgress) return;
   pushUndo();
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(function() {
-    var sites = getSavedSites();
-    sites[currentSiteName] = serializeSite();
-    saveSitesIndex(sites);
-    flashSaveIndicator();
+    var userId = window.__currentUserId;
+    if (!userId) return;
+    var data = serializeSite();
+    // Update local cache
+    if (currentSiteId) {
+      cachedSites[currentSiteId] = data;
+      cachedSites[currentSiteId].siteId = currentSiteId;
+    }
+    // Persist to Firestore
+    window.__firestore.saveSite(userId, currentSiteId, data).then(function(id) {
+      if (!currentSiteId) {
+        currentSiteId = id;
+        data.siteId = id;
+        cachedSites[id] = data;
+      }
+      flashSaveIndicator();
+    }).catch(function(err) {
+      console.error('Auto-save failed:', err);
+    });
   }, 500);
 }
 
@@ -6295,28 +6338,29 @@ document.addEventListener('click', function(e) {
 
 function renderSitesList() {
   var sites = getSavedSites();
-  var keys = Object.keys(sites).sort(function(a, b) {
+  var ids = Object.keys(sites).sort(function(a, b) {
     return (sites[b].updatedAt || 0) - (sites[a].updatedAt || 0);
   });
   var el = document.getElementById('sites-list');
 
-  if (!keys.length) {
+  if (!ids.length) {
     el.innerHTML = '<div class="no-sites-msg">No saved sites yet.<br>Draw a site boundary to get started.</div>';
     return;
   }
 
-  el.innerHTML = keys.map(function(name) {
-    var s = sites[name];
-    var isActive = name === currentSiteName;
+  el.innerHTML = ids.map(function(id) {
+    var s = sites[id];
+    var name = s.name || 'Untitled';
+    var isActive = id === currentSiteId;
     var bCount = (s.buildings || []).length;
     var date = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : '';
-    return '<div class="site-item' + (isActive ? ' active-site' : '') + '" onclick="loadSite(\'' + escHtml(name) + '\')">'
+    return '<div class="site-item' + (isActive ? ' active-site' : '') + '" onclick="loadSiteById(\'' + id + '\')">'
       + '<div style="flex:1;min-width:0">'
       + '<div class="site-item-name">' + escHtml(name) + '</div>'
       + '<div class="site-item-meta">' + bCount + ' building' + (bCount !== 1 ? 's' : '') + ' · ' + date + '</div>'
       + '</div>'
       + '<div class="site-item-actions">'
-      + '<button class="btn-ghost" onclick="event.stopPropagation();deleteSavedSite(\'' + escHtml(name) + '\')" title="Delete">🗑</button>'
+      + '<button class="btn-ghost" onclick="event.stopPropagation();deleteSavedSiteById(\'' + id + '\')" title="Delete">&#128465;</button>'
       + '</div></div>';
   }).join('');
 }
@@ -6326,37 +6370,75 @@ function escHtml(s) {
 }
 
 function loadSite(name) {
-  // Unescape the name
-  name = name.replace(/\\'/g, "'");
+  // Legacy compat - find site by name
   var sites = getSavedSites();
-  if (!sites[name]) { setStatus('Site not found.'); return; }
-  deserializeSite(sites[name]);
-  setSiteName(name);
+  var ids = Object.keys(sites);
+  for (var i = 0; i < ids.length; i++) {
+    if (sites[ids[i]].name === name) {
+      loadSiteById(ids[i]);
+      return;
+    }
+  }
+  setStatus('Site not found.');
+}
+
+function loadSiteById(siteId) {
+  var sites = getSavedSites();
+  if (!sites[siteId]) { setStatus('Site not found.'); return; }
+  var data = sites[siteId];
+  currentSiteId = siteId;
+  deserializeSite(data);
+  setSiteName(data.name || 'Untitled');
   document.getElementById('sites-dropdown').classList.add('hidden');
   _sitesDropdownOpen = false;
-  setStatus('Loaded site "' + name + '"');
+  setStatus('Loaded site "' + (data.name || 'Untitled') + '"');
 }
 
 function deleteSavedSite(name) {
-  name = name.replace(/\\'/g, "'");
-  if (!confirm('Delete saved site "' + name + '"? This cannot be undone.')) return;
+  // Legacy compat - find by name
   var sites = getSavedSites();
-  delete sites[name];
-  saveSitesIndex(sites);
-  if (currentSiteName === name) {
+  var ids = Object.keys(sites);
+  for (var i = 0; i < ids.length; i++) {
+    if (sites[ids[i]].name === name) {
+      deleteSavedSiteById(ids[i]);
+      return;
+    }
+  }
+}
+
+function deleteSavedSiteById(siteId) {
+  var sites = getSavedSites();
+  var siteName = sites[siteId] ? sites[siteId].name : 'this site';
+  if (!confirm('Delete saved site "' + siteName + '"? This cannot be undone.')) return;
+  var userId = window.__currentUserId;
+  // Remove from cache
+  delete cachedSites[siteId];
+  if (currentSiteId === siteId) {
+    currentSiteId = null;
     clearSiteName();
   }
   renderSitesList();
-  setStatus('Deleted site "' + name + '"');
+  setStatus('Deleted site "' + siteName + '"');
+  // Delete from Firestore
+  if (userId) {
+    window.__firestore.deleteSite(userId, siteId).catch(function(err) {
+      console.error('Failed to delete site from Firestore:', err);
+    });
+  }
 }
 
 function newSite() {
+  if (window.__migrationInProgress) {
+    setStatus('Please wait for migration to complete.');
+    return;
+  }
   document.getElementById('sites-dropdown').classList.add('hidden');
   _sitesDropdownOpen = false;
   if (buildings.length || roads.length || ponds.length || siteBoundary) {
     if (!confirm('Start a new site? Current unsaved changes will be lost.')) return;
   }
   clearAll_noConfirm();
+  currentSiteId = null;
   clearSiteName();
   setStatus('Ready for a new site. Draw a site boundary to begin.');
 }
@@ -6373,26 +6455,34 @@ function duplicateSite() {
   var sites = getSavedSites();
   var baseName = currentSiteName + ' - Option ';
   var n = 2;
-  while (sites[baseName + n]) n++;
+  var existingNames = Object.keys(sites).map(function(id) { return sites[id].name; });
+  while (existingNames.indexOf(baseName + n) !== -1) n++;
   var suggested = baseName + n;
 
   var newName = prompt('Duplicate site as:', suggested);
   if (!newName || !newName.trim()) return;
   newName = newName.trim();
 
-  if (sites[newName]) {
-    if (!confirm('A site named "' + newName + '" already exists. Overwrite it?')) return;
-  }
+  var userId = window.__currentUserId;
+  if (!userId) return;
 
   var data = serializeSite();
   data.name = newName;
   data.updatedAt = Date.now();
-  sites[newName] = data;
-  saveSitesIndex(sites);
 
   setSiteName(newName);
-  flashSaveIndicator();
-  setStatus('Site duplicated as "' + newName + '"');
+  setStatus('Duplicating site...');
+
+  window.__firestore.saveSite(userId, null, data).then(function(newId) {
+    currentSiteId = newId;
+    data.siteId = newId;
+    cachedSites[newId] = data;
+    flashSaveIndicator();
+    setStatus('Site duplicated as "' + newName + '"');
+  }).catch(function(err) {
+    console.error('Failed to duplicate site:', err);
+    setStatus('Failed to duplicate site. Please try again.');
+  });
 }
 
 function clearAll_noConfirm() {
@@ -6445,19 +6535,21 @@ function clearAll_noConfirm() {
 
 /* ===== LOAD LAST SITE ON STARTUP ===== */
 
-(function autoLoadLastSite() {
-  var sites = getSavedSites();
-  var keys = Object.keys(sites);
-  if (!keys.length) return;
+window.onFirestoreSitesLoaded = function(sites) {
+  cachedSites = sites;
+  var ids = Object.keys(sites);
+  if (!ids.length) return;
   // Load most recently updated site
-  keys.sort(function(a, b) { return (sites[b].updatedAt || 0) - (sites[a].updatedAt || 0); });
-  var lastName = keys[0];
+  ids.sort(function(a, b) { return (sites[b].updatedAt || 0) - (sites[a].updatedAt || 0); });
+  var lastId = ids[0];
+  var lastSite = sites[lastId];
   setTimeout(function() {
-    deserializeSite(sites[lastName]);
-    setSiteName(lastName);
-    setStatus('Loaded last site: "' + lastName + '"');
+    currentSiteId = lastId;
+    deserializeSite(lastSite);
+    setSiteName(lastSite.name || 'Untitled');
+    setStatus('Loaded last site: "' + (lastSite.name || 'Untitled') + '"');
   }, 300);
-})();
+};
 
 </script>
 </body>

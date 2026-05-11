@@ -1,5 +1,6 @@
 import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./lib/firebase";
+import "./firestore";
 
 const loadingEl = document.getElementById("auth-loading") as HTMLDivElement;
 const overlay = document.getElementById("login-overlay") as HTMLDivElement;
@@ -76,11 +77,70 @@ async function attemptLogin() {
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
+    (window as any).__currentUserId = user.uid;
     showApp();
+    handlePostAuth(user.uid);
   } else {
+    (window as any).__currentUserId = null;
     showLogin();
   }
 });
+
+async function handlePostAuth(userId: string) {
+  const fs = (window as any).__firestore;
+  const migrationOverlay = document.getElementById("migration-overlay");
+  const sitesLoadingEl = document.getElementById("sites-loading-overlay");
+
+  const localData = localStorage.getItem("siteplan_pro_sites");
+  const alreadyMigrated = localStorage.getItem("siteplan_pro_migrated");
+
+  // Migration check
+  if (localData && !alreadyMigrated) {
+    try {
+      const parsed = JSON.parse(localData);
+      if (Object.keys(parsed).length > 0) {
+        if (migrationOverlay) migrationOverlay.classList.remove("hidden");
+        (window as any).__migrationInProgress = true;
+        await fs.migrateSitesToFirestore(userId, parsed);
+        localStorage.setItem("siteplan_pro_migrated", "true");
+        localStorage.removeItem("siteplan_pro_sites");
+        if (migrationOverlay) migrationOverlay.classList.add("hidden");
+        (window as any).__migrationInProgress = false;
+      }
+    } catch (err) {
+      console.error("Migration failed:", err);
+      if (migrationOverlay) migrationOverlay.classList.add("hidden");
+      (window as any).__migrationInProgress = false;
+      const errorEl = document.getElementById("sites-error-msg");
+      if (errorEl) {
+        errorEl.textContent =
+          "Migration encountered an issue. Your local data is safe. Some sites may not have synced.";
+        errorEl.classList.remove("hidden");
+        setTimeout(() => errorEl.classList.add("hidden"), 6000);
+      }
+    }
+  }
+
+  // Load sites from Firestore
+  try {
+    if (sitesLoadingEl) sitesLoadingEl.classList.remove("hidden");
+    const sites = await fs.getAllSites(userId);
+    (window as any).__firestoreSites = sites;
+    if (sitesLoadingEl) sitesLoadingEl.classList.add("hidden");
+    if (typeof (window as any).onFirestoreSitesLoaded === "function") {
+      (window as any).onFirestoreSitesLoaded(sites);
+    }
+  } catch (err) {
+    console.error("Failed to load sites from Firestore:", err);
+    if (sitesLoadingEl) sitesLoadingEl.classList.add("hidden");
+    const errorEl = document.getElementById("sites-error-msg");
+    if (errorEl) {
+      errorEl.textContent =
+        "Couldn't load your sites. Please check your connection and try again.";
+      errorEl.classList.remove("hidden");
+    }
+  }
+}
 
 btn.addEventListener("click", attemptLogin);
 
