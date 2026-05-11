@@ -454,6 +454,11 @@ body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-mini
             <div>
               <label style="margin-bottom:6px">Truck Court &amp; Parking</label>
               <div>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                  <label style="font-size:10px;color:var(--muted);white-space:nowrap">Fire Lane Width:</label>
+                  <input type="number" id="fire-lane-width" min="20" max="40" value="26" step="1" style="width:52px;padding:2px 4px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)">
+                  <span style="font-size:9px;color:var(--muted)">ft (default 26')</span>
+                </div>
                 <div id="cross-trailer-opts">
                   <label class="checkbox-row"><input type="checkbox" id="chk-trailer-top"> Trailer parking — top side (130→185 ft)</label>
                   <label class="checkbox-row"><input type="checkbox" id="chk-trailer-bottom"> Trailer parking — bottom side (130→185 ft)</label>
@@ -1869,6 +1874,7 @@ function registerBuilding(layer, verts) {
     tcInsetBottomLeft: 0,
     tcInsetBottomRight: 0,
     clearHeight: '40',
+    fireLaneWidth: 26,
     rotation: 0,
     scale: 100,
     // Bump out flags (at each end of building, facing truck court)
@@ -2113,6 +2119,8 @@ function showBuildingOpts() {
   if (elTT) elTT.checked = b.trailerTop;
   if (elTB) elTB.checked = b.trailerBottom;
   if (elTR) elTR.checked = b.trailerRear;
+  var elFLW = document.getElementById('fire-lane-width');
+  if (elFLW) elFLW.value = b.fireLaneWidth || 26;
   // Populate per-side parking checkboxes and depth toggles
   // Cross-dock: left, right (no top parking — truck courts on top and bottom)
   var elLeftCross = document.getElementById('chk-left-cross');
@@ -2206,9 +2214,9 @@ function selectType(type) {
   updateTrailerOpts(type);
 }
 
-function calcParkingDepth(numRows) {
+function calcParkingDepth(numRows, fireLaneW) {
   numRows = Math.max(1, Math.min(20, parseInt(numRows) || 2));
-  var SIDEWALK = 10, STALL = 20, FIRELANE = 26, CURB = 0.5;
+  var SIDEWALK = 10, STALL = 20, FIRELANE = fireLaneW || 26, CURB = 0.5;
   var depth = SIDEWALK + STALL + FIRELANE;
   for (var r = 2; r <= numRows; r++) {
     if (r % 2 === 0) {
@@ -2226,7 +2234,9 @@ function setParkingRows(inputId, labelId) {
   if (input && label) {
     var rows = Math.max(1, Math.min(20, parseInt(input.value) || 2));
     input.value = rows;
-    label.textContent = calcParkingDepth(rows) + "'";
+    var b = buildings.find(function(x){return x.id===activeBuilding});
+    var flw = (b && b.fireLaneWidth) || 26;
+    label.textContent = calcParkingDepth(rows, flw) + "'";
   }
 }
 
@@ -2332,12 +2342,20 @@ function initParkingCheckboxes() {
       el.addEventListener('input', function() { applyBuildingOptions(); });
     }
   });
+
+  // Fire lane width input
+  var flwInput = document.getElementById('fire-lane-width');
+  if (flwInput) {
+    flwInput.addEventListener('change', function() { applyBuildingOptions(); });
+    flwInput.addEventListener('input', function() { applyBuildingOptions(); });
+  }
 }
 
 function applyBuildingOptions() {
   var b = buildings.find(function(x){return x.id===activeBuilding});
   if (!b) return;
   b.type = document.getElementById('opt-cross').classList.contains('selected') ? 'cross' : 'rear';
+  b.fireLaneWidth = Math.max(20, Math.min(40, parseInt(document.getElementById('fire-lane-width').value) || 26));
   b.trailerTop = document.getElementById('chk-trailer-top').checked;
   b.trailerBottom = document.getElementById('chk-trailer-bottom').checked;
   b.trailerRear = document.getElementById('chk-trailer-rear').checked;
@@ -2490,10 +2508,11 @@ function drawBuildingOverlays(b) {
   // Per-side parking depths
   // Convert legacy string values to numeric
   function toNumRows(v) { if (typeof v === 'number') return v; return (v === 'single') ? 1 : 2; }
-  var PARK_TOP = calcParkingDepth(toNumRows(b.parkingRowsTop));
-  var PARK_LEFT = calcParkingDepth(toNumRows(b.parkingRowsLeft));
-  var PARK_RIGHT = calcParkingDepth(toNumRows(b.parkingRowsRight));
-  var PARK_MAIN = calcParkingDepth(toNumRows(b.parkingRowsMain));
+  var bldgFLW = b.fireLaneWidth || 26;
+  var PARK_TOP = calcParkingDepth(toNumRows(b.parkingRowsTop), bldgFLW);
+  var PARK_LEFT = calcParkingDepth(toNumRows(b.parkingRowsLeft), bldgFLW);
+  var PARK_RIGHT = calcParkingDepth(toNumRows(b.parkingRowsRight), bldgFLW);
+  var PARK_MAIN = calcParkingDepth(toNumRows(b.parkingRowsMain), bldgFLW);
 
   // Edge lengths in feet
   var topFt = topLen / ftToCoord;    // length of top/bottom edge in feet
@@ -2597,7 +2616,7 @@ function drawBuildingOverlays(b) {
   // numRowsOrBool: number of rows (1-4) or boolean for legacy compat (true=2, false=1)
   // insetStartFt, insetEndFt: optional insets from p1/p2 ends
   function addParkingSubZones(p1, p2, dirAlongFt, dirPerpFt, numRowsOrBool, insetStartFt, insetEndFt) {
-    var SIDEWALK = 10, STALL = 20, FIRELANE = 26, CURB = 0.5;
+    var SIDEWALK = 10, STALL = 20, FIRELANE = b.fireLaneWidth || 26, CURB = 0.5;
     // Legacy compat: convert boolean to number
     var numRows;
     if (typeof numRowsOrBool === 'boolean') {
@@ -2608,7 +2627,7 @@ function drawBuildingOverlays(b) {
       numRows = parseInt(numRowsOrBool) || 2;
     }
     numRows = Math.max(1, Math.min(20, numRows));
-    var totalDepth = calcParkingDepth(numRows);
+    var totalDepth = calcParkingDepth(numRows, b.fireLaneWidth || 26);
 
     // Apply insets to get effective edge points
     var ep1 = p1, ep2 = p2;
@@ -4491,6 +4510,7 @@ function duplicateBuilding(id) {
     tcInsetBottomLeft: src.tcInsetBottomLeft || 0,
     tcInsetBottomRight: src.tcInsetBottomRight || 0,
     clearHeight: src.clearHeight || '40',
+    fireLaneWidth: src.fireLaneWidth || 26,
     rotation: src.rotation || 0,
     scale: src.scale || 100,
     bumpTopLeft: src.bumpTopLeft || false,
@@ -4983,6 +5003,7 @@ function serializeSite() {
         tcInsetBottomLeft: b.tcInsetBottomLeft || 0,
         tcInsetBottomRight: b.tcInsetBottomRight || 0,
         clearHeight: b.clearHeight || '40',
+        fireLaneWidth: b.fireLaneWidth || 26,
         rotation: b.rotation,
         scale: b.scale,
         bumpTopLeft: b.bumpTopLeft || false,
@@ -5157,6 +5178,7 @@ function deserializeSite(data) {
         tcInsetBottomLeft: bd.tcInsetBottomLeft || 0,
         tcInsetBottomRight: bd.tcInsetBottomRight || 0,
         clearHeight: bd.clearHeight || '40',
+        fireLaneWidth: bd.fireLaneWidth || 26,
         rotation: bd.rotation || 0,
         scale: bd.scale || 100,
         bumpTopLeft: bd.bumpTopLeft || false,
