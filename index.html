@@ -2631,7 +2631,6 @@ function drawBuildingOverlays(b) {
       }
     }
 
-    var labeledTypes = {};
     // Helper to draw one sub-zone strip and return the far edge points
     function drawStrip(startP1, startP2, depth, color, opacity, strokeDash, overlayType, labelText) {
       var farP1 = offsetPt(startP1, dirAlongFt * depth, dirPerpFt * depth);
@@ -2643,19 +2642,6 @@ function drawBuildingOverlays(b) {
       });
       poly._overlayType = overlayType;
       poly.addTo(b.overlayGroup);
-
-      // Add depth label only for the first occurrence of each strip type
-      if (!labeledTypes[overlayType]) {
-        labeledTypes[overlayType] = true;
-        var mid = getMidpoint(startP1, farP1);
-        var icon = L.divIcon({
-          className: 'bldg-label label-overlay-dim',
-          html: '<div class="bldg-label-dim" style="color:#000000;font-size:9px;text-shadow:0 0 4px rgba(255,255,255,1),0 0 8px rgba(255,255,255,1),0 0 2px rgba(255,255,255,1);">' + labelText + '</div>',
-          iconSize: [60, 14], iconAnchor: [30, 7]
-        });
-        L.marker(mid, {icon: icon, interactive: false, zIndexOffset: 910}).addTo(b.overlayGroup);
-      }
-
       return { p1: farP1, p2: farP2 };
     }
 
