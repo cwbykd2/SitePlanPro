@@ -143,6 +143,11 @@ select option{background:var(--panel2)}
 #btn-adjust-site:hover{border-color:var(--warn);background:rgba(245,158,11,.1)}
 
 
+/* Truck Court Toggle Button */
+.btn-toggle-tc{width:100%;padding:8px 12px;font-size:11px;font-weight:600;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);cursor:pointer;font-family:'Syne',sans-serif;transition:all 0.2s;margin-bottom:8px}
+.btn-toggle-tc:hover{background:var(--border);border-color:var(--muted)}
+.btn-toggle-tc.active{background:rgba(59,130,246,0.15);border-color:var(--accent);color:var(--accent)}
+
 /* Stats Panel Toggle */
 .stats-section-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;user-select:none}
 .stats-section-toggle .section-label{margin:0;cursor:pointer}
@@ -557,6 +562,7 @@ body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-mini
                 Default truck court: 130 ft &bull; With trailer parking: 185 ft
               </div>
             </div>
+            <button class="btn-toggle-tc" id="btn-toggle-truckcourt" onclick="toggleTruckCourtVisibility()">Hide Truck Court</button>
             <button class="btn-primary" onclick="applyBuildingOptions()" style="width:100%">Apply Options</button>
                                               </div>
         </div>
@@ -2000,6 +2006,13 @@ function showBuildingOpts() {
 
   // Update bay configuration UI
   updateBayUIForBuilding(b);
+
+  // Sync truck court toggle button state
+  var btnTC = document.getElementById('btn-toggle-truckcourt');
+  if (btnTC) {
+    btnTC.textContent = b.truckCourtHidden ? 'Show Truck Court' : 'Hide Truck Court';
+    btnTC.classList.toggle('active', !!b.truckCourtHidden);
+  }
 }
 
 function updateTrailerOpts(type) {
@@ -2159,6 +2172,28 @@ function initParkingCheckboxes() {
   if (flwInput) {
     flwInput.addEventListener('change', function() { applyBuildingOptions(); });
     flwInput.addEventListener('input', function() { applyBuildingOptions(); });
+  }
+}
+
+function toggleTruckCourtVisibility() {
+  var b = buildings.find(function(x){return x.id===activeBuilding});
+  if (!b) return;
+  b.truckCourtHidden = !b.truckCourtHidden;
+  b.overlayGroup.eachLayer(function(o) {
+    if (o._overlayType === 'truckcourt') {
+      if (b.truckCourtHidden) {
+        o.setStyle({opacity: 0, fillOpacity: 0});
+        o._tcWasHidden = true;
+      } else {
+        o.setStyle({opacity: 1, fillOpacity: 0.35});
+        o._tcWasHidden = false;
+      }
+    }
+  });
+  var btn = document.getElementById('btn-toggle-truckcourt');
+  if (btn) {
+    btn.textContent = b.truckCourtHidden ? 'Show Truck Court' : 'Hide Truck Court';
+    btn.classList.toggle('active', b.truckCourtHidden);
   }
 }
 
@@ -2778,6 +2813,13 @@ function drawBuildingOverlays(b) {
         addBumpOutLabel(br1, br2, -1, 0, bumpDepthRR, bwRR);
       }
     }
+  }
+  if (b.truckCourtHidden) {
+    b.overlayGroup.eachLayer(function(o) {
+      if (o._overlayType === 'truckcourt') {
+        o.setStyle({opacity: 0, fillOpacity: 0});
+      }
+    });
   }
 }
 
