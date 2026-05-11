@@ -1239,9 +1239,7 @@ function updateBuildingLabels(b) {
   } else {
     totalSF = getTotalBuildingSF(b);
   }
-  var sfText = totalSF >= 1e6 ? (totalSF / 1e6).toFixed(2) + 'M SF' :
-               totalSF >= 1e3 ? (totalSF / 1e3).toFixed(1) + 'K SF' :
-               Math.round(totalSF).toLocaleString() + ' SF';
+  var sfText = Math.round(totalSF).toLocaleString() + ' SF';
   var sfIcon = L.divIcon({
     className: 'bldg-label label-bldg-sf',
     html: '<div class="bldg-label-sf-total">' + sfText + '</div>',
@@ -3177,9 +3175,7 @@ function updatePavingLabels(p) {
 
   if (p.isRect && verts.length >= 4) {
     var dims = getBuildingDimensions(verts);
-    var sfText = dims.sf >= 1e6 ? (dims.sf / 1e6).toFixed(2) + 'M SF' :
-                 dims.sf >= 1e3 ? (dims.sf / 1e3).toFixed(1) + 'K SF' :
-                 Math.round(dims.sf).toLocaleString() + ' SF';
+    var sfText = Math.round(dims.sf).toLocaleString() + ' SF';
     var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + sfText + '</div>';
 
     var sfIcon = L.divIcon({
@@ -3214,9 +3210,7 @@ function updatePavingLabels(p) {
     L.marker(depthMid, {icon: dIcon, interactive: false, zIndexOffset: 900}).addTo(p.labelGroup);
   } else {
     var sf = areaSF(p.layer);
-    var sfText = sf >= 1e6 ? (sf / 1e6).toFixed(2) + 'M SF' :
-                 sf >= 1e3 ? (sf / 1e3).toFixed(1) + 'K SF' :
-                 Math.round(sf).toLocaleString() + ' SF';
+    var sfText = Math.round(sf).toLocaleString() + ' SF';
     var labelHtml = typeLabel ? '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + typeLabel + '<br>' + sfText + '</div>' : '<div class="bldg-label-sf" style="' + pavLabelStyle + '">' + sfText + '</div>';
     var sfIcon = L.divIcon({
       className: 'bldg-label label-paving',
@@ -3922,8 +3916,6 @@ function recalcStats() {
 }
 
 function fmt(n) {
-  if (n>=1e6) return (n/1e6).toFixed(2)+'M';
-  if (n>=1e3) return (n/1e3).toFixed(1)+'K';
   return Math.round(n).toLocaleString();
 }
 
