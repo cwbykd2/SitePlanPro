@@ -4699,8 +4699,10 @@ function exportPDF() {
     bldgData.forEach(function(row, idx) {
       if (idx % 2 === 0) {
         pdf.setFillColor(20, 25, 38);
-        pdf.rect(col1, rowY, availW, rowH, 'F');
+      } else {
+        pdf.setFillColor(30, 35, 50);
       }
+      pdf.rect(col1, rowY, availW, rowH, 'F');
       pdf.setTextColor(220, 225, 235);
       var rx = col1;
       pdf.text(row.name, rx + 3, rowY + 4.2);
@@ -4717,8 +4719,10 @@ function exportPDF() {
     if (additionalCarParks > 0) {
       if (bldgData.length % 2 === 0) {
         pdf.setFillColor(20, 25, 38);
-        pdf.rect(col1, rowY, availW, rowH, 'F');
+      } else {
+        pdf.setFillColor(30, 35, 50);
       }
+      pdf.rect(col1, rowY, availW, rowH, 'F');
       pdf.setTextColor(180, 185, 195);
       var rx = col1;
       pdf.text('Additional Parking Lots', rx + 3, rowY + 4.2);
