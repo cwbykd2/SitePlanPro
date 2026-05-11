@@ -143,6 +143,13 @@ select option{background:var(--panel2)}
 #btn-adjust-site:hover{border-color:var(--warn);background:rgba(245,158,11,.1)}
 
 
+/* Stats Panel Toggle */
+.stats-section-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;user-select:none}
+.stats-section-toggle .section-label{margin:0;cursor:pointer}
+.stats-section-toggle:hover .stats-toggle-arrow{color:var(--text)}
+.stats-toggle-arrow{font-size:10px;color:var(--muted);transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);display:inline-block}
+.stats-toggle-arrow.open{transform:rotate(180deg)}
+
 /* Bay Spacing System Styles */
 .bay-config{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .bay-config-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -596,9 +603,9 @@ body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-mini
         <div id="bldg-list"><div style="font-size:11px;color:var(--muted);text-align:center;padding:12px">No buildings yet - use Building tool</div></div>
       </div>
       <div>
-        <div class="cost-section-toggle" onclick="toggleStatsPanel()">
+        <div class="stats-section-toggle" onclick="toggleStatsPanel()">
           <div class="section-label">Site Statistics</div>
-          <span class="cost-toggle-arrow" id="stats-arrow">▼</span>
+          <span class="stats-toggle-arrow" id="stats-arrow">&#9662;</span>
         </div>
         <div id="stats-panel" style="display:none;flex-direction:column;gap:6px;padding-top:6px">
           <div class="stats-grid">
