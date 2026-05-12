@@ -279,6 +279,31 @@ body.labels-minimal .label-road,body.labels-minimal .label-pond,body.labels-mini
   <button class="btn-ghost" id="btn-topo" onclick="toggleTopoLayer()" style="margin-left:auto">🏔 Elevation</button>
   <button class="btn-ghost" id="btn-nwi" onclick="toggleNWILayer()">💧 Wetlands</button>
   <button class="btn-ghost" id="btn-fema" onclick="toggleFEMALayer()">🌊 Flood</button>
+  <div class="parcels-wrapper" style="position:relative">
+    <button class="btn-ghost" id="btn-parcels" onclick="toggleParcelsLayer()">📐 Parcels</button>
+    <button class="btn-ghost" id="btn-parcels-cfg" onclick="toggleParcelsConfig(event)" title="Configure parcel source" style="padding:6px 8px;margin-left:-6px">▾</button>
+    <div id="parcels-config" class="hidden" style="position:absolute;top:100%;right:0;margin-top:4px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:10px;width:320px;z-index:10000;box-shadow:0 6px 20px rgba(0,0,0,0.4)">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Parcel Data Source</div>
+      <select id="parcels-preset" onchange="applyParcelPreset(this.value)" style="width:100%;padding:6px;font-size:11px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;margin-bottom:6px">
+        <option value="dallas">Dallas County, TX</option>
+        <option value="tarrant">Tarrant County, TX</option>
+        <option value="harris">Harris County, TX</option>
+        <option value="collin">Collin County, TX</option>
+        <option value="maricopa">Maricopa County, AZ</option>
+        <option value="losangeles">Los Angeles County, CA</option>
+        <option value="cookil">Cook County, IL</option>
+        <option value="mecklenburg">Mecklenburg County, NC</option>
+        <option value="custom">Custom ArcGIS URL…</option>
+      </select>
+      <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">ArcGIS MapServer/FeatureServer URL</label>
+      <input type="text" id="parcels-url" placeholder="https://.../MapServer" style="width:100%;padding:6px;font-size:10px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;margin-bottom:6px" />
+      <div style="display:flex;gap:6px">
+        <input type="text" id="parcels-layers" value="0" placeholder="Layer IDs (e.g. 0 or 0,1)" style="flex:1;padding:6px;font-size:10px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px" />
+        <button class="btn-primary" onclick="applyParcelsUrl()" style="padding:6px 12px;font-size:11px">Apply</button>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.4">Best zoom: 15+. Many county servers serve parcels at layer 0. Use "Custom" for other jurisdictions.</div>
+    </div>
+  </div>
   <button class="btn-ghost" id="btn-toggle-labels" onclick="toggleMinimalLabels()">SF Only</button>
   <button class="btn-ghost" id="btn-export-pdf" onclick="exportPDF()">📄 Export PDF</button>
 </header>
@@ -879,6 +904,144 @@ function toggleFEMALayer() {
     btn.style.background = 'rgba(245,158,11,0.08)';
   }
 }
+
+/* ===== PARCELS LAYER ===== */
+var PARCEL_PRESETS = {
+  dallas: { url: 'https://gis.dallascounty.org/arcgis/rest/services/Property/LandParcel/MapServer', layers: '0', type: 'export' },
+  tarrant: { url: 'https://gis.tarrantcounty.com/arcgis/rest/services/WebApps/Parcels/MapServer', layers: '0', type: 'export' },
+  harris: { url: 'https://www.gis.hctx.net/arcgis/rest/services/Parcels/Parcels/MapServer', layers: '0', type: 'export' },
+  collin: { url: 'https://gis.collincountytx.gov/arcgis/rest/services/CollinViewer/MapServer', layers: '0', type: 'export' },
+  maricopa: { url: 'https://services1.arcgis.com/mVFRs7NF4iFitgbY/arcgis/rest/services/Parcels/FeatureServer', layers: '0', type: 'export' },
+  losangeles: { url: 'https://maps.lacounty.gov/public/rest/services/LACounty_Dynamic/Parcel/MapServer', layers: '0', type: 'export' },
+  cookil: { url: 'https://gis.cookcountyil.gov/traditional/rest/services/politicalBoundary/MapServer', layers: '2', type: 'export' },
+  mecklenburg: { url: 'https://meckgis.mecklenburgcountync.gov/server/rest/services/Parcels/MapServer', layers: '0', type: 'export' }
+};
+
+var parcelsConfig = { url: PARCEL_PRESETS.dallas.url, layers: '0', type: 'export' };
+var parcelsLayer = null;
+var parcelsVisible = false;
+
+var ParcelsDynamicLayer = L.GridLayer.extend({
+  createTile: function(coords, done) {
+    var tile = document.createElement('img');
+    tile.crossOrigin = 'anonymous';
+    tile.alt = '';
+    var size = this.getTileSize();
+    var nwPoint = coords.scaleBy(size);
+    var sePoint = nwPoint.add(size);
+    var nw = this._map.unproject(nwPoint, coords.z);
+    var se = this._map.unproject(sePoint, coords.z);
+    var bbox = [
+      Math.min(nw.lng, se.lng),
+      Math.min(nw.lat, se.lat),
+      Math.max(nw.lng, se.lng),
+      Math.max(nw.lat, se.lat)
+    ].join(',');
+    var base = parcelsConfig.url.replace(/\/$/, '');
+    var url = base + '/export'
+      + '?bbox=' + bbox
+      + '&bboxSR=4326&imageSR=3857'
+      + '&size=' + size.x + ',' + size.y
+      + '&format=png32&transparent=true'
+      + '&layers=show:' + (parcelsConfig.layers || '0')
+      + '&f=image';
+    tile.onload = function() { done(null, tile); };
+    tile.onerror = function() { done(null, tile); };
+    tile.src = url;
+    return tile;
+  }
+});
+
+function buildParcelsLayer() {
+  return new ParcelsDynamicLayer({
+    opacity: 0.75,
+    attribution: 'Parcels',
+    maxZoom: 19,
+    minZoom: 13
+  });
+}
+
+function setParcelsBtnActive(active) {
+  var btn = document.getElementById('btn-parcels');
+  if (!btn) return;
+  if (active) {
+    btn.style.borderColor = '#10b981';
+    btn.style.color = '#10b981';
+    btn.style.background = 'rgba(16,185,129,0.08)';
+  } else {
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    btn.style.background = '';
+  }
+}
+
+function toggleParcelsLayer() {
+  if (parcelsVisible && parcelsLayer) {
+    map.removeLayer(parcelsLayer);
+    parcelsVisible = false;
+    setParcelsBtnActive(false);
+    return;
+  }
+  if (!parcelsLayer) parcelsLayer = buildParcelsLayer();
+  parcelsLayer.addTo(map);
+  parcelsVisible = true;
+  setParcelsBtnActive(true);
+  if (map.getZoom() < 14) {
+    setStatus('Zoom in to see parcel lines (zoom 14+)');
+  }
+}
+
+function toggleParcelsConfig(e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var cfg = document.getElementById('parcels-config');
+  if (cfg) cfg.classList.toggle('hidden');
+}
+
+function applyParcelPreset(key) {
+  var urlInput = document.getElementById('parcels-url');
+  var layersInput = document.getElementById('parcels-layers');
+  if (key === 'custom') {
+    if (urlInput) urlInput.focus();
+    return;
+  }
+  var preset = PARCEL_PRESETS[key];
+  if (!preset) return;
+  if (urlInput) urlInput.value = preset.url;
+  if (layersInput) layersInput.value = preset.layers || '0';
+  applyParcelsUrl();
+}
+
+function applyParcelsUrl() {
+  var urlInput = document.getElementById('parcels-url');
+  var layersInput = document.getElementById('parcels-layers');
+  var presetSel = document.getElementById('parcels-preset');
+  var url = (urlInput && urlInput.value || '').trim();
+  if (!url) { setStatus('Enter a parcel service URL'); return; }
+  parcelsConfig = {
+    url: url,
+    layers: (layersInput && layersInput.value || '0').trim(),
+    type: 'export'
+  };
+  var wasVisible = parcelsVisible;
+  if (parcelsLayer) { map.removeLayer(parcelsLayer); parcelsLayer = null; parcelsVisible = false; }
+  if (wasVisible) {
+    parcelsLayer = buildParcelsLayer();
+    parcelsLayer.addTo(map);
+    parcelsVisible = true;
+    setParcelsBtnActive(true);
+  }
+  setStatus('Parcel source updated');
+  var cfg = document.getElementById('parcels-config');
+  if (cfg) cfg.classList.add('hidden');
+}
+
+document.addEventListener('click', function(e) {
+  var cfg = document.getElementById('parcels-config');
+  var wrapper = document.querySelector('.parcels-wrapper');
+  if (cfg && !cfg.classList.contains('hidden') && wrapper && !wrapper.contains(e.target)) {
+    cfg.classList.add('hidden');
+  }
+});
 
 /* ===== ZOOM-RESPONSIVE LABEL SCALING ===== */
 var LABEL_BASE_ZOOM = 17;
